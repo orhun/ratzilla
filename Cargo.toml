@@ -1,0 +1,19 @@
+
+[package]
+edition = "2021"
+name = "dom-test"
+publish = false
+version = "0.0.0"
+
+[dependencies]
+wasm-bindgen = "0.2.99"
+web-sys = { version = "0.3.76", features = [
+    'Document',
+    'Element',
+    'HtmlElement',
+    'Node',
+    'Window',
+] }
+
+[lib]
+crate-type = ["cdylib"]
