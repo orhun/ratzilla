@@ -13,4 +13,8 @@ web-sys = { version = "0.3.76", features = [
     'HtmlElement',
     'Node',
     'Window',
+    'Screen',
+    'console'
 ] }
+ratatui-core = { path = "ratatui/ratatui-core", default-features = false }
+ratatui = { path = "ratatui/ratatui", default-features = false }
