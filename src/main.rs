@@ -14,8 +14,14 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
         .expect("should register `requestAnimationFrame` OK");
 }
 
-#[wasm_bindgen(start)]
-pub fn start() -> Result<(), JsValue> {
+fn create_span(document: &Document, text: &str, style: &str) -> Element {
+    let span = document.create_element("span").unwrap();
+    span.set_inner_html(text);
+    span.set_attribute("style", style).unwrap();
+    span
+}
+
+fn main() -> Result<(), JsValue> {
     // Access the document
     let window = window().unwrap();
     let document = window.document().unwrap();
@@ -124,11 +130,4 @@ pub fn start() -> Result<(), JsValue> {
     body.append_child(&div)?;
 
     Ok(())
-}
-
-fn create_span(document: &Document, text: &str, style: &str) -> Element {
-    let span = document.create_element("span").unwrap();
-    span.set_inner_html(text);
-    span.set_attribute("style", style).unwrap();
-    span
 }

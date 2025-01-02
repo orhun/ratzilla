@@ -7,24 +7,22 @@ This project is a playground for experimenting with WebAssembly (Wasm).
 Ensure you have the following installed:
 
 - Rust
-- wasm-pack
+- trunk
 
 ### Installation
 
 1. Clone the repository:
 2. Build the WebAssembly module:
    ```sh
-   wasm-pack build --target web
+   trunk build
    ```
 
 ### Running the Project
 
-To serve the project, you can use any static file server, such as Vercel's [serve](https://www.npmjs.com/package/serve).
-
 ```sh
-serve
+trunk serve
 ```
 
 ### Usage
 
-Open your browser and navigate to the address provided by `serve` to see the project in action.
+Open your browser and navigate to the address provided by `trunk` to see the project in action.
