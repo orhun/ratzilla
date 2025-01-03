@@ -35,6 +35,7 @@ impl WasmBackend {
         let window = window().unwrap();
         let document = window.document().unwrap();
         let div = document.create_element("div").unwrap();
+        div.set_attribute("id", "grid").unwrap();
         let body = document.body().unwrap();
         body.append_child(&div).unwrap();
 
