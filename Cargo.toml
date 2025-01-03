@@ -16,6 +16,6 @@ web-sys = { version = "0.3.76", features = [
     'Screen',
     'console',
 ] }
-ratatui-core = { path = "ratatui/ratatui-core", default-features = false }
-ratatui = { path = "ratatui/ratatui", default-features = false }
+ratatui = { version = "0.29", default-features = false }
 js-sys = "0.3.76"
+console_error_panic_hook = "0.1.7"

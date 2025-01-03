@@ -1,14 +1,12 @@
 use std::io::Result as IoResult;
 
+use ratatui::backend::WindowSize;
 use ratatui::buffer::Cell;
+use ratatui::layout::Position;
+use ratatui::layout::Size;
 use ratatui::prelude::Backend;
-use ratatui::style;
-use ratatui_core::backend::WindowSize;
-
-use ratatui_core::layout::Position;
-use ratatui_core::layout::Size;
-use ratatui_core::style::Color;
-use ratatui_core::style::Modifier;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
 use wasm_bindgen::JsValue;
 use web_sys::window;
 use web_sys::Document;
@@ -16,6 +14,7 @@ use web_sys::Element;
 
 use crate::utils::ansi_to_rgb;
 use crate::utils::create_cell;
+use crate::utils::get_cell_color;
 
 type TermSpan = ((Color, Color), Modifier, String);
 
@@ -36,6 +35,7 @@ impl WasmBackend {
         let window = window().unwrap();
         let document = window.document().unwrap();
         let div = document.create_element("div").unwrap();
+        div.set_attribute("id", "grid").unwrap();
         let body = document.body().unwrap();
         body.append_child(&div).unwrap();
 
@@ -49,9 +49,8 @@ impl WasmBackend {
         }
     }
 
+    // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
     fn update_grid(&mut self) {
-        // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
-
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] {
@@ -59,6 +58,7 @@ impl WasmBackend {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(&cell.symbol());
+                    elem.set_attribute("style", &get_cell_color(cell)).unwrap();
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }
