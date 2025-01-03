@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WASM Example</title>
+    <style>
+      body {
+        align-content: center;
+        height: 100vh;
+        width: 100%;
+        margin: 0;
+        font-family: "Courier New", Courier, monospace;
+        background-color: #333;
+        font-size: 16px;
+        align-content: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+      import init from "./pkg/dom_test.js";
+      init();
+    </script>
+  </body>
+</html>
