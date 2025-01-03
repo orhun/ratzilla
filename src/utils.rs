@@ -5,6 +5,13 @@ pub fn create_cell(cell: &Cell) -> Element {
     let document = web_sys::window().unwrap().document().unwrap();
     let span = document.create_element("span").unwrap();
     span.set_inner_html(cell.symbol());
+
+    let style = get_cell_color(cell);
+    span.set_attribute("style", &style).unwrap();
+    span
+}
+
+pub fn get_cell_color(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
 
@@ -27,15 +34,7 @@ pub fn create_cell(cell: &Cell) -> Element {
         }
     };
 
-    let style = format!("{} {}", fg_style, bg_style);
-
-    span.set_attribute("style", &style).unwrap();
-    span
-    // let pre = document.create_element("pre").unwrap();
-    // pre.set_attribute("style", "margin: 0px;").unwrap();
-    // pre.append_child(&span).unwrap();
-
-    // pre
+    format!("{} {}", fg_style, bg_style)
 }
 
 pub fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {

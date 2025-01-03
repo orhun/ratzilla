@@ -14,6 +14,7 @@ use web_sys::Element;
 
 use crate::utils::ansi_to_rgb;
 use crate::utils::create_cell;
+use crate::utils::get_cell_color;
 
 type TermSpan = ((Color, Color), Modifier, String);
 
@@ -47,9 +48,8 @@ impl WasmBackend {
         }
     }
 
+    // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
     fn update_grid(&mut self) {
-        // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
-
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] {
@@ -57,6 +57,7 @@ impl WasmBackend {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(&cell.symbol());
+                    elem.set_attribute("style", &get_cell_color(cell)).unwrap();
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }
