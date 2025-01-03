@@ -3,6 +3,7 @@ use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
 use ratatui::style::Color;
 use ratatui::style::Style;
+use ratatui::symbols::Marker;
 use ratatui::widgets::canvas::Canvas;
 use ratatui::widgets::canvas::Circle;
 use ratatui::widgets::Block;
@@ -51,6 +52,7 @@ impl App {
 
     fn pong_canvas(&self) -> impl Widget + '_ {
         Canvas::default()
+            .marker(Marker::Dot)
             .block(Block::bordered().title("Pong"))
             .paint(|ctx| {
                 ctx.draw(&self.ball);
