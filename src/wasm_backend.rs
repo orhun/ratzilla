@@ -2,6 +2,7 @@ use std::io::Result as IoResult;
 
 use ratatui::buffer::Cell;
 use ratatui::prelude::Backend;
+use ratatui::style;
 use ratatui_core::backend::WindowSize;
 
 use ratatui_core::layout::Position;
@@ -13,7 +14,8 @@ use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 
-use crate::utils::create_span;
+use crate::utils::ansi_to_rgb;
+use crate::utils::create_cell;
 
 type TermSpan = ((Color, Color), Modifier, String);
 
@@ -21,8 +23,11 @@ type TermSpan = ((Color, Color), Modifier, String);
 pub struct WasmBackend {
     buffer: Vec<Vec<Cell>>,
     // spans: Vec<Vec<TermSpan>>,
+    prev_buffer: Vec<Vec<Cell>>,
     grid: Element,
     document: Document,
+    cells: Vec<Element>,
+    initialized: bool,
 }
 
 impl WasmBackend {
@@ -36,9 +41,27 @@ impl WasmBackend {
 
         Self {
             buffer: get_sized_buffer(),
-
+            prev_buffer: get_sized_buffer(),
             grid: div,
             document,
+            cells: vec![],
+            initialized: false,
+        }
+    }
+
+    fn update_grid(&mut self) {
+        // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
+
+        for (y, line) in self.buffer.iter().enumerate() {
+            for (x, cell) in line.iter().enumerate() {
+                if cell != &self.prev_buffer[y][x] {
+                    // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
+                    let elem = self.cells[y * self.buffer[0].len() + x].clone();
+                    // web_sys::console::log_1(&"Element retrieved".into());
+                    elem.set_inner_html(&cell.symbol());
+                    // web_sys::console::log_1(&"Inner HTML set".into());
+                }
+            }
         }
     }
 
@@ -46,41 +69,21 @@ impl WasmBackend {
     fn prerender(&mut self) {
         web_sys::console::log_1(&"hello from prerender".into());
 
-        let mut grid: Vec<Element> = vec![];
-
-        let Some(cell) = self.buffer.first().and_then(|l| l.first()) else {
-            return;
-        };
-
-        let mut fg = cell.fg;
-        let mut bg = cell.bg;
-        let mut mods = cell.modifier;
         for line in self.buffer.iter() {
-            let mut text = String::with_capacity(line.len());
-            let mut line_buf: Vec<TermSpan> = Vec::new();
+            let mut line_cells: Vec<Element> = vec![];
             for c in line {
-                if fg != c.fg || bg != c.bg || mods != c.modifier {
-                    // Create a new node, clear the text buffer, update the foreground/background
-                    if !text.is_empty() {
-                        let span = ((fg, bg), mods, text.to_owned());
-                        line_buf.push(span);
-                    }
-                    mods = c.modifier;
-                    fg = c.fg;
-                    bg = c.bg;
-                    text.clear();
-                }
-                text.push_str(c.symbol())
+                let elem = create_cell(&c);
+                self.cells.push(elem.clone());
+                line_cells.push(elem.clone());
             }
-            // Create a new node, combine into a `pre` tag, push onto buf
-            if !text.is_empty() {
-                line_buf.push(((fg, bg), mods, text.to_owned()));
-            }
-            web_sys::console::log_1(&text.clone().into());
 
-            let elem = create_span(&self.document, &text, "color: rgb(255, 255, 255);");
-            self.grid.append_child(&elem).unwrap();
-            grid.push(elem);
+            let pre = self.document.create_element("pre").unwrap();
+            pre.set_attribute("style", "margin: 0px;").unwrap();
+
+            for elem in line_cells {
+                pre.append_child(&elem).unwrap();
+            }
+            self.grid.append_child(&pre).unwrap();
         }
     }
 }
@@ -90,7 +93,7 @@ impl Backend for WasmBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        web_sys::console::log_1(&"hello from draw".into());
+        // web_sys::console::log_1(&"hello from draw".into());
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
@@ -98,6 +101,7 @@ impl Backend for WasmBackend {
             line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
             line[x] = cell.clone();
         }
+        // web_sys::console::log_1(&"hello from draw end ".into());
         Ok(())
     }
 
@@ -134,7 +138,18 @@ impl Backend for WasmBackend {
     }
 
     fn flush(&mut self) -> IoResult<()> {
-        self.prerender();
+        if !self.initialized {
+            // web_sys::console::log_1(&"hello from flush".into());
+            self.prerender();
+            self.prev_buffer = self.buffer.clone(); // set the previous buffer to the current buffer for the first render
+            self.initialized = true;
+        }
+        // web_sys::console::log_1(&"flush1".into());
+        // check if the buffer has changed since the last render and update the grid
+        if self.buffer != self.prev_buffer {
+            self.update_grid();
+        }
+        self.prev_buffer = self.buffer.clone();
         Ok(())
     }
 
@@ -194,4 +209,16 @@ fn get_sized_buffer() -> Vec<Vec<Cell>> {
         get_window_size()
     };
     vec![vec![Cell::default(); width as usize]; height as usize]
+}
+
+pub fn show_diff(a: &[Vec<Cell>], b: &[Vec<Cell>]) {
+    let mut diff = String::new();
+    for (y, line) in a.iter().enumerate() {
+        for (x, cell) in line.iter().enumerate() {
+            if cell != &b[y][x] {
+                diff.push_str(&format!("{{{y}}},{{{x}}}: {cell:?} != {:?}\n", b[y][x]));
+            }
+        }
+    }
+    web_sys::console::log_1(&diff.into());
 }
