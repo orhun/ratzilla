@@ -12,10 +12,17 @@ Ensure you have the following installed:
 ### Installation
 
 1. Clone the repository:
-2. Build the WebAssembly module:
-   ```sh
-   trunk build
-   ```
+2. Initialize submodules:
+
+```sh
+git submodule update --init
+```
+
+3. Build the WebAssembly module:
+
+```sh
+trunk build
+```
 
 ### Running the Project
 

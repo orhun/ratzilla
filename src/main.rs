@@ -1,133 +1,121 @@
-// warning: cobbled together code from the web_sys examples and chatgpt for help with requestAnimationFrame and closures in wasm
-// here be dragons fo sho
+use ratatui::layout::Alignment;
+use ratatui::layout::Constraint;
+use ratatui::layout::Layout;
+use ratatui::style::Color;
+use ratatui::style::Style;
+use ratatui::widgets::canvas::Canvas;
+use ratatui::widgets::canvas::Circle;
+use ratatui::widgets::Block;
+use ratatui::widgets::Paragraph;
+use ratatui::widgets::Widget;
+use ratatui::Terminal;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::{window, Document, Element, HtmlElement};
+use web_sys::window;
+mod utils;
 
-fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-    window()
-        .unwrap()
-        .request_animation_frame(f.as_ref().unchecked_ref())
-        .expect("should register `requestAnimationFrame` OK");
+mod wasm_backend;
+use wasm_backend::WasmBackend;
+
+struct App {
+    count: u64,
+    some_text: String,
+    ball: Circle,
+    vx: f64,
+    vy: f64,
 }
 
-fn create_span(document: &Document, text: &str, style: &str) -> Element {
-    let span = document.create_element("span").unwrap();
-    span.set_inner_html(text);
-    span.set_attribute("style", style).unwrap();
-    span
-}
-
-fn main() -> Result<(), JsValue> {
-    // Access the document
-    let window = window().unwrap();
-    let document = window.document().unwrap();
-
-    // Create the spans
-    let span1 = create_span(&document, "Link", "color: red; font-weight: bold;");
-    let span2 = create_span(&document, "foo", "color: green; cursor: pointer;");
-    let span3 = create_span(&document, "ClickToRemove", "color: blue;");
-
-    // Wrap the first span in an <a> element
-    // NOTE: Ratatui has no Link widget atm as far as I know
-    let anchor = document.create_element("a")?;
-    anchor.set_attribute("href", "https://ratatui.rs")?;
-    anchor.append_child(&span1)?;
-
-    // Attach onclick event to the second span
-
-    let span2_clone = span2.clone();
-    let closure = Closure::wrap(Box::new(move || {
-        // toggle the text of the span between "foo" and "bar"
-
-        span2_clone.set_inner_html(if span2_clone.inner_html() == "foo" {
-            "bar"
-        } else {
-            "foo"
-        });
-    }) as Box<dyn Fn()>);
-
-    span2
-        .dyn_ref::<HtmlElement>()
-        .unwrap()
-        .set_onclick(Some(closure.as_ref().unchecked_ref()));
-    closure.forget(); // Prevent closure from being dropped
-
-    // attach remove event to the last span
-    let span3_clone = span3.clone();
-    let closure = Closure::wrap(Box::new(move || span3_clone.remove()) as Box<dyn Fn()>);
-
-    span3
-        .dyn_ref::<HtmlElement>()
-        .unwrap()
-        .set_onclick(Some(closure.as_ref().unchecked_ref()));
-    closure.forget(); // Prevent closure from being dropped
-
-    // create div to hold the grid of characters
-    let div = document.create_element("div").unwrap();
-    div.set_attribute("id", "grid").unwrap();
-
-    let x = 40;
-    let y = 50;
-    let mut grid: Vec<Element> = vec![];
-
-    // create the grid
-    for _i in 0..y {
-        for _j in 0..x {
-            let elem = create_span(&document, "A", "color: hsl(0, 100%, 50%);");
-            div.append_child(&elem).unwrap();
-            grid.push(elem);
+impl App {
+    const fn new() -> Self {
+        Self {
+            count: 0,
+            some_text: String::new(),
+            ball: Circle {
+                x: 20.0,
+                y: 20.0,
+                radius: 5.0,
+                color: Color::Red,
+            },
+            vx: 1.0,
+            vy: 1.0,
         }
-        div.append_child(&document.create_element("br").unwrap())
+    }
+    fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+        window()
+            .unwrap()
+            .request_animation_frame(f.as_ref().unchecked_ref())
             .unwrap();
     }
 
-    // Use requestAnimationFrame to change the color of the last span
-    let span3_clone = span3.clone();
-    let mut hue: i32 = 0;
+    fn pong_canvas(&self) -> impl Widget + '_ {
+        Canvas::default()
+            .block(Block::bordered().title("Pong"))
+            .paint(|ctx| {
+                ctx.draw(&self.ball);
+            })
+            .x_bounds([0.0, 50.0])
+            .y_bounds([0.0, 100.0])
+    }
 
-    let f = Rc::new(RefCell::new(None::<Closure<dyn FnMut()>>));
-    let g = f.clone();
-
-    *g.borrow_mut() = Some(Closure::new({
-        let g = g.clone();
-        move || {
-            hue = (hue + 1) % 360;
-            span3_clone
-                .set_attribute("style", &format!("color: hsl({}, 100%, 50%);", hue))
-                .unwrap();
-
-            // update the grid
-            for i in 0..y {
-                for j in 0..x {
-                    let elem = grid[i * x + j].clone();
-
-                    elem.set_attribute(
-                        "style",
-                        &format!("color: hsl({}, 100%, 50%);", hue + ((i + j) as i32) % 360),
-                    )
-                    .unwrap();
-                }
-            }
-
-            // Request the next animation frame - this is stupid, but I guess it works?
-            window
-                .request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())
-                .unwrap();
+    fn update(&mut self) {
+        if self.ball.x < 10.0 || self.ball.x > 40.0 {
+            self.vx = -self.vx;
         }
-    }));
+        if self.ball.y < 10.0 || self.ball.y > 100.0 {
+            self.vy = -self.vy;
+        }
+        self.ball.x += self.vx;
+        self.ball.y += self.vy;
+    }
+}
 
-    request_animation_frame(g.borrow().as_ref().unwrap());
+fn main() {
+    let mut terminal = Terminal::new(WasmBackend::new()).unwrap();
 
-    // Add the elements to the document body
-    let body = document.body().unwrap();
-    body.append_child(&anchor)?;
-    body.append_child(&span2)?;
-    body.append_child(&span3)?;
-    body.append_child(&div)?;
+    let mut app_state = App::new();
 
-    Ok(())
+    let cb = Rc::new(RefCell::new(None));
+
+    *cb.borrow_mut() = Some(Closure::wrap(Box::new({
+        let cb = cb.clone();
+        move || {
+            // This should repeat every frame
+            app_state.count += 1;
+            app_state.update();
+            terminal
+                .draw(|f| {
+                    let horizontal = Layout::horizontal([
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(50),
+                    ]);
+                    let vertical =
+                        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]);
+                    let [left, right] = horizontal.areas(f.area());
+                    let [draw, map] = vertical.areas(left);
+                    let [pong, boxes] = vertical.areas(right);
+
+                    f.render_widget(
+                        Paragraph::new(format!("Count: {}", app_state.count))
+                            .alignment(Alignment::Center)
+                            .block(
+                                Block::bordered().border_style(
+                                    Style::default().fg(Color::Yellow).bg(Color::Black),
+                                ),
+                            ),
+                        left,
+                    );
+                    f.render_widget(app_state.pong_canvas(), right);
+                    // web_sys::console::log_1(&"Drawing after".into());
+                })
+                .unwrap();
+
+            App::request_animation_frame(cb.borrow().as_ref().unwrap());
+        }
+    }) as Box<dyn FnMut()>));
+
+    App::request_animation_frame(cb.borrow().as_ref().unwrap());
+
+    web_sys::console::log_1(&"Done".into());
 }
