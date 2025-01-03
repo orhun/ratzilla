@@ -74,6 +74,7 @@ impl App {
 }
 
 fn main() {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let mut terminal = Terminal::new(WasmBackend::new()).unwrap();
 
     let mut app_state = App::new();
