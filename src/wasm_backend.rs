@@ -1,14 +1,12 @@
 use std::io::Result as IoResult;
 
+use ratatui::backend::WindowSize;
 use ratatui::buffer::Cell;
+use ratatui::layout::Position;
+use ratatui::layout::Size;
 use ratatui::prelude::Backend;
-use ratatui::style;
-use ratatui_core::backend::WindowSize;
-
-use ratatui_core::layout::Position;
-use ratatui_core::layout::Size;
-use ratatui_core::style::Color;
-use ratatui_core::style::Modifier;
+use ratatui::style::Color;
+use ratatui::style::Modifier;
 use wasm_bindgen::JsValue;
 use web_sys::window;
 use web_sys::Document;
