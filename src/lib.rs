@@ -5,7 +5,7 @@ use web_sys::window;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use wasm_bindgen::prelude::*;
+use web_sys::wasm_bindgen::prelude::*;
 
 mod utils;
 mod wasm_backend;
