@@ -13,11 +13,11 @@
 //! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
 //! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{cell::RefCell, error::Error, rc::Rc, time::Duration};
+use std::{cell::RefCell, error::Error, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use dom_test::{render_on_web, WasmBackend};
+use dom_test::{RenderOnWeb, WasmBackend};
 use ratatui::Terminal;
 
 mod app;
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let terminal = Terminal::new(backend).unwrap();
-    render_on_web(terminal, move |f| {
+    terminal.render_on_web(move |f| {
         app_state.borrow_mut().on_tick();
         ui::draw(f, &mut app_state.borrow_mut());
     });

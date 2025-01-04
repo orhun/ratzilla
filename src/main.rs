@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use dom_test::render_on_web;
+use dom_test::RenderOnWeb;
 use dom_test::WasmBackend;
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
@@ -79,7 +79,7 @@ fn main() {
     });
 
     let terminal = Terminal::new(backend).unwrap();
-    render_on_web(terminal, move |f| {
+    terminal.render_on_web(move |f| {
         app_state.borrow_mut().count += 1;
         app_state.borrow_mut().update();
         let horizontal =

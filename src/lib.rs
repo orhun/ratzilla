@@ -19,22 +19,30 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
         .unwrap();
 }
 
-pub fn render_on_web<F>(mut terminal: Terminal<WasmBackend>, mut render_callback: F)
-where
-    F: FnMut(&mut Frame) + 'static,
-{
-    let cb = Rc::new(RefCell::new(None));
-    *cb.borrow_mut() = Some(Closure::wrap(Box::new({
-        let cb = cb.clone();
-        move || {
-            terminal.autoresize().unwrap();
-            let mut frame = terminal.get_frame();
-            render_callback(&mut frame);
-            terminal.flush().unwrap();
-            terminal.swap_buffers();
-            terminal.backend_mut().flush().unwrap();
-            request_animation_frame(cb.borrow().as_ref().unwrap());
-        }
-    }) as Box<dyn FnMut()>));
-    request_animation_frame(cb.borrow().as_ref().unwrap());
+pub trait RenderOnWeb {
+    fn render_on_web<F>(self, render_callback: F)
+    where
+        F: FnMut(&mut Frame) + 'static;
+}
+
+impl RenderOnWeb for Terminal<WasmBackend> {
+    fn render_on_web<F>(mut self, mut render_callback: F)
+    where
+        F: FnMut(&mut Frame) + 'static,
+    {
+        let cb = Rc::new(RefCell::new(None));
+        *cb.borrow_mut() = Some(Closure::wrap(Box::new({
+            let cb = cb.clone();
+            move || {
+                self.autoresize().unwrap();
+                let mut frame = self.get_frame();
+                render_callback(&mut frame);
+                self.flush().unwrap();
+                self.swap_buffers();
+                self.backend_mut().flush().unwrap();
+                request_animation_frame(cb.borrow().as_ref().unwrap());
+            }
+        }) as Box<dyn FnMut()>));
+        request_animation_frame(cb.borrow().as_ref().unwrap());
+    }
 }
