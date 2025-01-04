@@ -13,7 +13,7 @@
 //! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
 //! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{error::Error, time::Duration};
+use std::{cell::RefCell, error::Error, rc::Rc, time::Duration};
 
 use app::App;
 use clap::Parser;
@@ -37,13 +37,22 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
-    let terminal = Terminal::new(WasmBackend::new()).unwrap();
-    let mut app_state = App::new("o7", false);
+    let app_state = Rc::new(RefCell::new(App::new("o7", false)));
+    let backend = WasmBackend::new();
+    let app_state_cloned = app_state.clone();
+    backend.on_key_event(move |event| {
+        app_state_cloned
+            .borrow_mut()
+            .on_key(event.chars().next().unwrap());
+        if event == "q" {
+            app_state_cloned.borrow_mut().on_right();
+        }
+    });
 
+    let terminal = Terminal::new(backend).unwrap();
     render_on_web(terminal, move |f| {
-        app_state.on_tick();
-        ui::draw(f, &mut app_state);
+        app_state.borrow_mut().on_tick();
+        ui::draw(f, &mut app_state.borrow_mut());
     });
 
     Ok(())

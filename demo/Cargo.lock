@@ -216,9 +216,7 @@ name = "dom-test"
 version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
- "js-sys",
  "ratatui",
- "wasm-bindgen",
  "web-sys",
 ]
 

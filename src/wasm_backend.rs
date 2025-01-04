@@ -5,6 +5,8 @@ use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
+use web_sys::wasm_bindgen::prelude::Closure;
+use web_sys::wasm_bindgen::JsCast;
 use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
 use web_sys::Document;
@@ -79,6 +81,20 @@ impl WasmBackend {
             }
             self.grid.append_child(&pre).unwrap();
         }
+    }
+
+    pub fn on_key_event<F>(&self, mut callback: F)
+    where
+        F: FnMut(&str) + 'static,
+    {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
+            web_sys::console::log_1(&event);
+            callback(&event.key());
+        });
+        self.document
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+            .unwrap();
+        closure.forget();
     }
 }
 

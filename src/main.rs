@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use dom_test::render_on_web;
 use dom_test::WasmBackend;
 use ratatui::layout::Alignment;
@@ -17,7 +20,7 @@ mod utils;
 
 struct App {
     count: u64,
-    ball: Circle,
+    pub ball: Circle,
     vx: f64,
     vy: f64,
 }
@@ -62,17 +65,28 @@ impl App {
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let terminal = Terminal::new(WasmBackend::new()).unwrap();
-    let mut app_state = App::new();
+    let app_state = Rc::new(RefCell::new(App::new()));
+    let backend = WasmBackend::new();
+    let app_state_cloned = app_state.clone();
+    backend.on_key_event(move |event| {
+        web_sys::console::log_1(&event.into());
+        if event == "a" {
+            app_state_cloned.borrow_mut().count = 0;
+            app_state_cloned.borrow_mut().ball.color = Color::Green;
+        } else if event == "b" {
+            app_state_cloned.borrow_mut().ball.color = Color::Red;
+        }
+    });
 
+    let terminal = Terminal::new(backend).unwrap();
     render_on_web(terminal, move |f| {
-        app_state.count += 1;
-        app_state.update();
+        app_state.borrow_mut().count += 1;
+        app_state.borrow_mut().update();
         let horizontal =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
         let [left, right] = horizontal.areas(f.area());
         f.render_widget(
-            Paragraph::new(format!("Count: {}", app_state.count))
+            Paragraph::new(format!("Count: {}", app_state.borrow().count))
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
@@ -80,8 +94,7 @@ fn main() {
                 ),
             left,
         );
-        f.render_widget(app_state.pong_canvas(), right);
-        web_sys::console::log_1(&"Drawing after".into());
+        f.render_widget(app_state.borrow().pong_canvas(), right);
     });
 
     web_sys::console::log_1(&"Done".into());

@@ -17,10 +17,7 @@ pub(crate) fn get_cell_color(cell: &Cell) -> String {
 
     let fg_style = match fg {
         Some(color) => format!("color: rgb({}, {}, {});", color.0, color.1, color.2),
-        None => {
-            web_sys::console::log_1(&"Invalid color".into());
-            "color: rgb(255, 255, 255);".to_string()
-        }
+        None => "color: rgb(255, 255, 255);".to_string(),
     };
 
     let bg_style = match bg {
@@ -28,10 +25,7 @@ pub(crate) fn get_cell_color(cell: &Cell) -> String {
             "background-color: rgb({}, {}, {});",
             color.0, color.1, color.2
         ),
-        None => {
-            web_sys::console::log_1(&"Invalid color".into());
-            "background-color: transparent;".to_string()
-        }
+        None => "background-color: transparent;".to_string(),
     };
 
     format!("{} {}", fg_style, bg_style)
