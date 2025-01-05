@@ -12,8 +12,9 @@ use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 
-use crate::utils::create_cell;
+use crate::utils::create_span;
 use crate::utils::get_cell_color;
+use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
 pub struct WasmBackend {
@@ -49,6 +50,9 @@ impl WasmBackend {
     fn update_grid(&mut self) {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
+                if cell.modifier.contains(HYPERLINK) {
+                    continue;
+                }
                 if cell != &self.prev_buffer[y][x] {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
@@ -66,19 +70,59 @@ impl WasmBackend {
         web_sys::console::log_1(&"hello from prerender".into());
 
         for line in self.buffer.iter() {
-            let mut line_cells: Vec<Element> = vec![];
-            for c in line {
-                let elem = create_cell(&c);
-                self.cells.push(elem.clone());
-                line_cells.push(elem.clone());
+            let mut line_cells: Vec<Element> = Vec::new();
+            let mut hyperlink: Vec<Cell> = Vec::new();
+            let mut anchor_element: Option<Element> = None;
+            for (i, cell) in line.iter().enumerate() {
+                if cell.modifier.contains(HYPERLINK) {
+                    // Start a new hyperlink
+                    if hyperlink.is_empty() {
+                        anchor_element = Some(self.document.create_element("a").unwrap());
+                    }
+                    hyperlink.push(cell.clone());
+                    // If the next cell is not part of the hyperlink, close it
+                    if !line
+                        .get(i + 1)
+                        .map(|c| c.modifier.contains(HYPERLINK))
+                        .unwrap_or(false)
+                    {
+                        // Close the hyperlink by appending the accumulated cells to <a> and clearing the state
+                        if let Some(anchor) = anchor_element.take() {
+                            anchor
+                                .set_attribute(
+                                    "href",
+                                    &hyperlink.iter().map(|c| c.symbol()).collect::<String>(),
+                                )
+                                .unwrap();
+                            anchor
+                                .set_attribute("style", &get_cell_color(&cell))
+                                .unwrap();
+                            for link_cell in &hyperlink {
+                                let elem = create_span(link_cell);
+                                self.cells.push(elem.clone());
+                                anchor.append_child(&elem).unwrap();
+                            }
+                            line_cells.push(anchor.clone());
+                            hyperlink.clear();
+                        }
+                    }
+                } else {
+                    let elem = create_span(cell);
+                    self.cells.push(elem.clone());
+                    line_cells.push(elem);
+                }
             }
 
+            // Create a <pre> element for the line
             let pre = self.document.create_element("pre").unwrap();
             pre.set_attribute("style", "margin: 0px;").unwrap();
 
+            // Append all elements (spans and anchors) to the <pre>
             for elem in line_cells {
                 pre.append_child(&elem).unwrap();
             }
+
+            // Append the <pre> to the grid
             self.grid.append_child(&pre).unwrap();
         }
     }

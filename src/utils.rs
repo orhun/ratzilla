@@ -1,7 +1,7 @@
 use ratatui::{buffer::Cell, style::Color};
 use web_sys::Element;
 
-pub(crate) fn create_cell(cell: &Cell) -> Element {
+pub(crate) fn create_span(cell: &Cell) -> Element {
     let document = web_sys::window().unwrap().document().unwrap();
     let span = document.create_element("span").unwrap();
     span.set_inner_html(cell.symbol());

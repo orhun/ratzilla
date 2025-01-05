@@ -9,6 +9,7 @@ use web_sys::wasm_bindgen::prelude::*;
 
 mod utils;
 mod wasm_backend;
+pub mod widgets;
 
 pub use wasm_backend::WasmBackend;
 

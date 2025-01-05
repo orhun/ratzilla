@@ -6,6 +6,7 @@ use dom_test::WasmBackend;
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
+use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::symbols::Marker;
@@ -15,8 +16,10 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::Terminal;
+use widgets::Hyperlink;
 
 mod utils;
+mod widgets;
 
 struct App {
     count: u64,
@@ -89,6 +92,7 @@ fn main() {
         let horizontal =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
         let [left, right] = horizontal.areas(f.area());
+
         f.render_widget(
             Paragraph::new(format!("Count: {}", app_state.count))
                 .alignment(Alignment::Center)
@@ -99,6 +103,9 @@ fn main() {
             left,
         );
         f.render_widget(app_state.pong_canvas(), right);
+
+        let link = Hyperlink::new("https://orhun.dev");
+        f.render_widget(link, Rect::new(75, 10, 20, 1));
     });
 
     web_sys::console::log_1(&"Done".into());
