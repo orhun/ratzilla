@@ -37,22 +37,24 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let app_state = Rc::new(RefCell::new(App::new("o7", false)));
+    let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
     let backend = WasmBackend::new();
-    let app_state_cloned = app_state.clone();
-    backend.on_key_event(move |event| {
-        app_state_cloned
-            .borrow_mut()
-            .on_key(event.chars().next().unwrap());
-        if event == "q" {
-            app_state_cloned.borrow_mut().on_right();
+    backend.on_key_event({
+        let app_state_cloned = app_state.clone();
+        move |event| {
+            let mut app_state = app_state_cloned.borrow_mut();
+            app_state.on_key(event.chars().next().unwrap());
+            if event == "q" {
+                app_state.on_right();
+            }
         }
     });
 
     let terminal = Terminal::new(backend).unwrap();
     terminal.render_on_web(move |f| {
-        app_state.borrow_mut().on_tick();
-        ui::draw(f, &mut app_state.borrow_mut());
+        let mut app_state = app_state.borrow_mut();
+        app_state.on_tick();
+        ui::draw(f, &mut app_state);
     });
 
     Ok(())

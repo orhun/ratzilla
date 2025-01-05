@@ -67,26 +67,30 @@ fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
     let backend = WasmBackend::new();
-    let app_state_cloned = app_state.clone();
-    backend.on_key_event(move |event| {
-        web_sys::console::log_1(&event.into());
-        if event == "a" {
-            app_state_cloned.borrow_mut().count = 0;
-            app_state_cloned.borrow_mut().ball.color = Color::Green;
-        } else if event == "b" {
-            app_state_cloned.borrow_mut().ball.color = Color::Red;
+    backend.on_key_event({
+        let app_state_cloned = app_state.clone();
+        move |event| {
+            let mut app_state = app_state_cloned.borrow_mut();
+            web_sys::console::log_1(&event.into());
+            if event == "a" {
+                app_state.count = 0;
+                app_state.ball.color = Color::Green;
+            } else if event == "b" {
+                app_state.ball.color = Color::Red;
+            }
         }
     });
 
     let terminal = Terminal::new(backend).unwrap();
     terminal.render_on_web(move |f| {
-        app_state.borrow_mut().count += 1;
-        app_state.borrow_mut().update();
+        let mut app_state = app_state.borrow_mut();
+        app_state.count += 1;
+        app_state.update();
         let horizontal =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
         let [left, right] = horizontal.areas(f.area());
         f.render_widget(
-            Paragraph::new(format!("Count: {}", app_state.borrow().count))
+            Paragraph::new(format!("Count: {}", app_state.count))
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
@@ -94,7 +98,7 @@ fn main() {
                 ),
             left,
         );
-        f.render_widget(app_state.borrow().pong_canvas(), right);
+        f.render_widget(app_state.pong_canvas(), right);
     });
 
     web_sys::console::log_1(&"Done".into());
