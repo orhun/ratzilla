@@ -52,3 +52,10 @@ pub fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
         _ => None, // Handle invalid color names
     }
 }
+pub fn set_document_title(title: &str) {
+    web_sys::window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .set_title(title);
+}
