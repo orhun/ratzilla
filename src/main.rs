@@ -16,6 +16,7 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::Terminal;
+use utils::set_document_title;
 use widgets::Hyperlink;
 
 mod utils;
@@ -75,6 +76,12 @@ fn main() {
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
             web_sys::console::log_1(&event.into());
+            if event == "q" {
+                set_document_title("Grind to win");
+            }
+            if event == "t" {
+                set_document_title("RATAUI ! ! !");
+            }
             if event == "a" {
                 app_state.count = 0;
                 app_state.ball.color = Color::Green;
