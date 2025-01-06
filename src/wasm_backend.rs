@@ -5,23 +5,20 @@ use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
-use ratatui::style::Color;
-use ratatui::style::Modifier;
-use wasm_bindgen::JsValue;
+use web_sys::wasm_bindgen::prelude::Closure;
+use web_sys::wasm_bindgen::JsCast;
+use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 
-use crate::utils::ansi_to_rgb;
-use crate::utils::create_cell;
+use crate::utils::create_span;
 use crate::utils::get_cell_color;
-
-type TermSpan = ((Color, Color), Modifier, String);
+use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
 pub struct WasmBackend {
     buffer: Vec<Vec<Cell>>,
-    // spans: Vec<Vec<TermSpan>>,
     prev_buffer: Vec<Vec<Cell>>,
     grid: Element,
     document: Document,
@@ -53,6 +50,9 @@ impl WasmBackend {
     fn update_grid(&mut self) {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
+                if cell.modifier.contains(HYPERLINK) {
+                    continue;
+                }
                 if cell != &self.prev_buffer[y][x] {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
@@ -70,21 +70,75 @@ impl WasmBackend {
         web_sys::console::log_1(&"hello from prerender".into());
 
         for line in self.buffer.iter() {
-            let mut line_cells: Vec<Element> = vec![];
-            for c in line {
-                let elem = create_cell(&c);
-                self.cells.push(elem.clone());
-                line_cells.push(elem.clone());
+            let mut line_cells: Vec<Element> = Vec::new();
+            let mut hyperlink: Vec<Cell> = Vec::new();
+            let mut anchor_element: Option<Element> = None;
+            for (i, cell) in line.iter().enumerate() {
+                if cell.modifier.contains(HYPERLINK) {
+                    // Start a new hyperlink
+                    if hyperlink.is_empty() {
+                        anchor_element = Some(self.document.create_element("a").unwrap());
+                    }
+                    hyperlink.push(cell.clone());
+                    // If the next cell is not part of the hyperlink, close it
+                    if !line
+                        .get(i + 1)
+                        .map(|c| c.modifier.contains(HYPERLINK))
+                        .unwrap_or(false)
+                    {
+                        // Close the hyperlink by appending the accumulated cells to <a> and clearing the state
+                        if let Some(anchor) = anchor_element.take() {
+                            anchor
+                                .set_attribute(
+                                    "href",
+                                    &hyperlink.iter().map(|c| c.symbol()).collect::<String>(),
+                                )
+                                .unwrap();
+                            anchor
+                                .set_attribute("style", &get_cell_color(&cell))
+                                .unwrap();
+                            for link_cell in &hyperlink {
+                                let elem = create_span(link_cell);
+                                self.cells.push(elem.clone());
+                                anchor.append_child(&elem).unwrap();
+                            }
+                            line_cells.push(anchor.clone());
+                            hyperlink.clear();
+                        }
+                    }
+                } else {
+                    let elem = create_span(cell);
+                    self.cells.push(elem.clone());
+                    line_cells.push(elem);
+                }
             }
 
+            // Create a <pre> element for the line
             let pre = self.document.create_element("pre").unwrap();
             pre.set_attribute("style", "margin: 0px;").unwrap();
 
+            // Append all elements (spans and anchors) to the <pre>
             for elem in line_cells {
                 pre.append_child(&elem).unwrap();
             }
+
+            // Append the <pre> to the grid
             self.grid.append_child(&pre).unwrap();
         }
+    }
+
+    pub fn on_key_event<F>(&self, mut callback: F)
+    where
+        F: FnMut(&str) + 'static,
+    {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
+            web_sys::console::log_1(&event);
+            callback(&event.key());
+        });
+        self.document
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+            .unwrap();
+        closure.forget();
     }
 }
 
@@ -163,13 +217,13 @@ impl Backend for WasmBackend {
 }
 
 /// Calculates the number of characters that can fit in the window.
-pub fn get_window_size() -> (u16, u16) {
+fn get_window_size() -> (u16, u16) {
     let (w, h) = get_raw_window_size();
     // These are mildly magical numbers... make them more precise
     (w / 10, h / 20)
 }
 
-pub(crate) fn get_raw_window_size() -> (u16, u16) {
+fn get_raw_window_size() -> (u16, u16) {
     fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
         val.as_f64().and_then(|i| I::try_from(i as usize).ok())
     }
@@ -185,18 +239,18 @@ pub(crate) fn get_raw_window_size() -> (u16, u16) {
 }
 
 // TODO: Improve this...
-pub(crate) fn is_mobile() -> bool {
+fn is_mobile() -> bool {
     get_raw_screen_size().0 < 550
 }
 
 /// Calculates the number of pixels that can fit in the window.
-pub fn get_raw_screen_size() -> (i32, i32) {
+fn get_raw_screen_size() -> (i32, i32) {
     let s = web_sys::window().unwrap().screen().unwrap();
     (s.width().unwrap(), s.height().unwrap())
 }
 
 /// Calculates the number of characters that can fit in the window.
-pub fn get_screen_size() -> (u16, u16) {
+fn get_screen_size() -> (u16, u16) {
     let (w, h) = get_raw_screen_size();
     // These are mildly magical numbers... make them more precise
     (w as u16 / 10, h as u16 / 19)
@@ -211,7 +265,7 @@ fn get_sized_buffer() -> Vec<Vec<Cell>> {
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
-pub fn show_diff(a: &[Vec<Cell>], b: &[Vec<Cell>]) {
+fn show_diff(a: &[Vec<Cell>], b: &[Vec<Cell>]) {
     let mut diff = String::new();
     for (y, line) in a.iter().enumerate() {
         for (x, cell) in line.iter().enumerate() {

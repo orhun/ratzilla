@@ -1,6 +1,12 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use dom_test::RenderOnWeb;
+use dom_test::WasmBackend;
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
+use ratatui::layout::Rect;
 use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::symbols::Marker;
@@ -10,20 +16,14 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::Terminal;
+use widgets::Hyperlink;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use wasm_bindgen::prelude::*;
-use web_sys::window;
 mod utils;
-
-mod wasm_backend;
-use wasm_backend::WasmBackend;
+mod widgets;
 
 struct App {
     count: u64,
-    some_text: String,
-    ball: Circle,
+    pub ball: Circle,
     vx: f64,
     vy: f64,
 }
@@ -32,7 +32,6 @@ impl App {
     const fn new() -> Self {
         Self {
             count: 0,
-            some_text: String::new(),
             ball: Circle {
                 x: 20.0,
                 y: 20.0,
@@ -42,12 +41,6 @@ impl App {
             vx: 1.0,
             vy: 1.0,
         }
-    }
-    fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-        window()
-            .unwrap()
-            .request_animation_frame(f.as_ref().unchecked_ref())
-            .unwrap();
     }
 
     fn pong_canvas(&self) -> impl Widget + '_ {
@@ -75,50 +68,45 @@ impl App {
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let mut terminal = Terminal::new(WasmBackend::new()).unwrap();
-
-    let mut app_state = App::new();
-
-    let cb = Rc::new(RefCell::new(None));
-
-    *cb.borrow_mut() = Some(Closure::wrap(Box::new({
-        let cb = cb.clone();
-        move || {
-            // This should repeat every frame
-            app_state.count += 1;
-            app_state.update();
-            terminal
-                .draw(|f| {
-                    let horizontal = Layout::horizontal([
-                        Constraint::Percentage(50),
-                        Constraint::Percentage(50),
-                    ]);
-                    let vertical =
-                        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]);
-                    let [left, right] = horizontal.areas(f.area());
-                    let [draw, map] = vertical.areas(left);
-                    let [pong, boxes] = vertical.areas(right);
-
-                    f.render_widget(
-                        Paragraph::new(format!("Count: {}", app_state.count))
-                            .alignment(Alignment::Center)
-                            .block(
-                                Block::bordered().border_style(
-                                    Style::default().fg(Color::Yellow).bg(Color::Black),
-                                ),
-                            ),
-                        left,
-                    );
-                    f.render_widget(app_state.pong_canvas(), right);
-                    // web_sys::console::log_1(&"Drawing after".into());
-                })
-                .unwrap();
-
-            App::request_animation_frame(cb.borrow().as_ref().unwrap());
+    let app_state = Rc::new(RefCell::new(App::new()));
+    let backend = WasmBackend::new();
+    backend.on_key_event({
+        let app_state_cloned = app_state.clone();
+        move |event| {
+            let mut app_state = app_state_cloned.borrow_mut();
+            web_sys::console::log_1(&event.into());
+            if event == "a" {
+                app_state.count = 0;
+                app_state.ball.color = Color::Green;
+            } else if event == "b" {
+                app_state.ball.color = Color::Red;
+            }
         }
-    }) as Box<dyn FnMut()>));
+    });
 
-    App::request_animation_frame(cb.borrow().as_ref().unwrap());
+    let terminal = Terminal::new(backend).unwrap();
+    terminal.render_on_web(move |f| {
+        let mut app_state = app_state.borrow_mut();
+        app_state.count += 1;
+        app_state.update();
+        let horizontal =
+            Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
+        let [left, right] = horizontal.areas(f.area());
+
+        f.render_widget(
+            Paragraph::new(format!("Count: {}", app_state.count))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::bordered()
+                        .border_style(Style::default().fg(Color::Yellow).bg(Color::Black)),
+                ),
+            left,
+        );
+        f.render_widget(app_state.pong_canvas(), right);
+
+        let link = Hyperlink::new("https://orhun.dev");
+        f.render_widget(link, Rect::new(75, 10, 20, 1));
+    });
 
     web_sys::console::log_1(&"Done".into());
 }

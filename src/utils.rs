@@ -1,7 +1,7 @@
 use ratatui::{buffer::Cell, style::Color};
 use web_sys::Element;
 
-pub fn create_cell(cell: &Cell) -> Element {
+pub(crate) fn create_span(cell: &Cell) -> Element {
     let document = web_sys::window().unwrap().document().unwrap();
     let span = document.create_element("span").unwrap();
     span.set_inner_html(cell.symbol());
@@ -11,16 +11,13 @@ pub fn create_cell(cell: &Cell) -> Element {
     span
 }
 
-pub fn get_cell_color(cell: &Cell) -> String {
+pub(crate) fn get_cell_color(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
 
     let fg_style = match fg {
         Some(color) => format!("color: rgb({}, {}, {});", color.0, color.1, color.2),
-        None => {
-            web_sys::console::log_1(&"Invalid color".into());
-            "color: rgb(255, 255, 255);".to_string()
-        }
+        None => "color: rgb(255, 255, 255);".to_string(),
     };
 
     let bg_style = match bg {
@@ -28,10 +25,7 @@ pub fn get_cell_color(cell: &Cell) -> String {
             "background-color: rgb({}, {}, {});",
             color.0, color.1, color.2
         ),
-        None => {
-            web_sys::console::log_1(&"Invalid color".into());
-            "background-color: transparent;".to_string()
-        }
+        None => "background-color: transparent;".to_string(),
     };
 
     format!("{} {}", fg_style, bg_style)
