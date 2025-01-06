@@ -14,6 +14,8 @@ use web_sys::Element;
 
 use crate::utils::create_span;
 use crate::utils::get_cell_color;
+use crate::utils::get_document_mode;
+use crate::utils::DocumentMode;
 use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
@@ -24,6 +26,7 @@ pub struct WasmBackend {
     document: Document,
     cells: Vec<Element>,
     initialized: bool,
+    document_mode: DocumentMode,
 }
 
 impl WasmBackend {
@@ -36,6 +39,8 @@ impl WasmBackend {
         let body = document.body().unwrap();
         body.append_child(&div).unwrap();
 
+        let document_mode = get_document_mode();
+
         Self {
             buffer: get_sized_buffer(),
             prev_buffer: get_sized_buffer(),
@@ -43,6 +48,7 @@ impl WasmBackend {
             document,
             cells: vec![],
             initialized: false,
+            document_mode,
         }
     }
 
@@ -58,7 +64,8 @@ impl WasmBackend {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(&cell.symbol());
-                    elem.set_attribute("style", &get_cell_color(cell)).unwrap();
+                    elem.set_attribute("style", &get_cell_color(cell, &self.document_mode))
+                        .unwrap();
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }
@@ -95,10 +102,10 @@ impl WasmBackend {
                                 )
                                 .unwrap();
                             anchor
-                                .set_attribute("style", &get_cell_color(&cell))
+                                .set_attribute("style", &get_cell_color(&cell, &self.document_mode))
                                 .unwrap();
                             for link_cell in &hyperlink {
-                                let elem = create_span(link_cell);
+                                let elem = create_span(link_cell, &self.document_mode);
                                 self.cells.push(elem.clone());
                                 anchor.append_child(&elem).unwrap();
                             }
@@ -107,7 +114,7 @@ impl WasmBackend {
                         }
                     }
                 } else {
-                    let elem = create_span(cell);
+                    let elem = create_span(cell, &self.document_mode);
                     self.cells.push(elem.clone());
                     line_cells.push(elem);
                 }

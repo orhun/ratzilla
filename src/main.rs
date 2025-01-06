@@ -16,6 +16,7 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::Terminal;
+use utils::get_document_mode;
 use utils::set_document_title;
 use widgets::Hyperlink;
 
@@ -68,6 +69,14 @@ impl App {
 }
 
 fn main() {
+    let mode = get_document_mode();
+    if mode.dark {
+        web_sys::console::log_1(&"dark mode".into());
+    }
+    if mode.light {
+        web_sys::console::log_1(&"light mode".into());
+    }
+
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
     let backend = WasmBackend::new();
