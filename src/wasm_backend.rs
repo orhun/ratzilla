@@ -12,8 +12,11 @@ use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 
+use crate::utils::ansi_to_class;
 use crate::utils::create_span;
 use crate::utils::get_cell_color;
+use crate::utils::inject_base_style;
+use crate::utils::CssStyle;
 use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
@@ -35,6 +38,7 @@ impl WasmBackend {
         div.set_attribute("id", "grid").unwrap();
         let body = document.body().unwrap();
         body.append_child(&div).unwrap();
+        inject_base_style(CssStyle::default()).unwrap();
 
         Self {
             buffer: get_sized_buffer(),
@@ -56,9 +60,18 @@ impl WasmBackend {
                 if cell != &self.prev_buffer[y][x] {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(&cell.symbol());
-                    elem.set_attribute("style", &get_cell_color(cell)).unwrap();
+                    // TODO: check if we really need to set the class names here,
+                    // maybe we can keep previous class names and just add the new ones? or maybe not?
+                    // TODO: ansi_to_class is nice, but what about user defined colors?
+                    let class = format!(
+                        "{} {}",
+                        ansi_to_class(cell.fg, false),
+                        ansi_to_class(cell.bg, true)
+                    );
+                    // diff the class names and add the new class name to the element
+                    elem.set_attribute("class", &class).unwrap();
+
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }
@@ -115,7 +128,6 @@ impl WasmBackend {
 
             // Create a <pre> element for the line
             let pre = self.document.create_element("pre").unwrap();
-            pre.set_attribute("style", "margin: 0px;").unwrap();
 
             // Append all elements (spans and anchors) to the <pre>
             for elem in line_cells {

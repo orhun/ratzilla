@@ -207,6 +207,7 @@ pub(crate) fn inject_base_style(style_options: CssStyle) -> Result<(), JsValue> 
     // add a default color class name for unset colors
     style.push_str(".bg-default { background-color: transparent; }");
 
+    // define light mode and dark mode styles
     let light_fg = style_options.modes.light.foreground;
     let light_bg = style_options.modes.light.background;
     let default_colors_light = format!(
@@ -218,6 +219,7 @@ pub(crate) fn inject_base_style(style_options: CssStyle) -> Result<(), JsValue> 
     "#,
         light_fg.0, light_fg.1, light_fg.2
     );
+
     let default_bg_light = format!(
         r#"
         @media (prefers-color-scheme: light) {{
