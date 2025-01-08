@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::wasm_bindgen::prelude::*;
 
+mod backend;
 pub mod utils;
-mod wasm_backend;
 pub mod widgets;
 
-pub use wasm_backend::WasmBackend;
+pub use backend::WasmBackend;
 
 fn request_animation_frame(f: &Closure<dyn FnMut()>) {
     window()
