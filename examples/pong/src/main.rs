@@ -1,8 +1,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use dom_test::utils::set_document_title;
+use dom_test::widgets::Hyperlink;
 use dom_test::RenderOnWeb;
 use dom_test::WasmBackend;
+
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
@@ -16,11 +19,6 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::Terminal;
-use utils::set_document_title;
-use widgets::Hyperlink;
-
-mod utils;
-mod widgets;
 
 struct App {
     count: u64,
@@ -37,7 +35,7 @@ impl App {
                 x: 20.0,
                 y: 20.0,
                 radius: 5.0,
-                color: Color::Red,
+                color: Color::Green,
             },
             vx: 1.0,
             vy: 1.0,
@@ -75,12 +73,11 @@ fn main() {
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
-            web_sys::console::log_1(&event.into());
             if event == "q" {
                 set_document_title("Grind to win");
             }
-            if event == "t" {
-                set_document_title("RATAUI ! ! !");
+            if event == "r" {
+                set_document_title("RATATUI ! ! !");
             }
             if event == "a" {
                 app_state.count = 0;
@@ -114,6 +111,4 @@ fn main() {
         let link = Hyperlink::new("https://orhun.dev");
         f.render_widget(link, Rect::new(75, 10, 20, 1));
     });
-
-    web_sys::console::log_1(&"Done".into());
 }

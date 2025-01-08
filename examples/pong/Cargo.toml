@@ -1,0 +1,10 @@
+[package]
+name = "pong"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ratatui = { version = "0.29", default-features = false }
+dom-test = { path = "../../" }
+console_error_panic_hook = "0.1.7"
