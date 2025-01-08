@@ -24,6 +24,12 @@ pub struct WasmBackend {
     document: Document,
 }
 
+impl Default for WasmBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WasmBackend {
     pub fn new() -> Self {
         // use this time to initialize the grid and the document object for the backend to use later on
@@ -100,7 +106,7 @@ impl WasmBackend {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     // web_sys::console::log_1(&"Element retrieved".into());
-                    elem.set_inner_html(&cell.symbol());
+                    elem.set_inner_html(cell.symbol());
                     elem.set_attribute("style", &get_cell_color(cell)).unwrap();
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }

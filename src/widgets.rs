@@ -15,7 +15,7 @@ impl<'a> Hyperlink<'a> {
     }
 }
 
-impl<'a> Widget for Hyperlink<'a> {
+impl Widget for Hyperlink<'_> {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized,
