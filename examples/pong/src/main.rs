@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use dom_test::utils::set_document_title;
-use dom_test::widgets::Hyperlink;
-use dom_test::RenderOnWeb;
-use dom_test::WasmBackend;
+use ratzilla::utils::set_document_title;
+use ratzilla::widgets::Hyperlink;
+use ratzilla::RenderOnWeb;
+use ratzilla::WasmBackend;
 
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
