@@ -7,13 +7,11 @@ use ratatui::layout::Size;
 use ratatui::prelude::Backend;
 use web_sys::wasm_bindgen::prelude::Closure;
 use web_sys::wasm_bindgen::JsCast;
-use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 
-use crate::utils::create_span;
-use crate::utils::get_cell_color;
+use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
@@ -214,65 +212,4 @@ impl Backend for WasmBackend {
     fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
         todo!()
     }
-}
-
-/// Calculates the number of characters that can fit in the window.
-fn get_window_size() -> (u16, u16) {
-    let (w, h) = get_raw_window_size();
-    // These are mildly magical numbers... make them more precise
-    (w / 10, h / 20)
-}
-
-fn get_raw_window_size() -> (u16, u16) {
-    fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
-        val.as_f64().and_then(|i| I::try_from(i as usize).ok())
-    }
-
-    web_sys::window()
-        .and_then(|s| {
-            s.inner_width()
-                .ok()
-                .and_then(js_val_to_int::<u16>)
-                .zip(s.inner_height().ok().and_then(js_val_to_int::<u16>))
-        })
-        .unwrap_or((120, 120))
-}
-
-// TODO: Improve this...
-fn is_mobile() -> bool {
-    get_raw_screen_size().0 < 550
-}
-
-/// Calculates the number of pixels that can fit in the window.
-fn get_raw_screen_size() -> (i32, i32) {
-    let s = web_sys::window().unwrap().screen().unwrap();
-    (s.width().unwrap(), s.height().unwrap())
-}
-
-/// Calculates the number of characters that can fit in the window.
-fn get_screen_size() -> (u16, u16) {
-    let (w, h) = get_raw_screen_size();
-    // These are mildly magical numbers... make them more precise
-    (w as u16 / 10, h as u16 / 19)
-}
-
-fn get_sized_buffer() -> Vec<Vec<Cell>> {
-    let (width, height) = if is_mobile() {
-        get_screen_size()
-    } else {
-        get_window_size()
-    };
-    vec![vec![Cell::default(); width as usize]; height as usize]
-}
-
-fn show_diff(a: &[Vec<Cell>], b: &[Vec<Cell>]) {
-    let mut diff = String::new();
-    for (y, line) in a.iter().enumerate() {
-        for (x, cell) in line.iter().enumerate() {
-            if cell != &b[y][x] {
-                diff.push_str(&format!("{{{y}}},{{{x}}}: {cell:?} != {:?}\n", b[y][x]));
-            }
-        }
-    }
-    web_sys::console::log_1(&diff.into());
 }
