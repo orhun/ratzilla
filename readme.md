@@ -1,35 +1,78 @@
-# WebAssembly Test Project
+# Ratzilla
 
-This project is a playground for experimenting with WebAssembly (Wasm).
+Build terminal-themed web applications with Rust and WebAssembly. Powered by [Ratatui].
 
-### Prerequisites
+## Quickstart
 
-Ensure you have the following installed:
-
-- Rust
-- trunk
-
-### Installation
-
-1. Clone the repository:
-2. Initialize submodules:
+Add Ratzilla as a dependency in your `Cargo.toml`:
 
 ```sh
-git submodule update --init
+cargo add ratzilla
 ```
 
-3. Build the WebAssembly module:
+Here is a minimal example:
+
+```rust
+use std::cell::RefCell;
+use std::io;
+use std::rc::Rc;
+
+use ratzilla::{RenderOnWeb, WasmBackend};
+
+use ratatui::layout::Alignment;
+use ratatui::style::Color;
+use ratatui::widgets::{Block, Paragraph};
+use ratatui::Terminal;
+
+fn main() -> io::Result<()> {
+    let counter = Rc::new(RefCell::new(0));
+    let backend = WasmBackend::new();
+    let terminal = Terminal::new(backend)?;
+
+    terminal.on_key_event({
+        let counter_cloned = counter.clone();
+        move |event| {
+            if event == " " {
+                let mut counter = counter_cloned.borrow_mut();
+                *counter += 1;
+            }
+        }
+    });
+
+    terminal.render_on_web(move |f| {
+        let counter = counter.borrow();
+        f.render_widget(
+            Paragraph::new(format!("Count: {counter}"))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::bordered()
+                        .title("Ratzilla")
+                        .title_alignment(Alignment::Center)
+                        .border_style(Color::Yellow),
+                ),
+            f.area(),
+        );
+    });
+
+    Ok(())
+}
+```
+
+Ratzilla uses [trunk] to build and serve the web application.
+
+Install trunk with:
 
 ```sh
-trunk build
+cargo install --locked trunk
 ```
 
-### Running the Project
+Then serve it on your browser:
 
 ```sh
 trunk serve
 ```
 
-### Usage
+Now go to `http://localhost:8080` and keep cooking!
 
-Open your browser and navigate to the address provided by `trunk` to see the project in action.
+[trunk]: https://trunkrs.dev
+[Ratatui]: https://ratatui.rs
