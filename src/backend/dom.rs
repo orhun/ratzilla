@@ -1,24 +1,30 @@
+use std::cell::RefCell;
 use std::io::Result as IoResult;
+use std::rc::Rc;
 
 use ratatui::backend::WindowSize;
 use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
+use web_sys::wasm_bindgen::prelude::Closure;
+use web_sys::wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
+use web_sys::Window;
 
 use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
 pub struct DomBackend {
-    initialized: bool,
+    initialized: Rc<RefCell<bool>>,
     buffer: Vec<Vec<Cell>>,
     prev_buffer: Vec<Vec<Cell>>,
     cells: Vec<Element>,
     grid: Element,
+    window: Window,
     document: Document,
 }
 
@@ -33,21 +39,30 @@ impl DomBackend {
         // use this time to initialize the grid and the document object for the backend to use later on
         let window = window().unwrap();
         let document = window.document().unwrap();
-        let div = document.create_element("div").unwrap();
-        div.set_attribute("id", "grid").unwrap();
-        let body = document.body().unwrap();
-        body.append_child(&div).unwrap();
-
-        Self {
-            buffer: get_sized_buffer(),
-            prev_buffer: get_sized_buffer(),
-            grid: div,
-            document,
+        let mut backend = Self {
+            buffer: vec![],
+            prev_buffer: vec![],
             cells: vec![],
-            initialized: false,
-        }
+            grid: document.create_element("div").unwrap(),
+            window,
+            document,
+            initialized: Rc::new(RefCell::new(false)),
+        };
+        backend.add_on_resize_listener();
+        backend.reset_grid();
+        backend
     }
 
+    /// Reset the grid and clear the cells.
+    fn reset_grid(&mut self) {
+        self.grid = self.document.create_element("div").unwrap();
+        self.grid.set_attribute("id", "grid").unwrap();
+        self.cells.clear();
+        self.buffer = get_sized_buffer();
+        self.prev_buffer = self.buffer.clone();
+    }
+
+    /// This function is called from [`flush`] once to render the initial content to the screen.
     fn prerender(&mut self) {
         web_sys::console::log_1(&"hello from prerender".into());
 
@@ -93,7 +108,8 @@ impl DomBackend {
         }
     }
 
-    // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
+    // Compare the current buffer to the previous buffer and update only the cells that have
+    // changed since the last render call.
     fn update_grid(&mut self) {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
@@ -103,14 +119,22 @@ impl DomBackend {
                 if cell != &self.prev_buffer[y][x] {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(cell.symbol());
                     elem.set_attribute("style", &get_cell_color_as_css(cell))
                         .unwrap();
-                    // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }
         }
+    }
+
+    fn add_on_resize_listener(&mut self) {
+        let initialized = self.initialized.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |_: web_sys::Event| {
+            initialized.replace(false);
+        });
+        self.window
+            .set_onresize(Some(closure.as_ref().unchecked_ref()));
+        closure.forget();
     }
 }
 
@@ -119,15 +143,48 @@ impl Backend for DomBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        // web_sys::console::log_1(&"hello from draw".into());
+        if !*self.initialized.borrow() {
+            // Only runs on resize event.
+            if let Some(grid) = self.document.get_element_by_id("grid") {
+                grid.remove();
+                self.reset_grid();
+            }
+        }
+
+        // Update the cells with new content
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
-            let line = &mut self.buffer[y];
-            line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
-            line[x] = cell.clone();
+            if y < self.buffer.len() {
+                let line = &mut self.buffer[y];
+                line.extend(
+                    std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())),
+                );
+                if x < line.len() {
+                    line[x] = cell.clone();
+                }
+            }
         }
-        // web_sys::console::log_1(&"hello from draw end ".into());
+        Ok(())
+    }
+
+    /// The flush is called after the draw function to actually render the content to the screen.
+    fn flush(&mut self) -> IoResult<()> {
+        if !*self.initialized.borrow() {
+            self.initialized.replace(true);
+
+            let body = self.document.body().unwrap();
+            body.append_child(&self.grid).unwrap();
+
+            self.prerender();
+            // set the previous buffer to the current buffer for the first render
+            self.prev_buffer = self.buffer.clone();
+        }
+        // check if the buffer has changed since the last render and update the grid
+        if self.buffer != self.prev_buffer {
+            self.update_grid();
+        }
+        self.prev_buffer = self.buffer.clone();
         Ok(())
     }
 
@@ -161,22 +218,6 @@ impl Backend for DomBackend {
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
         todo!()
-    }
-
-    fn flush(&mut self) -> IoResult<()> {
-        if !self.initialized {
-            // web_sys::console::log_1(&"hello from flush".into());
-            self.prerender();
-            self.prev_buffer = self.buffer.clone(); // set the previous buffer to the current buffer for the first render
-            self.initialized = true;
-        }
-        // web_sys::console::log_1(&"flush1".into());
-        // check if the buffer has changed since the last render and update the grid
-        if self.buffer != self.prev_buffer {
-            self.update_grid();
-        }
-        self.prev_buffer = self.buffer.clone();
-        Ok(())
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
