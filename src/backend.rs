@@ -5,8 +5,6 @@ use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
-use web_sys::wasm_bindgen::prelude::Closure;
-use web_sys::wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;

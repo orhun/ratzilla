@@ -1,4 +1,4 @@
-use ratatui::{
+use ratzilla::ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,

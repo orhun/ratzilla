@@ -6,19 +6,14 @@ use ratzilla::widgets::Hyperlink;
 use ratzilla::RenderOnWeb;
 use ratzilla::WasmBackend;
 
-use ratatui::layout::Alignment;
-use ratatui::layout::Constraint;
-use ratatui::layout::Layout;
-use ratatui::layout::Rect;
-use ratatui::style::Color;
-use ratatui::style::Style;
-use ratatui::symbols::Marker;
-use ratatui::widgets::canvas::Canvas;
-use ratatui::widgets::canvas::Circle;
-use ratatui::widgets::Block;
-use ratatui::widgets::Paragraph;
-use ratatui::widgets::Widget;
-use ratatui::Terminal;
+use ratzilla::ratatui::{
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Style},
+    symbols::Marker,
+    widgets::canvas::{Canvas, Circle},
+    widgets::{Block, Paragraph, Widget},
+    Terminal,
+};
 
 struct App {
     count: u64,

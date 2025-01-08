@@ -17,7 +17,7 @@ use std::{cell::RefCell, error::Error, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use ratatui::Terminal;
+use ratzilla::ratatui::Terminal;
 use ratzilla::{RenderOnWeb, WasmBackend};
 
 mod app;

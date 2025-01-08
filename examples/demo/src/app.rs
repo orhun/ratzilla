@@ -1,9 +1,9 @@
+use rand::SeedableRng;
 use rand::{
     distributions::{Distribution, Uniform},
     rngs::SmallRng,
 };
-use rand::{Rng, SeedableRng};
-use ratatui::widgets::ListState;
+use ratzilla::ratatui::widgets::ListState;
 
 const TASKS: [&str; 24] = [
     "Item1", "Item2", "Item3", "Item4", "Item5", "Item6", "Item7", "Item8", "Item9", "Item10",
