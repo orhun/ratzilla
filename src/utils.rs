@@ -1,5 +1,5 @@
 use ratatui::{buffer::Cell, style::Color};
-use web_sys::Element;
+use web_sys::{wasm_bindgen::JsValue, Element};
 
 pub(crate) fn create_span(cell: &Cell) -> Element {
     let document = web_sys::window().unwrap().document().unwrap();
@@ -31,7 +31,7 @@ pub(crate) fn get_cell_color(cell: &Cell) -> String {
     format!("{} {}", fg_style, bg_style)
 }
 
-pub fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
+fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
     match color {
         Color::Black => Some((0, 0, 0)),
         Color::Red => Some((128, 0, 0)),
@@ -52,6 +52,56 @@ pub fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
         _ => None, // Handle invalid color names
     }
 }
+
+/// Calculates the number of characters that can fit in the window.
+fn get_window_size() -> (u16, u16) {
+    let (w, h) = get_raw_window_size();
+    // These are mildly magical numbers... make them more precise
+    (w / 10, h / 20)
+}
+
+fn get_raw_window_size() -> (u16, u16) {
+    fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
+        val.as_f64().and_then(|i| I::try_from(i as usize).ok())
+    }
+
+    web_sys::window()
+        .and_then(|s| {
+            s.inner_width()
+                .ok()
+                .and_then(js_val_to_int::<u16>)
+                .zip(s.inner_height().ok().and_then(js_val_to_int::<u16>))
+        })
+        .unwrap_or((120, 120))
+}
+
+// TODO: Improve this...
+fn is_mobile() -> bool {
+    get_raw_screen_size().0 < 550
+}
+
+/// Calculates the number of pixels that can fit in the window.
+fn get_raw_screen_size() -> (i32, i32) {
+    let s = web_sys::window().unwrap().screen().unwrap();
+    (s.width().unwrap(), s.height().unwrap())
+}
+
+/// Calculates the number of characters that can fit in the window.
+fn get_screen_size() -> (u16, u16) {
+    let (w, h) = get_raw_screen_size();
+    // These are mildly magical numbers... make them more precise
+    (w as u16 / 10, h as u16 / 19)
+}
+
+pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
+    let (width, height) = if is_mobile() {
+        get_screen_size()
+    } else {
+        get_window_size()
+    };
+    vec![vec![Cell::default(); width as usize]; height as usize]
+}
+
 pub fn set_document_title(title: &str) {
     web_sys::window()
         .unwrap()
