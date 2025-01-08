@@ -1,14 +1,27 @@
 use ratatui::{buffer::Cell, style::Color};
-use web_sys::{wasm_bindgen::JsValue, Element};
+use web_sys::{wasm_bindgen::JsValue, Document, Element};
 
-pub(crate) fn create_span(cell: &Cell) -> Element {
-    let document = web_sys::window().unwrap().document().unwrap();
+pub(crate) fn create_span(document: &Document, cell: &Cell) -> Element {
     let span = document.create_element("span").unwrap();
     span.set_inner_html(cell.symbol());
 
     let style = get_cell_color(cell);
     span.set_attribute("style", &style).unwrap();
     span
+}
+
+pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Element {
+    let anchor = document.create_element("a").unwrap();
+    anchor
+        .set_attribute(
+            "href",
+            &cells.iter().map(|c| c.symbol()).collect::<String>(),
+        )
+        .unwrap();
+    anchor
+        .set_attribute("style", &get_cell_color(&cells[0]))
+        .unwrap();
+    anchor
 }
 
 pub(crate) fn get_cell_color(cell: &Cell) -> String {
