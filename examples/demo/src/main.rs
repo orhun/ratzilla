@@ -17,8 +17,8 @@ use std::{cell::RefCell, error::Error, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use ratzilla::{RenderOnWeb, WasmBackend};
 use ratatui::Terminal;
+use ratzilla::{RenderOnWeb, WasmBackend};
 
 mod app;
 
@@ -39,7 +39,8 @@ struct Cli {
 fn main() -> Result<(), Box<dyn Error>> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
     let backend = WasmBackend::new();
-    backend.on_key_event({
+    let terminal = Terminal::new(backend).unwrap();
+    terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
@@ -49,8 +50,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     });
-
-    let terminal = Terminal::new(backend).unwrap();
     terminal.render_on_web(move |f| {
         let mut app_state = app_state.borrow_mut();
         app_state.on_tick();

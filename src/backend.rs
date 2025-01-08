@@ -113,20 +113,6 @@ impl WasmBackend {
             }
         }
     }
-
-    pub fn on_key_event<F>(&self, mut callback: F)
-    where
-        F: FnMut(&str) + 'static,
-    {
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            web_sys::console::log_1(&event);
-            callback(&event.key());
-        });
-        self.document
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-            .unwrap();
-        closure.forget();
-    }
 }
 
 impl Backend for WasmBackend {

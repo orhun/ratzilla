@@ -101,15 +101,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dom-test"
-version = "0.0.0"
-dependencies = [
- "console_error_panic_hook",
- "ratatui",
- "web-sys",
-]
-
-[[package]]
 name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -232,8 +223,8 @@ name = "pong"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
- "dom-test",
  "ratatui",
+ "ratzilla",
 ]
 
 [[package]]
@@ -272,6 +263,15 @@ dependencies = [
  "unicode-segmentation",
  "unicode-truncate",
  "unicode-width 0.2.0",
+]
+
+[[package]]
+name = "ratzilla"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "ratatui",
+ "web-sys",
 ]
 
 [[package]]
