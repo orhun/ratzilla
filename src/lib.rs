@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use web_sys::wasm_bindgen::prelude::*;
 
-mod utils;
+pub mod utils;
 mod wasm_backend;
 pub mod widgets;
 
