@@ -18,11 +18,12 @@ use std::io;
 use std::rc::Rc;
 
 use ratzilla::{RenderOnWeb, WasmBackend};
-
-use ratatui::layout::Alignment;
-use ratatui::style::Color;
-use ratatui::widgets::{Block, Paragraph};
-use ratatui::Terminal;
+use ratzilla::ratatui::{
+    layout::Alignment,
+    style::Color,
+    widgets::{Block, Paragraph},
+    Terminal,
+};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
