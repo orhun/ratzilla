@@ -1,6 +1,8 @@
 [package]
 name = "ratzilla"
 version = "0.0.0-alpha.0"
+description = "Build terminal-themed web applications with Ratatui and WebAssembly"
+license = "MIT or Apache-2.0"
 edition = "2021"
 
 [dependencies]
