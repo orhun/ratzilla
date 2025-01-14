@@ -105,7 +105,8 @@ impl DomBackend {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     // web_sys::console::log_1(&"Element retrieved".into());
                     elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_color(cell)).unwrap();
+                    elem.set_attribute("style", &get_cell_color_as_css(cell))
+                        .unwrap();
                     // web_sys::console::log_1(&"Inner HTML set".into());
                 }
             }

@@ -18,7 +18,7 @@ use std::{cell::RefCell, error::Error, rc::Rc};
 use app::App;
 use clap::Parser;
 use ratzilla::ratatui::Terminal;
-use ratzilla::{RenderOnWeb, DomBackend};
+use ratzilla::{CanvasBackend, RenderOnWeb};
 
 mod app;
 
@@ -38,7 +38,7 @@ struct Cli {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    let backend = DomBackend::new();
+    let backend = CanvasBackend::new();
     let terminal = Terminal::new(backend).unwrap();
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();

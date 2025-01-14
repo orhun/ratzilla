@@ -1,11 +1,11 @@
 use ratatui::{buffer::Cell, style::Color};
-use web_sys::{wasm_bindgen::JsValue, Document, Element};
+use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Element {
     let span = document.create_element("span").unwrap();
     span.set_inner_html(cell.symbol());
 
-    let style = get_cell_color(cell);
+    let style = get_cell_color_as_css(cell);
     span.set_attribute("style", &style).unwrap();
     span
 }
@@ -19,12 +19,12 @@ pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Element {
         )
         .unwrap();
     anchor
-        .set_attribute("style", &get_cell_color(&cells[0]))
+        .set_attribute("style", &get_cell_color_as_css(&cells[0]))
         .unwrap();
     anchor
 }
 
-pub(crate) fn get_cell_color(cell: &Cell) -> String {
+pub(crate) fn get_cell_color_as_css(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
 
@@ -42,6 +42,23 @@ pub(crate) fn get_cell_color(cell: &Cell) -> String {
     };
 
     format!("{} {}", fg_style, bg_style)
+}
+
+pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {
+    let fg = ansi_to_rgb(cell.fg);
+    let bg = ansi_to_rgb(cell.bg);
+
+    let fg_style = match fg {
+        Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
+        None => "rgb(255, 255, 255)".to_string(),
+    };
+
+    let bg_style = match bg {
+        Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
+        None => "#333".to_string(),
+    };
+
+    (fg_style, bg_style)
 }
 
 fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
@@ -112,6 +129,12 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     } else {
         get_window_size()
     };
+    vec![vec![Cell::default(); width as usize]; height as usize]
+}
+
+pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
+    let width = canvas.client_width() as u16 / 10 as u16;
+    let height = canvas.client_height() as u16 / 19 as u16;
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
