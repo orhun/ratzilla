@@ -83,28 +83,27 @@ impl CanvasBackend {
             );
         }
 
-        let _ = self.ctx.translate(5 as f64, 5 as f64);
+        let _ = self.ctx.translate(5_f64, 5_f64);
         let xmul = 10.0;
         let ymul = 19.0;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
-                    let colors = get_cell_color_for_canvas(&cell);
+                    let colors = get_cell_color_for_canvas(cell);
 
                     self.ctx.set_fill_style_str(colors.1.as_str());
-                    let _ = self
-                        .ctx
+                    self.ctx
                         .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
 
                     self.ctx.set_fill_style_str(colors.0.as_str());
 
                     let _ = self
                         .ctx
-                        .fill_text(&cell.symbol(), x as f64 * xmul, y as f64 * ymul);
+                        .fill_text(cell.symbol(), x as f64 * xmul, y as f64 * ymul);
                 }
             }
         }
-        let _ = self.ctx.translate(-5 as f64, -5 as f64);
+        let _ = self.ctx.translate(-5_f64, -5_f64);
     }
 }
 

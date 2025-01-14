@@ -133,8 +133,8 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
 }
 
 pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
-    let width = canvas.client_width() as u16 / 10 as u16;
-    let height = canvas.client_height() as u16 / 19 as u16;
+    let width = canvas.client_width() as u16 / 10_u16;
+    let height = canvas.client_height() as u16 / 19_u16;
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
