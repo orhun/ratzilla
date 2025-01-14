@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
-use ratzilla::RenderOnWeb;
 use ratzilla::DomBackend;
+use ratzilla::RenderOnWeb;
 
 use ratatui::layout::Alignment;
 use ratatui::layout::Constraint;
