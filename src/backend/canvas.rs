@@ -5,37 +5,31 @@ use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
-use ratatui::style::Styled;
 use web_sys::js_sys::Boolean;
 use web_sys::js_sys::Map;
 use web_sys::wasm_bindgen::JsCast;
 use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
-use web_sys::Document;
 use web_sys::Element;
 
-use crate::canvas_utils::*;
 use crate::utils::*;
 
-use crate::widgets::HYPERLINK;
-
 #[derive(Debug)]
-pub struct WasmCanvasBackend {
+pub struct CanvasBackend {
     initialized: bool,
     buffer: Vec<Vec<Cell>>,
     prev_buffer: Vec<Vec<Cell>>,
     ctx: web_sys::CanvasRenderingContext2d,
     canvas: Element,
-    document: Document,
 }
 
-impl Default for WasmCanvasBackend {
+impl Default for CanvasBackend {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl WasmCanvasBackend {
+impl CanvasBackend {
     pub fn new() -> Self {
         // use this time to initialize the grid and the document object for the backend to use later on
         let window = window().unwrap();
@@ -70,12 +64,10 @@ impl WasmCanvasBackend {
         body.append_child(&canvas).unwrap();
 
         Self {
-            buffer: get_sized_buffer_canvas(&canvas_ref),
-            prev_buffer: get_sized_buffer_canvas(&canvas_ref),
+            buffer: get_sized_buffer_from_canvas(&canvas_ref),
+            prev_buffer: get_sized_buffer_from_canvas(&canvas_ref),
             canvas,
-            document,
             ctx,
-
             initialized: false,
         }
     }
@@ -97,7 +89,7 @@ impl WasmCanvasBackend {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
-                    let colors = get_cell_color_canvas(&cell);
+                    let colors = get_cell_color_for_canvas(&cell);
 
                     self.ctx.set_fill_style_str(colors.1.as_str());
                     let _ = self
@@ -116,7 +108,7 @@ impl WasmCanvasBackend {
     }
 }
 
-impl Backend for WasmCanvasBackend {
+impl Backend for CanvasBackend {
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
