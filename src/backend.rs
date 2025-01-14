@@ -13,7 +13,7 @@ use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
 #[derive(Debug)]
-pub struct WasmBackend {
+pub struct DomBackend {
     initialized: bool,
     buffer: Vec<Vec<Cell>>,
     prev_buffer: Vec<Vec<Cell>>,
@@ -22,13 +22,13 @@ pub struct WasmBackend {
     document: Document,
 }
 
-impl Default for WasmBackend {
+impl Default for DomBackend {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl WasmBackend {
+impl DomBackend {
     pub fn new() -> Self {
         // use this time to initialize the grid and the document object for the backend to use later on
         let window = window().unwrap();
@@ -113,7 +113,7 @@ impl WasmBackend {
     }
 }
 
-impl Backend for WasmBackend {
+impl Backend for DomBackend {
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,

@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use ratzilla::{RenderOnWeb, WasmBackend};
+use ratzilla::{RenderOnWeb, DomBackend};
 use ratzilla::ratatui::{
     layout::Alignment,
     style::Color,
@@ -27,7 +27,7 @@ use ratzilla::ratatui::{
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
-    let backend = WasmBackend::new();
+    let backend = DomBackend::new();
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({

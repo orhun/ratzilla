@@ -7,7 +7,7 @@ pub mod utils;
 
 pub mod widgets;
 
-pub use backend::WasmBackend;
+pub use backend::DomBackend;
 pub use canvas_backend::WasmCanvasBackend;
 pub use render::RenderOnWeb;
 pub use render_canvas::RenderOnWebCanvas;

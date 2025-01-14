@@ -6,7 +6,7 @@ use std::rc::Rc;
 use web_sys::wasm_bindgen::prelude::*;
 use web_sys::window;
 
-use crate::WasmBackend;
+use crate::DomBackend;
 
 pub trait RenderOnWeb {
     fn render_on_web<F>(self, render_callback: F)
@@ -38,7 +38,7 @@ pub trait RenderOnWeb {
     }
 }
 
-impl RenderOnWeb for Terminal<WasmBackend> {
+impl RenderOnWeb for Terminal<DomBackend> {
     fn render_on_web<F>(mut self, mut render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static,

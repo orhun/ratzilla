@@ -4,7 +4,7 @@ use std::rc::Rc;
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
 use ratzilla::RenderOnWeb;
-use ratzilla::WasmBackend;
+use ratzilla::DomBackend;
 
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
@@ -63,7 +63,7 @@ impl App {
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
-    let backend = WasmBackend::new();
+    let backend = DomBackend::new();
     let terminal = Terminal::new(backend).unwrap();
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
