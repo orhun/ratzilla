@@ -17,13 +17,14 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use ratzilla::{RenderOnWeb, DomBackend};
+use ratzilla::event::Key;
 use ratzilla::ratatui::{
     layout::Alignment,
     style::Color,
     widgets::{Block, Paragraph},
     Terminal,
 };
+use ratzilla::{DomBackend, RenderOnWeb};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
@@ -32,8 +33,8 @@ fn main() -> io::Result<()> {
 
     terminal.on_key_event({
         let counter_cloned = counter.clone();
-        move |event| {
-            if event == " " {
+        move |key_event| {
+            if key_event.key == Key::Char(' ') {
                 let mut counter = counter_cloned.borrow_mut();
                 *counter += 1;
             }
