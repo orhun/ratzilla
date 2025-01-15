@@ -6,6 +6,7 @@ use ratzilla::widgets::Hyperlink;
 use ratzilla::DomBackend;
 use ratzilla::RenderOnWeb;
 
+use ratzilla::event::KeyCode;
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style},
@@ -69,18 +70,18 @@ fn main() {
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
-            match event.key {
-                Key::Char('q') => {
+            match event.code {
+                KeyCode::Char('q') => {
                     set_document_title("Grind to win");
                 }
-                Key::Char('r') => {
+                KeyCode::Char('r') => {
                     set_document_title("RATATUI ! ! !");
                 }
-                Key::Char('a') => {
+                KeyCode::Char('a') => {
                     app_state.count = 0;
                     app_state.ball.color = Color::Green;
                 }
-                Key::Char('b') => {
+                KeyCode::Char('b') => {
                     app_state.ball.color = Color::Red;
                 }
                 _ => {}

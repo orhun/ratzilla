@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use ratzilla::event::Key;
+use ratzilla::event::KeyCode;
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
 use ratzilla::DomBackend;
@@ -75,18 +75,18 @@ fn main() {
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
-            match event.key {
-                Key::Char('q') => {
+            match event.code {
+                KeyCode::Char('q') => {
                     set_document_title("Grind to win");
                 }
-                Key::Char('r') => {
+                KeyCode::Char('r') => {
                     set_document_title("RATATUI ! ! !");
                 }
-                Key::Char('a') => {
+                KeyCode::Char('a') => {
                     app_state.count = 0;
                     app_state.ball.color = Color::Green;
                 }
-                Key::Char('b') => {
+                KeyCode::Char('b') => {
                     app_state.ball.color = Color::Red;
                 }
                 _ => {}

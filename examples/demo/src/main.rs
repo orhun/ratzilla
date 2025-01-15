@@ -17,7 +17,7 @@ use std::{cell::RefCell, error::Error, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use ratzilla::event::Key;
+use ratzilla::event::KeyCode;
 use ratzilla::ratatui::Terminal;
 use ratzilla::{CanvasBackend, RenderOnWeb};
 
@@ -45,11 +45,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
-            match event.key {
-                Key::Tab => {
+            match event.code {
+                KeyCode::Tab => {
                     app_state.on_right();
                 }
-                Key::Char(c) => app_state.on_key(c),
+                KeyCode::Char(c) => app_state.on_key(c),
                 _ => {}
             }
         }
