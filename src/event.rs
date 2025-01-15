@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
-    pub key: Key,
+    pub code: KeyCode,
     pub ctrl: bool,
     pub alt: bool,
     pub shift: bool,
@@ -12,7 +12,7 @@ impl From<web_sys::KeyboardEvent> for KeyEvent {
         let alt = event.alt_key();
         let shift = event.shift_key();
         KeyEvent {
-            key: event.into(),
+            code: event.into(),
             ctrl,
             alt,
             shift,
@@ -21,7 +21,7 @@ impl From<web_sys::KeyboardEvent> for KeyEvent {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Key {
+pub enum KeyCode {
     /// Normal letter key input.
     Char(char),
     /// F keys.
@@ -56,44 +56,44 @@ pub enum Key {
     Unidentified,
 }
 
-impl From<web_sys::KeyboardEvent> for Key {
+impl From<web_sys::KeyboardEvent> for KeyCode {
     fn from(event: web_sys::KeyboardEvent) -> Self {
         let key = event.key();
         if key.len() == 1 {
             let char = key.chars().next();
             if let Some(char) = char {
-                return Key::Char(char);
+                return KeyCode::Char(char);
             } else {
-                return Key::Unidentified;
+                return KeyCode::Unidentified;
             }
         }
         match key.as_str() {
-            "F1" => Key::F(1),
-            "F2" => Key::F(2),
-            "F3" => Key::F(3),
-            "F4" => Key::F(4),
-            "F5" => Key::F(5),
-            "F6" => Key::F(6),
-            "F7" => Key::F(7),
-            "F8" => Key::F(8),
-            "F9" => Key::F(9),
-            "F10" => Key::F(10),
-            "F11" => Key::F(11),
-            "F12" => Key::F(12),
-            "Backspace" => Key::Backspace,
-            "Enter" => Key::Enter,
-            "ArrowLeft" => Key::Left,
-            "ArrowRight" => Key::Right,
-            "ArrowUp" => Key::Up,
-            "ArrowDown" => Key::Down,
-            "Tab" => Key::Tab,
-            "Delete" => Key::Delete,
-            "Home" => Key::Home,
-            "End" => Key::End,
-            "PageUp" => Key::PageUp,
-            "PageDown" => Key::PageDown,
-            "Escape" => Key::Esc,
-            _ => Key::Unidentified,
+            "F1" => KeyCode::F(1),
+            "F2" => KeyCode::F(2),
+            "F3" => KeyCode::F(3),
+            "F4" => KeyCode::F(4),
+            "F5" => KeyCode::F(5),
+            "F6" => KeyCode::F(6),
+            "F7" => KeyCode::F(7),
+            "F8" => KeyCode::F(8),
+            "F9" => KeyCode::F(9),
+            "F10" => KeyCode::F(10),
+            "F11" => KeyCode::F(11),
+            "F12" => KeyCode::F(12),
+            "Backspace" => KeyCode::Backspace,
+            "Enter" => KeyCode::Enter,
+            "ArrowLeft" => KeyCode::Left,
+            "ArrowRight" => KeyCode::Right,
+            "ArrowUp" => KeyCode::Up,
+            "ArrowDown" => KeyCode::Down,
+            "Tab" => KeyCode::Tab,
+            "Delete" => KeyCode::Delete,
+            "Home" => KeyCode::Home,
+            "End" => KeyCode::End,
+            "PageUp" => KeyCode::PageUp,
+            "PageDown" => KeyCode::PageDown,
+            "Escape" => KeyCode::Esc,
+            _ => KeyCode::Unidentified,
         }
     }
 }
