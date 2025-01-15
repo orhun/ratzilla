@@ -79,6 +79,7 @@ fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
         Color::LightMagenta => Some((255, 0, 255)),
         Color::LightCyan => Some((0, 255, 255)),
         Color::White => Some((255, 255, 255)),
+        Color::Rgb(r, g, b) => Some((r, g, b)),
         _ => None, // Handle invalid color names
     }
 }
