@@ -1,4 +1,5 @@
 mod backend;
+pub mod event;
 mod render;
 pub mod utils;
 

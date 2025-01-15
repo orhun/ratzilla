@@ -6,6 +6,8 @@ use std::rc::Rc;
 use web_sys::wasm_bindgen::prelude::*;
 use web_sys::window;
 
+use crate::event::KeyEvent;
+
 pub trait RenderOnWeb {
     fn render_on_web<F>(self, render_callback: F)
     where
@@ -13,11 +15,11 @@ pub trait RenderOnWeb {
 
     fn on_key_event<F>(&self, mut callback: F)
     where
-        F: FnMut(&str) + 'static,
+        F: FnMut(KeyEvent) + 'static,
     {
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
             web_sys::console::log_1(&event);
-            callback(&event.key());
+            callback(event.into());
         });
 
         let window = window().unwrap();

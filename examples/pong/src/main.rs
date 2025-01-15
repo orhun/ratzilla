@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
-use ratzilla::RenderOnWeb;
 use ratzilla::DomBackend;
+use ratzilla::RenderOnWeb;
 
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
@@ -69,17 +69,21 @@ fn main() {
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
-            if event == "q" {
-                set_document_title("Grind to win");
-            }
-            if event == "r" {
-                set_document_title("RATATUI ! ! !");
-            }
-            if event == "a" {
-                app_state.count = 0;
-                app_state.ball.color = Color::Green;
-            } else if event == "b" {
-                app_state.ball.color = Color::Red;
+            match event.key {
+                Key::Char('q') => {
+                    set_document_title("Grind to win");
+                }
+                Key::Char('r') => {
+                    set_document_title("RATATUI ! ! !");
+                }
+                Key::Char('a') => {
+                    app_state.count = 0;
+                    app_state.ball.color = Color::Green;
+                }
+                Key::Char('b') => {
+                    app_state.ball.color = Color::Red;
+                }
+                _ => {}
             }
         }
     });
