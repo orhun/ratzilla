@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
     pub key: Key,
     pub ctrl: bool,
@@ -20,7 +20,7 @@ impl From<web_sys::KeyboardEvent> for KeyEvent {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Key {
     /// Normal letter key input.
     Char(char),
