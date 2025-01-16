@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use ratzilla::event::Key;
+use ratzilla::event::KeyCode;
 use ratzilla::ratatui::{
     layout::Alignment,
     style::Color,
@@ -34,7 +34,7 @@ fn main() -> io::Result<()> {
     terminal.on_key_event({
         let counter_cloned = counter.clone();
         move |key_event| {
-            if key_event.key == Key::Char(' ') {
+            if key_event.code == KeyCode::Char(' ') {
                 let mut counter = counter_cloned.borrow_mut();
                 *counter += 1;
             }
