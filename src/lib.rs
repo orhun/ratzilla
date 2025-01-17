@@ -1,9 +1,10 @@
-mod backend;
+pub mod error;
 pub mod event;
-mod render;
 pub mod utils;
-
 pub mod widgets;
+
+mod backend;
+mod render;
 
 pub use backend::canvas::CanvasBackend;
 pub use backend::dom::DomBackend;

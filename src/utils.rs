@@ -1,27 +1,25 @@
 use ratatui::{buffer::Cell, style::Color};
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
-pub(crate) fn create_span(document: &Document, cell: &Cell) -> Element {
-    let span = document.create_element("span").unwrap();
+use crate::error::Error;
+
+pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
+    let span = document.create_element("span")?;
     span.set_inner_html(cell.symbol());
 
     let style = get_cell_color_as_css(cell);
-    span.set_attribute("style", &style).unwrap();
-    span
+    span.set_attribute("style", &style)?;
+    Ok(span)
 }
 
-pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Element {
-    let anchor = document.create_element("a").unwrap();
-    anchor
-        .set_attribute(
-            "href",
-            &cells.iter().map(|c| c.symbol()).collect::<String>(),
-        )
-        .unwrap();
-    anchor
-        .set_attribute("style", &get_cell_color_as_css(&cells[0]))
-        .unwrap();
-    anchor
+pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Element, Error> {
+    let anchor = document.create_element("a")?;
+    anchor.set_attribute(
+        "href",
+        &cells.iter().map(|c| c.symbol()).collect::<String>(),
+    )?;
+    anchor.set_attribute("style", &get_cell_color_as_css(&cells[0]))?;
+    Ok(anchor)
 }
 
 pub(crate) fn get_cell_color_as_css(cell: &Cell) -> String {
@@ -139,10 +137,11 @@ pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Ve
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
-pub fn set_document_title(title: &str) {
+pub fn set_document_title(title: &str) -> Result<(), Error> {
     web_sys::window()
-        .unwrap()
+        .ok_or(Error::UnableToRetrieveWindow)?
         .document()
-        .unwrap()
+        .ok_or(Error::UnableToRetrieveDocument)?
         .set_title(title);
+    Ok(())
 }

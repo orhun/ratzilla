@@ -28,7 +28,7 @@ use ratzilla::{DomBackend, RenderOnWeb};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
-    let backend = DomBackend::new();
+    let backend = DomBackend::new()?;
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({

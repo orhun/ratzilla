@@ -10,80 +10,85 @@ use web_sys::js_sys::Map;
 use web_sys::wasm_bindgen::JsCast;
 use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
-use web_sys::Element;
 
+use crate::error::Error;
 use crate::utils::*;
 
 #[derive(Debug)]
-pub struct CanvasBackend {
-    initialized: bool,
-    buffer: Vec<Vec<Cell>>,
-    prev_buffer: Vec<Vec<Cell>>,
-    ctx: web_sys::CanvasRenderingContext2d,
-    canvas: Element,
+struct Canvas {
+    inner: web_sys::HtmlCanvasElement,
+    context: web_sys::CanvasRenderingContext2d,
 }
 
-impl Default for CanvasBackend {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CanvasBackend {
-    pub fn new() -> Self {
-        // use this time to initialize the grid and the document object for the backend to use later on
-        let window = window().unwrap();
-        let document = window.document().unwrap();
-        let canvas = document.create_element("canvas").unwrap();
-
-        let canvas_ref: web_sys::HtmlCanvasElement = canvas
+impl Canvas {
+    fn new(document: web_sys::Document) -> Result<Self, Error> {
+        let element = document.create_element("canvas")?;
+        let canvas = element
             .clone()
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
-            .unwrap();
-        canvas_ref.set_width(1400);
-        canvas_ref.set_height(1000);
-
+            .expect("Unable to cast canvas element");
+        canvas.set_width(1400);
+        canvas.set_height(1000);
         let context_options = Map::new();
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
         context_options.set(
             &JsValue::from_str("desynchronized"),
             &Boolean::from(JsValue::TRUE),
         );
-        let ctx = canvas_ref
-            .get_context_with_context_options("2d", &context_options)
-            .unwrap()
-            .unwrap()
+        let context = canvas
+            .get_context_with_context_options("2d", &context_options)?
+            .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
             .dyn_into::<web_sys::CanvasRenderingContext2d>()
-            .unwrap();
+            .expect("Unable to cast canvas context");
 
-        ctx.set_font("16px monospace");
-        ctx.set_text_baseline("top");
+        context.set_font("16px monospace");
+        context.set_text_baseline("top");
+        let body = document.body().ok_or(Error::UnableToRetrieveBody)?;
+        body.append_child(&element)?;
+        Ok(Self {
+            inner: canvas,
+            context,
+        })
+    }
+}
 
-        let body = document.body().unwrap();
-        body.append_child(&canvas).unwrap();
+#[derive(Debug)]
+pub struct CanvasBackend {
+    initialized: bool,
+    buffer: Vec<Vec<Cell>>,
+    prev_buffer: Vec<Vec<Cell>>,
+    canvas: Canvas,
+}
 
-        Self {
-            buffer: get_sized_buffer_from_canvas(&canvas_ref),
-            prev_buffer: get_sized_buffer_from_canvas(&canvas_ref),
-            canvas,
-            ctx,
+impl CanvasBackend {
+    pub fn new() -> Result<Self, Error> {
+        // use this time to initialize the grid and the document object for the backend to use later on
+        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
+        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+
+        let canvas = Canvas::new(document)?;
+
+        Ok(Self {
+            buffer: get_sized_buffer_from_canvas(&canvas.inner),
+            prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
             initialized: false,
-        }
+            canvas,
+        })
     }
 
     // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
     fn update_grid(&mut self, force_redraw: bool) {
         if force_redraw {
-            self.ctx.clear_rect(
+            self.canvas.context.clear_rect(
                 0.0,
                 0.0,
-                self.canvas.client_width() as f64,
-                self.canvas.client_height() as f64,
+                self.canvas.inner.client_width() as f64,
+                self.canvas.inner.client_height() as f64,
             );
         }
 
-        let _ = self.ctx.translate(5_f64, 5_f64);
+        let _ = self.canvas.context.translate(5_f64, 5_f64);
         let xmul = 10.0;
         let ymul = 19.0;
         for (y, line) in self.buffer.iter().enumerate() {
@@ -91,19 +96,22 @@ impl CanvasBackend {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
                     let colors = get_cell_color_for_canvas(cell);
 
-                    self.ctx.set_fill_style_str(colors.1.as_str());
-                    self.ctx
+                    self.canvas.context.set_fill_style_str(colors.1.as_str());
+                    self.canvas
+                        .context
                         .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
 
-                    self.ctx.set_fill_style_str(colors.0.as_str());
+                    self.canvas.context.set_fill_style_str(colors.0.as_str());
 
-                    let _ = self
-                        .ctx
-                        .fill_text(cell.symbol(), x as f64 * xmul, y as f64 * ymul);
+                    let _ = self.canvas.context.fill_text(
+                        cell.symbol(),
+                        x as f64 * xmul,
+                        y as f64 * ymul,
+                    );
                 }
             }
         }
-        let _ = self.ctx.translate(-5_f64, -5_f64);
+        let _ = self.canvas.context.translate(-5_f64, -5_f64);
     }
 }
 
@@ -147,7 +155,7 @@ impl Backend for CanvasBackend {
 
     fn size(&self) -> IoResult<Size> {
         Ok(Size::new(
-            self.buffer.first().unwrap().len().saturating_sub(1) as u16,
+            self.buffer[0].len().saturating_sub(1) as u16,
             self.buffer.len().saturating_sub(1) as u16,
         ))
     }
