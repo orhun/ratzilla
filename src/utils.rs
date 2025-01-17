@@ -1,4 +1,7 @@
-use ratatui::{buffer::Cell, style::Color};
+use ratatui::{
+    buffer::Cell,
+    style::{Color, Modifier},
+};
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
 use crate::error::Error;
@@ -7,7 +10,7 @@ pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, E
     let span = document.create_element("span")?;
     span.set_inner_html(cell.symbol());
 
-    let style = get_cell_color_as_css(cell);
+    let style = get_cell_style_as_css(cell);
     span.set_attribute("style", &style)?;
     Ok(span)
 }
@@ -18,11 +21,11 @@ pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Eleme
         "href",
         &cells.iter().map(|c| c.symbol()).collect::<String>(),
     )?;
-    anchor.set_attribute("style", &get_cell_color_as_css(&cells[0]))?;
+    anchor.set_attribute("style", &get_cell_style_as_css(&cells[0]))?;
     Ok(anchor)
 }
 
-pub(crate) fn get_cell_color_as_css(cell: &Cell) -> String {
+pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
 
@@ -39,7 +42,27 @@ pub(crate) fn get_cell_color_as_css(cell: &Cell) -> String {
         None => "background-color: transparent;".to_string(),
     };
 
-    format!("{} {}", fg_style, bg_style)
+    let mut modifier_style = String::new();
+    if cell.modifier.contains(Modifier::BOLD) {
+        modifier_style.push_str("font-weight: bold; ");
+    }
+    if cell.modifier.contains(Modifier::DIM) {
+        modifier_style.push_str("opacity: 0.5; ");
+    }
+    if cell.modifier.contains(Modifier::ITALIC) {
+        modifier_style.push_str("font-style: italic; ");
+    }
+    if cell.modifier.contains(Modifier::UNDERLINED) {
+        modifier_style.push_str("text-decoration: underline; ");
+    }
+    if cell.modifier.contains(Modifier::HIDDEN) {
+        modifier_style.push_str("visibility: hidden; ");
+    }
+    if cell.modifier.contains(Modifier::CROSSED_OUT) {
+        modifier_style.push_str("text-decoration: line-through; ");
+    }
+
+    format!("{fg_style} {bg_style} {modifier_style}")
 }
 
 pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {

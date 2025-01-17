@@ -117,7 +117,7 @@ impl DomBackend {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_color_as_css(cell))?;
+                    elem.set_attribute("style", &get_cell_style_as_css(cell))?;
                 }
             }
         }

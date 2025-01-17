@@ -7,19 +7,14 @@ use ratzilla::widgets::Hyperlink;
 use ratzilla::DomBackend;
 use ratzilla::RenderOnWeb;
 
-use ratatui::layout::Alignment;
-use ratatui::layout::Constraint;
-use ratatui::layout::Layout;
-use ratatui::layout::Rect;
-use ratatui::style::Color;
-use ratatui::style::Style;
-use ratatui::symbols::Marker;
-use ratatui::widgets::canvas::Canvas;
-use ratatui::widgets::canvas::Circle;
-use ratatui::widgets::Block;
-use ratatui::widgets::Paragraph;
-use ratatui::widgets::Widget;
-use ratatui::Terminal;
+use ratzilla::ratatui::{
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Style, Stylize},
+    symbols::Marker,
+    widgets::canvas::{Canvas, Circle},
+    widgets::{Block, Paragraph, Widget},
+    Terminal,
+};
 
 struct App {
     count: u64,
@@ -106,6 +101,7 @@ fn main() {
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
+                        .title("Ratzilla".bold())
                         .border_style(Style::default().fg(Color::Yellow).bg(Color::Black)),
                 ),
             left,
