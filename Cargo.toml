@@ -20,3 +20,4 @@ web-sys = { version = "0.3.76", features = [
 ] }
 ratatui = { version = "0.29", default-features = false }
 console_error_panic_hook = "0.1.7"
+thiserror = "2.0.11"

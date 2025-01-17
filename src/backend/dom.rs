@@ -14,6 +14,7 @@ use web_sys::Document;
 use web_sys::Element;
 use web_sys::Window;
 
+use crate::error::Error;
 use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
@@ -28,42 +29,37 @@ pub struct DomBackend {
     document: Document,
 }
 
-impl Default for DomBackend {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DomBackend {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, Error> {
         // use this time to initialize the grid and the document object for the backend to use later on
-        let window = window().unwrap();
-        let document = window.document().unwrap();
+        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
+        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
         let mut backend = Self {
             buffer: vec![],
             prev_buffer: vec![],
             cells: vec![],
-            grid: document.create_element("div").unwrap(),
+            grid: document.create_element("div")?,
             window,
             document,
             initialized: Rc::new(RefCell::new(false)),
         };
         backend.add_on_resize_listener();
-        backend.reset_grid();
-        backend
+        backend.reset_grid()?;
+        Ok(backend)
     }
 
     /// Reset the grid and clear the cells.
-    fn reset_grid(&mut self) {
-        self.grid = self.document.create_element("div").unwrap();
-        self.grid.set_attribute("id", "grid").unwrap();
+    fn reset_grid(&mut self) -> Result<(), Error> {
+        self.grid = self.document.create_element("div")?;
+        self.grid.set_attribute("id", "grid")?;
         self.cells.clear();
         self.buffer = get_sized_buffer();
         self.prev_buffer = self.buffer.clone();
+        Ok(())
     }
 
     /// This function is called from [`flush`] once to render the initial content to the screen.
-    fn prerender(&mut self) {
+    fn prerender(&mut self) -> Result<(), Error> {
         web_sys::console::log_1(&"hello from prerender".into());
 
         for line in self.buffer.iter() {
@@ -78,39 +74,40 @@ impl DomBackend {
                         .map(|c| c.modifier.contains(HYPERLINK))
                         .unwrap_or(false)
                     {
-                        let anchor = create_anchor(&self.document, &hyperlink);
+                        let anchor = create_anchor(&self.document, &hyperlink)?;
                         for link_cell in &hyperlink {
-                            let span = create_span(&self.document, link_cell);
+                            let span = create_span(&self.document, link_cell)?;
                             self.cells.push(span.clone());
-                            anchor.append_child(&span).unwrap();
+                            anchor.append_child(&span)?;
                         }
                         line_cells.push(anchor);
                         hyperlink.clear();
                     }
                 } else {
-                    let span = create_span(&self.document, cell);
+                    let span = create_span(&self.document, cell)?;
                     self.cells.push(span.clone());
                     line_cells.push(span);
                 }
             }
 
             // Create a <pre> element for the line
-            let pre = self.document.create_element("pre").unwrap();
-            pre.set_attribute("style", "margin: 0px;").unwrap();
+            let pre = self.document.create_element("pre")?;
+            pre.set_attribute("style", "margin: 0px;")?;
 
             // Append all elements (spans and anchors) to the <pre>
             for elem in line_cells {
-                pre.append_child(&elem).unwrap();
+                pre.append_child(&elem)?;
             }
 
             // Append the <pre> to the grid
-            self.grid.append_child(&pre).unwrap();
+            self.grid.append_child(&pre)?;
         }
+        Ok(())
     }
 
     // Compare the current buffer to the previous buffer and update only the cells that have
     // changed since the last render call.
-    fn update_grid(&mut self) {
+    fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell.modifier.contains(HYPERLINK) {
@@ -120,11 +117,11 @@ impl DomBackend {
                     // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_color_as_css(cell))
-                        .unwrap();
+                    elem.set_attribute("style", &get_cell_color_as_css(cell))?;
                 }
             }
         }
+        Ok(())
     }
 
     fn add_on_resize_listener(&mut self) {
@@ -147,7 +144,7 @@ impl Backend for DomBackend {
             // Only runs on resize event.
             if let Some(grid) = self.document.get_element_by_id("grid") {
                 grid.remove();
-                self.reset_grid();
+                self.reset_grid()?;
             }
         }
 
@@ -173,16 +170,16 @@ impl Backend for DomBackend {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
 
-            let body = self.document.body().unwrap();
-            body.append_child(&self.grid).unwrap();
+            let body = self.document.body().ok_or(Error::UnableToRetrieveBody)?;
+            body.append_child(&self.grid).map_err(Error::from)?;
 
-            self.prerender();
+            self.prerender()?;
             // set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
         }
         // check if the buffer has changed since the last render and update the grid
         if self.buffer != self.prev_buffer {
-            self.update_grid();
+            self.update_grid()?;
         }
         self.prev_buffer = self.buffer.clone();
         Ok(())
@@ -211,7 +208,7 @@ impl Backend for DomBackend {
 
     fn size(&self) -> IoResult<Size> {
         Ok(Size::new(
-            self.buffer.first().unwrap().len().saturating_sub(1) as u16,
+            self.buffer[0].len().saturating_sub(1) as u16,
             self.buffer.len().saturating_sub(1) as u16,
         ))
     }

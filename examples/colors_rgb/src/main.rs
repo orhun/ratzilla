@@ -14,7 +14,7 @@ use ratzilla::{
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new();
+    let backend = CanvasBackend::new().expect("Failed to initialize canvas backend");
     let terminal = Terminal::new(backend).expect("Failed to initialize terminal");
     let mut app = ColorsWidget::default();
     terminal.render_on_web(move |frame| {

@@ -39,7 +39,7 @@ struct Cli {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    let backend = CanvasBackend::new();
+    let backend = CanvasBackend::new().expect("Unable to create canvas backend");
     let terminal = Terminal::new(backend).unwrap();
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
