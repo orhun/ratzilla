@@ -1,15 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use ratzilla::event::KeyCode;
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
 use ratzilla::DomBackend;
 use ratzilla::RenderOnWeb;
 
-use ratzilla::event::KeyCode;
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Style, Stylize},
     symbols::Marker,
     widgets::canvas::{Canvas, Circle},
     widgets::{Block, Paragraph, Widget},
@@ -64,7 +64,7 @@ impl App {
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
-    let backend = DomBackend::new();
+    let backend = DomBackend::new().unwrap();
     let terminal = Terminal::new(backend).unwrap();
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
@@ -72,10 +72,10 @@ fn main() {
             let mut app_state = app_state_cloned.borrow_mut();
             match event.code {
                 KeyCode::Char('q') => {
-                    set_document_title("Grind to win");
+                    let _ = set_document_title("Grind to win");
                 }
                 KeyCode::Char('r') => {
-                    set_document_title("RATATUI ! ! !");
+                    let _ = set_document_title("RATATUI ! ! !");
                 }
                 KeyCode::Char('a') => {
                     app_state.count = 0;
@@ -101,6 +101,7 @@ fn main() {
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
+                        .title("Ratzilla".bold())
                         .border_style(Style::default().fg(Color::Yellow).bg(Color::Black)),
                 ),
             left,
