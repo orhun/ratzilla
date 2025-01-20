@@ -16,7 +16,7 @@ use web_sys::Window;
 
 use crate::backend::utils::*;
 use crate::error::Error;
-use crate::widgets::HYPERLINK;
+use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
 
 /// DOM backend.
 ///
@@ -90,12 +90,12 @@ impl DomBackend {
             let mut line_cells: Vec<Element> = Vec::new();
             let mut hyperlink: Vec<Cell> = Vec::new();
             for (i, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK) {
+                if cell.modifier.contains(HYPERLINK_MODIFIER) {
                     hyperlink.push(cell.clone());
                     // If the next cell is not part of the hyperlink, close it
                     if !line
                         .get(i + 1)
-                        .map(|c| c.modifier.contains(HYPERLINK))
+                        .map(|c| c.modifier.contains(HYPERLINK_MODIFIER))
                         .unwrap_or(false)
                     {
                         let anchor = create_anchor(&self.document, &hyperlink)?;
@@ -133,7 +133,7 @@ impl DomBackend {
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK) {
+                if cell.modifier.contains(HYPERLINK_MODIFIER) {
                     continue;
                 }
                 if cell != &self.prev_buffer[y][x] {
