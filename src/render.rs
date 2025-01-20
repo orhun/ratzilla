@@ -8,20 +8,33 @@ use web_sys::window;
 
 use crate::event::KeyEvent;
 
+/// Trait for rendering on the web.
+///
+/// It provides all the necessary methods to render the terminal on the web
+/// and also interact with the browser such as handling key events.
 pub trait RenderOnWeb {
+    /// Renders the terminal on the web.
+    ///
+    /// This method takes a closure that will be called on every update
+    /// that the browser makes during [`requestAnimationFrame`] calls.
+    ///
+    /// TODO: Clarify and validate this.
+    ///
+    /// [`requestAnimationFrame`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
     fn render_on_web<F>(self, render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static;
 
+    /// Handles key events.
+    ///
+    /// This method takes a closure that will be called on every `keydown` event.
     fn on_key_event<F>(&self, mut callback: F)
     where
         F: FnMut(KeyEvent) + 'static,
     {
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            web_sys::console::log_1(&event);
             callback(event.into());
         });
-
         let window = window().unwrap();
         let document = window.document().unwrap();
         document
@@ -30,6 +43,7 @@ pub trait RenderOnWeb {
         closure.forget();
     }
 
+    /// Requests an animation frame.
     fn request_animation_frame(f: &Closure<dyn FnMut()>) {
         window()
             .unwrap()
@@ -38,6 +52,7 @@ pub trait RenderOnWeb {
     }
 }
 
+/// Implement [`RenderOnWeb`] for Ratatui's [`Terminal`].
 impl<T> RenderOnWeb for Terminal<T>
 where
     T: Backend + 'static,

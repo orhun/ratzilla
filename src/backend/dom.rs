@@ -18,34 +18,58 @@ use crate::error::Error;
 use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
+/// DOM backend.
+///
+/// This backend uses the DOM to render the content to the screen.
+///
+/// In other words, it transforms the [`Cell`]s into `<span>`s which are then appended to a `<pre>`
+/// element.
 #[derive(Debug)]
 pub struct DomBackend {
+    /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
+    /// Current buffer.
     buffer: Vec<Vec<Cell>>,
+    /// Previous buffer.
     prev_buffer: Vec<Vec<Cell>>,
+    /// Cells.
     cells: Vec<Element>,
+    /// Grid element.
     grid: Element,
+    /// Window.
     window: Window,
+    /// Document.
     document: Document,
 }
 
 impl DomBackend {
+    /// Constructs a new [`DomBackend`].
     pub fn new() -> Result<Self, Error> {
-        // use this time to initialize the grid and the document object for the backend to use later on
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
         let mut backend = Self {
+            initialized: Rc::new(RefCell::new(false)),
             buffer: vec![],
             prev_buffer: vec![],
             cells: vec![],
             grid: document.create_element("div")?,
             window,
             document,
-            initialized: Rc::new(RefCell::new(false)),
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
         Ok(backend)
+    }
+
+    /// Add a listener to the window resize event.
+    fn add_on_resize_listener(&mut self) {
+        let initialized = self.initialized.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |_: web_sys::Event| {
+            initialized.replace(false);
+        });
+        self.window
+            .set_onresize(Some(closure.as_ref().unchecked_ref()));
+        closure.forget();
     }
 
     /// Reset the grid and clear the cells.
@@ -58,10 +82,10 @@ impl DomBackend {
         Ok(())
     }
 
+    /// Pre-render the content to the screen.
+    ///
     /// This function is called from [`flush`] once to render the initial content to the screen.
     fn prerender(&mut self) -> Result<(), Error> {
-        web_sys::console::log_1(&"hello from prerender".into());
-
         for line in self.buffer.iter() {
             let mut line_cells: Vec<Element> = Vec::new();
             let mut hyperlink: Vec<Cell> = Vec::new();
@@ -105,8 +129,7 @@ impl DomBackend {
         Ok(())
     }
 
-    // Compare the current buffer to the previous buffer and update only the cells that have
-    // changed since the last render call.
+    /// Compare the current buffer to the previous buffer and updates the grid accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
@@ -114,7 +137,6 @@ impl DomBackend {
                     continue;
                 }
                 if cell != &self.prev_buffer[y][x] {
-                    // web_sys::console::log_1(&format!("Cell different at ({}, {})", x, y).into());
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     elem.set_inner_html(cell.symbol());
                     elem.set_attribute("style", &get_cell_style_as_css(cell))?;
@@ -123,19 +145,10 @@ impl DomBackend {
         }
         Ok(())
     }
-
-    fn add_on_resize_listener(&mut self) {
-        let initialized = self.initialized.clone();
-        let closure = Closure::<dyn FnMut(_)>::new(move |_: web_sys::Event| {
-            initialized.replace(false);
-        });
-        self.window
-            .set_onresize(Some(closure.as_ref().unchecked_ref()));
-        closure.forget();
-    }
 }
 
 impl Backend for DomBackend {
+    // Populates the buffer with the given content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
@@ -165,19 +178,20 @@ impl Backend for DomBackend {
         Ok(())
     }
 
-    /// The flush is called after the draw function to actually render the content to the screen.
+    /// Flush the content to the screen.
+    ///
+    /// This function is called after the [`draw`] function to actually
+    /// render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
-
             let body = self.document.body().ok_or(Error::UnableToRetrieveBody)?;
             body.append_child(&self.grid).map_err(Error::from)?;
-
             self.prerender()?;
-            // set the previous buffer to the current buffer for the first render
+            // Set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
         }
-        // check if the buffer has changed since the last render and update the grid
+        // Check if the buffer has changed since the last render and update the grid
         if self.buffer != self.prev_buffer {
             self.update_grid()?;
         }
@@ -214,14 +228,14 @@ impl Backend for DomBackend {
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        todo!()
+        unimplemented!()
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
-        todo!()
+        unimplemented!()
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
-        todo!()
+        unimplemented!()
     }
 }

@@ -1,11 +1,17 @@
+/// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
+    /// The key code.
     pub code: KeyCode,
+    /// Whether the control key is pressed.
     pub ctrl: bool,
+    /// Whether the alt key is pressed.
     pub alt: bool,
+    /// Whether the shift key is pressed.
     pub shift: bool,
 }
 
+/// Convert a [`web_sys::KeyboardEvent`] to a [`KeyEvent`].
 impl From<web_sys::KeyboardEvent> for KeyEvent {
     fn from(event: web_sys::KeyboardEvent) -> Self {
         let ctrl = event.ctrl_key();
@@ -20,6 +26,7 @@ impl From<web_sys::KeyboardEvent> for KeyEvent {
     }
 }
 
+/// A key code.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum KeyCode {
     /// Normal letter key input.
@@ -56,6 +63,7 @@ pub enum KeyCode {
     Unidentified,
 }
 
+/// Convert a [`web_sys::KeyboardEvent`] to a [`KeyCode`].
 impl From<web_sys::KeyboardEvent> for KeyCode {
     fn from(event: web_sys::KeyboardEvent) -> Self {
         let key = event.key();
