@@ -11,8 +11,8 @@ use web_sys::wasm_bindgen::JsCast;
 use web_sys::wasm_bindgen::JsValue;
 use web_sys::window;
 
+use crate::backend::utils::*;
 use crate::error::Error;
-use crate::utils::*;
 
 /// Canvas renderer.
 #[derive(Debug)]

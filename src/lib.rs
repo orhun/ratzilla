@@ -7,7 +7,7 @@ pub mod error;
 /// Event/input handling.
 pub mod event;
 
-/// Utility functions.
+/// Web utility functions.
 pub mod utils;
 
 /// Widgets.
