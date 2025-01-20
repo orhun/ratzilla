@@ -14,8 +14,8 @@ use web_sys::Document;
 use web_sys::Element;
 use web_sys::Window;
 
+use crate::backend::utils::*;
 use crate::error::Error;
-use crate::utils::*;
 use crate::widgets::HYPERLINK;
 
 /// DOM backend.
