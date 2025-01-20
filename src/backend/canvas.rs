@@ -14,13 +14,17 @@ use web_sys::window;
 use crate::error::Error;
 use crate::utils::*;
 
+/// Canvas renderer.
 #[derive(Debug)]
 struct Canvas {
+    /// Canvas element.
     inner: web_sys::HtmlCanvasElement,
+    /// Rendering context.
     context: web_sys::CanvasRenderingContext2d,
 }
 
 impl Canvas {
+    /// Constructs a new [`Canvas`].
     fn new(document: web_sys::Document) -> Result<Self, Error> {
         let element = document.create_element("canvas")?;
         let canvas = element
@@ -53,22 +57,27 @@ impl Canvas {
     }
 }
 
+/// Canvas backend.
+///
+/// This backend renders the buffer onto a HTML canvas element.
 #[derive(Debug)]
 pub struct CanvasBackend {
+    /// Whether the canvas has been initialized.
     initialized: bool,
+    /// Current buffer.
     buffer: Vec<Vec<Cell>>,
+    /// Previous buffer.
     prev_buffer: Vec<Vec<Cell>>,
+    /// Canvas.
     canvas: Canvas,
 }
 
 impl CanvasBackend {
+    /// Constructs a new [`CanvasBackend`].
     pub fn new() -> Result<Self, Error> {
-        // use this time to initialize the grid and the document object for the backend to use later on
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-
         let canvas = Canvas::new(document)?;
-
         Ok(Self {
             buffer: get_sized_buffer_from_canvas(&canvas.inner),
             prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
@@ -77,8 +86,10 @@ impl CanvasBackend {
         })
     }
 
-    // here's the deal, we compare the current buffer to the previous buffer and update only the cells that have changed since the last render call
-    fn update_grid(&mut self, force_redraw: bool) {
+    // Compare the current buffer to the previous buffer and updates the canvas accordingly.
+    //
+    // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
+    fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
         if force_redraw {
             self.canvas.context.clear_rect(
                 0.0,
@@ -87,40 +98,37 @@ impl CanvasBackend {
                 self.canvas.inner.client_height() as f64,
             );
         }
-
-        let _ = self.canvas.context.translate(5_f64, 5_f64);
+        self.canvas.context.translate(5_f64, 5_f64)?;
         let xmul = 10.0;
         let ymul = 19.0;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
                     let colors = get_cell_color_for_canvas(cell);
-
                     self.canvas.context.set_fill_style_str(colors.1.as_str());
                     self.canvas
                         .context
                         .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
-
                     self.canvas.context.set_fill_style_str(colors.0.as_str());
-
-                    let _ = self.canvas.context.fill_text(
+                    self.canvas.context.fill_text(
                         cell.symbol(),
                         x as f64 * xmul,
                         y as f64 * ymul,
-                    );
+                    )?;
                 }
             }
         }
-        let _ = self.canvas.context.translate(-5_f64, -5_f64);
+        self.canvas.context.translate(-5_f64, -5_f64)?;
+        Ok(())
     }
 }
 
 impl Backend for CanvasBackend {
+    // Populates the buffer with the given content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        // web_sys::console::log_1(&"hello from draw".into());
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
@@ -128,7 +136,6 @@ impl Backend for CanvasBackend {
             line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
             line[x] = cell.clone();
         }
-        // web_sys::console::log_1(&"hello from draw end ".into());
         Ok(())
     }
 
@@ -161,28 +168,28 @@ impl Backend for CanvasBackend {
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        todo!()
+        unimplemented!()
     }
 
     fn flush(&mut self) -> IoResult<()> {
         if !self.initialized {
-            self.update_grid(true);
+            self.update_grid(true)?;
             self.prev_buffer = self.buffer.clone();
             self.initialized = true;
             return Ok(());
         }
         if self.buffer != self.prev_buffer {
-            self.update_grid(false);
+            self.update_grid(false)?;
         }
         self.prev_buffer = self.buffer.clone();
         Ok(())
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
-        todo!()
+        unimplemented!()
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
-        todo!()
+        unimplemented!()
     }
 }

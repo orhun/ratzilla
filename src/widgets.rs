@@ -1,13 +1,18 @@
 use ratatui::{buffer::Buffer, layout::Rect, style::Modifier, text::Span, widgets::Widget};
 
+/// Hyperlink modifier.
+///
 /// When added as a modifier to a style, the styled element is marked as hyperlink.
 pub(crate) const HYPERLINK: Modifier = Modifier::SLOW_BLINK;
 
+/// Hyperlink widget.
 pub struct Hyperlink<'a> {
+    /// Line.
     line: Span<'a>,
 }
 
 impl<'a> Hyperlink<'a> {
+    /// Constructs a new [`Hyperlink`] widget.
     pub fn new(url: &'a str) -> Self {
         Self {
             line: Span::from(url).style(HYPERLINK),

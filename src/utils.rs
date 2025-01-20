@@ -6,6 +6,7 @@ use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
 use crate::error::Error;
 
+/// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
     span.set_inner_html(cell.symbol());
@@ -15,6 +16,7 @@ pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, E
     Ok(span)
 }
 
+/// Creates a new `<a>` element with the given cells.
 pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Element, Error> {
     let anchor = document.create_element("a")?;
     anchor.set_attribute(
@@ -25,6 +27,7 @@ pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Eleme
     Ok(anchor)
 }
 
+/// Converts a cell to a CSS style.
 pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
@@ -65,6 +68,7 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
+/// Converts a cell to a CSS style.
 pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
@@ -82,6 +86,7 @@ pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {
     (fg_style, bg_style)
 }
 
+/// Converts an ANSI color to an RGB tuple.
 fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
     match color {
         Color::Black => Some((0, 0, 0)),
@@ -112,6 +117,7 @@ fn get_window_size() -> (u16, u16) {
     (w / 10, h / 20)
 }
 
+/// Calculates the number of pixels that can fit in the window.
 fn get_raw_window_size() -> (u16, u16) {
     fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
         val.as_f64().and_then(|i| I::try_from(i as usize).ok())
@@ -127,6 +133,8 @@ fn get_raw_window_size() -> (u16, u16) {
         .unwrap_or((120, 120))
 }
 
+/// Returns `true` if the screen is a mobile device.
+///
 // TODO: Improve this...
 fn is_mobile() -> bool {
     get_raw_screen_size().0 < 550
@@ -145,6 +153,7 @@ fn get_screen_size() -> (u16, u16) {
     (w as u16 / 10, h as u16 / 19)
 }
 
+/// Returns a buffer based on the screen size.
 pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     let (width, height) = if is_mobile() {
         get_screen_size()
@@ -154,12 +163,14 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
+/// Returns a buffer based on the canvas size.
 pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
     let width = canvas.client_width() as u16 / 10_u16;
     let height = canvas.client_height() as u16 / 19_u16;
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
+/// Sets the document title.
 pub fn set_document_title(title: &str) -> Result<(), Error> {
     web_sys::window()
         .ok_or(Error::UnableToRetrieveWindow)?
