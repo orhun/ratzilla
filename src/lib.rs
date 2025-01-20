@@ -14,7 +14,7 @@ pub mod utils;
 pub mod widgets;
 
 /// Backend.
-mod backend;
+pub mod backend;
 
 /// Rendering.
 mod render;
