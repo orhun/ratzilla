@@ -4,7 +4,7 @@ Build terminal-themed web applications with Rust and WebAssembly. Powered by [Ra
 
 ## Quickstart
 
-Add Ratzilla as a dependency in your `Cargo.toml`:
+Add **Ratzilla** as a dependency in your `Cargo.toml`:
 
 ```sh
 cargo add ratzilla
@@ -17,14 +17,15 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use ratzilla::event::KeyCode;
 use ratzilla::ratatui::{
     layout::Alignment,
     style::Color,
     widgets::{Block, Paragraph},
     Terminal,
 };
+
 use ratzilla::{DomBackend, RenderOnWeb};
+use ratzilla::event::KeyCode;
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
@@ -113,5 +114,44 @@ trunk serve
 
 Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 
+## Backends
+
+**Ratzilla** currently supports the following backends:
+
+1. [`DomBackend`]: Works by converting the cells to HTML elements (e.g. `<span>`, `<a>`, etc.) and rendering them in the DOM.
+2. [`CanvasBackend`]: Works by rendering the cells in a HTML canvas element.
+
+Both of these backends have their own pros and cons.
+
+The [`DomBackend`] is more flexible and easier to style, but it can be slower for large TUIs. The [`CanvasBackend`] is faster and more efficient, but does not support all the features of the [`DomBackend`] such as hyperlinks.
+
+## Widgets
+
+**Ratzilla** provides web-only widgets that you can use while building TUIs for web.
+
+### [`Hyperlink`]
+
+A widget that can be used to render hyperlinks.
+
+```rust
+use ratzilla::widgets::Hyperlink;
+
+let link = Hyperlink::new("https://ratatui.rs");
+frame.render_widget(link, frame.area());
+```
+
+## Acknowledgements
+
+Thanks to [Webatui] projects for the inspiration and the initial implementation of the essential parts of DOM backend.
+
+Special thanks to [Martin Blasko] for his huge help and contributions.
+
+Lastly, thanks to [Ratatui] for providing the core TUI components.
+
 [trunk]: https://trunkrs.dev
 [Ratatui]: https://ratatui.rs
+[`DomBackend`]: https://docs.rs/ratzilla/latest/ratzilla/struct.DomBackend.html
+[`CanvasBackend`]: https://docs.rs/ratzilla/latest/ratzilla/struct.CanvasBackend.html
+[`Hyperlink`]: https://docs.rs/ratzilla/latest/ratzilla/widgets/struct.Hyperlink.html
+[Webatui]: https://github.com/TylerBloom/webatui
+[Martin Blasko]: https://github.com/MartinBspheroid
