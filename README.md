@@ -133,11 +133,13 @@ The [`DomBackend`] is more flexible and easier to style, but it can be slower fo
 
 A widget that can be used to render hyperlinks.
 
-```rust
+```rust no_run
 use ratzilla::widgets::Hyperlink;
 
 let link = Hyperlink::new("https://ratatui.rs");
-frame.render_widget(link, frame.area());
+
+// Then you can render it as usual:
+// frame.render_widget(link, frame.area());
 ```
 
 ## Acknowledgements
