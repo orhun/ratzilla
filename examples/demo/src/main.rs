@@ -1,23 +1,17 @@
 //! # [Ratatui] Original Demo example
 //!
-//! The latest version of this example is available in the [examples] folder in the repository.
-//!
-//! Please note that the examples are designed to be run against the `main` branch of the Github
-//! repository. This means that you may not be able to compile with the latest release version on
-//! crates.io, or the one that you have installed locally.
-//!
-//! See the [examples readme] for more information on finding examples that match the version of the
-//! library you are using.
+//! The latest version of this example is available in the [examples] folder in the upstream.
 //!
 //! [Ratatui]: https://github.com/ratatui/ratatui
 //! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
 //! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{cell::RefCell, error::Error, rc::Rc};
+use std::{cell::RefCell, io::Result, rc::Rc};
 
 use app::App;
 use clap::Parser;
 use ratzilla::event::KeyCode;
+use ratzilla::ratatui::style::Color;
 use ratzilla::ratatui::Terminal;
 use ratzilla::{CanvasBackend, RenderOnWeb};
 
@@ -37,17 +31,27 @@ struct Cli {
     unicode: bool,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<()> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    let backend = CanvasBackend::new().expect("Unable to create canvas backend");
-    let terminal = Terminal::new(backend).unwrap();
+    let mut backend = CanvasBackend::new_with_size(1600, 900)?;
+    backend.set_background_color(Color::Rgb(18, 18, 18));
+    let terminal = Terminal::new(backend)?;
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
             match event.code {
-                KeyCode::Tab => {
+                KeyCode::Right => {
                     app_state.on_right();
+                }
+                KeyCode::Left => {
+                    app_state.on_left();
+                }
+                KeyCode::Up => {
+                    app_state.on_up();
+                }
+                KeyCode::Down => {
+                    app_state.on_down();
                 }
                 KeyCode::Char(c) => app_state.on_key(c),
                 _ => {}
