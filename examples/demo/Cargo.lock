@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "ratzilla"
-version = "0.0.0-alpha.4"
+version = "0.0.0-alpha.5"
 dependencies = [
  "console_error_panic_hook",
  "ratatui",
