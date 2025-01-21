@@ -5,6 +5,7 @@ use ratatui::buffer::Cell;
 use ratatui::layout::Position;
 use ratatui::layout::Size;
 use ratatui::prelude::Backend;
+use ratatui::style::Color;
 use web_sys::js_sys::Boolean;
 use web_sys::js_sys::Map;
 use web_sys::wasm_bindgen::JsCast;
@@ -21,19 +22,26 @@ struct Canvas {
     inner: web_sys::HtmlCanvasElement,
     /// Rendering context.
     context: web_sys::CanvasRenderingContext2d,
+    /// Background color.
+    background_color: Color,
 }
 
 impl Canvas {
     /// Constructs a new [`Canvas`].
-    fn new(document: web_sys::Document) -> Result<Self, Error> {
+    fn new(
+        document: web_sys::Document,
+        width: u32,
+        height: u32,
+        background_color: Color,
+    ) -> Result<Self, Error> {
         let element = document.create_element("canvas")?;
         let canvas = element
             .clone()
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
             .expect("Unable to cast canvas element");
-        canvas.set_width(1400);
-        canvas.set_height(1000);
+        canvas.set_width(width);
+        canvas.set_height(height);
         let context_options = Map::new();
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
         context_options.set(
@@ -53,6 +61,7 @@ impl Canvas {
         Ok(Self {
             inner: canvas,
             context,
+            background_color,
         })
     }
 }
@@ -75,15 +84,26 @@ pub struct CanvasBackend {
 impl CanvasBackend {
     /// Constructs a new [`CanvasBackend`].
     pub fn new() -> Result<Self, Error> {
+        let (width, height) = get_raw_window_size();
+        Self::new_with_size(width.into(), height.into())
+    }
+
+    /// Constructs a new [`CanvasBackend`] with the given size.
+    pub fn new_with_size(width: u32, height: u32) -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-        let canvas = Canvas::new(document)?;
+        let canvas = Canvas::new(document, width, height, Color::Black)?;
         Ok(Self {
             buffer: get_sized_buffer_from_canvas(&canvas.inner),
             prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
             initialized: false,
             canvas,
         })
+    }
+
+    /// Sets the background color of the canvas.
+    pub fn set_background_color(&mut self, color: Color) {
+        self.canvas.background_color = color;
     }
 
     // Compare the current buffer to the previous buffer and updates the canvas accordingly.
@@ -104,7 +124,7 @@ impl CanvasBackend {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
-                    let colors = get_cell_color_for_canvas(cell);
+                    let colors = get_cell_color_for_canvas(cell, self.canvas.background_color);
                     self.canvas.context.set_fill_style_str(colors.1.as_str());
                     self.canvas
                         .context

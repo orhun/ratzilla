@@ -69,7 +69,7 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 }
 
 /// Converts a cell to a CSS style.
-pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {
+pub(crate) fn get_cell_color_for_canvas(cell: &Cell, background_color: Color) -> (String, String) {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
 
@@ -80,7 +80,10 @@ pub(crate) fn get_cell_color_for_canvas(cell: &Cell) -> (String, String) {
 
     let bg_style = match bg {
         Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
-        None => "#333".to_string(),
+        None => match background_color {
+            Color::Rgb(r, g, b) => format!("rgb({}, {}, {})", r, g, b),
+            _ => "rgb(0, 0, 0)".to_string(),
+        },
     };
 
     (fg_style, bg_style)
@@ -106,19 +109,19 @@ fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
         Color::LightCyan => Some((0, 255, 255)),
         Color::White => Some((255, 255, 255)),
         Color::Rgb(r, g, b) => Some((r, g, b)),
-        _ => None, // Handle invalid color names
+        _ => None,
     }
 }
 
 /// Calculates the number of characters that can fit in the window.
-fn get_window_size() -> (u16, u16) {
+pub(crate) fn get_window_size() -> (u16, u16) {
     let (w, h) = get_raw_window_size();
     // These are mildly magical numbers... make them more precise
     (w / 10, h / 20)
 }
 
 /// Calculates the number of pixels that can fit in the window.
-fn get_raw_window_size() -> (u16, u16) {
+pub(crate) fn get_raw_window_size() -> (u16, u16) {
     fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
         val.as_f64().and_then(|i| I::try_from(i as usize).ok())
     }
