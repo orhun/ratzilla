@@ -13,9 +13,12 @@ pub struct Hyperlink<'a> {
 
 impl<'a> Hyperlink<'a> {
     /// Constructs a new [`Hyperlink`] widget.
-    pub fn new(url: &'a str) -> Self {
+    pub fn new<T>(url: T) -> Self
+    where
+        T: Into<Span<'a>>,
+    {
         Self {
-            line: Span::from(url).style(HYPERLINK_MODIFIER),
+            line: url.into().style(HYPERLINK_MODIFIER),
         }
     }
 }
