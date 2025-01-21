@@ -124,6 +124,12 @@ trunk serve
 
 Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 
+## Examples
+
+- [Demo](https://github.com/orhun/ratzilla/tree/main/examples/demo)
+- [Pong](https://github.com/orhun/ratzilla/examples/pong)
+- [Colors RGB](https://github.com/orhun/ratzilla/examples/colors_rgb)
+
 ## Backends
 
 **Ratzilla** currently supports the following backends:
@@ -137,7 +143,7 @@ The [`DomBackend`] is more flexible and easier to style, but it can be slower fo
 
 ## Widgets
 
-**Ratzilla** provides web-only widgets that you can use while building TUIs for web.
+**Ratzilla** provides web-only widgets that you can use while building TUIs.
 
 ### [`Hyperlink`]
 
@@ -167,3 +173,22 @@ Lastly, thanks to [Ratatui] for providing the core TUI components.
 [`Hyperlink`]: https://docs.rs/ratzilla/latest/ratzilla/widgets/struct.Hyperlink.html
 [Webatui]: https://github.com/TylerBloom/webatui
 [Martin Blasko]: https://github.com/MartinBspheroid
+
+## Contributing
+
+Pull requests are welcome!
+
+Consider submitting your ideas via [issues](https://github.com/orhun/ratzilla/issues/new) first and check out the [existing issues](https://github.com/orhun/ratzilla/issues).
+
+## License
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat&logo=GitHub&labelColor=1D272B&color=819188&logoColor=white)](./LICENSE-MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat&logo=GitHub&labelColor=1D272B&color=819188&logoColor=white)](./LICENSE-APACHE)
+
+Licensed under either of [Apache License Version 2.0](./LICENSE-APACHE) or [The MIT License](./LICENSE-MIT) at your option.
+
+🦀 ノ( º \_ º ノ) - respect crables!
+
+## Copyright
+
+Copyright © 2025, [Orhun Parmaksız](mailto:orhunparmaksiz@gmail.com)
