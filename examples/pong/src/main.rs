@@ -61,28 +61,26 @@ impl App {
     }
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
-    let backend = DomBackend::new().unwrap();
-    let terminal = Terminal::new(backend).unwrap();
+    let backend = DomBackend::new()?;
+    let terminal = Terminal::new(backend)?;
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
             match event.code {
-                KeyCode::Char('q') => {
-                    let _ = set_document_title("Grind to win");
+                KeyCode::Char('t') => {
+                    let _ = set_document_title("RATATUI");
                 }
-                KeyCode::Char('r') => {
-                    let _ = set_document_title("RATATUI ! ! !");
-                }
-                KeyCode::Char('a') => {
+                KeyCode::Char(' ') => {
                     app_state.count = 0;
-                    app_state.ball.color = Color::Green;
-                }
-                KeyCode::Char('b') => {
-                    app_state.ball.color = Color::Red;
+                    if app_state.ball.color == Color::Green {
+                        app_state.ball.color = Color::White;
+                    } else {
+                        app_state.ball.color = Color::Green;
+                    }
                 }
                 _ => {}
             }
@@ -101,14 +99,19 @@ fn main() {
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
-                        .title("Ratzilla".bold())
+                        .title_top("Ratzilla".bold())
+                        .title_bottom("Press 't' to change title, enter to change color")
                         .border_style(Style::default().fg(Color::Yellow).bg(Color::Black)),
                 ),
             left,
         );
         f.render_widget(app_state.pong_canvas(), right);
 
-        let link = Hyperlink::new("https://orhun.dev");
-        f.render_widget(link, Rect::new(75, 10, 20, 1));
+        let url = "https://orhun.dev";
+        let link = Hyperlink::new(url);
+        let area = Rect::new(right.x, right.y + right.height - 1, url.len() as u16, 1);
+        f.render_widget(link, area);
     });
+
+    Ok(())
 }
