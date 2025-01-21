@@ -12,14 +12,15 @@ use ratzilla::{
     CanvasBackend, RenderOnWeb,
 };
 
-fn main() {
+fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new().expect("Failed to initialize canvas backend");
-    let terminal = Terminal::new(backend).expect("Failed to initialize terminal");
+    let backend = CanvasBackend::new()?;
+    let terminal = Terminal::new(backend)?;
     let mut app = ColorsWidget::default();
     terminal.render_on_web(move |frame| {
         frame.render_widget(&mut app, frame.area());
     });
+    Ok(())
 }
 
 /// A widget that displays the full range of RGB colors that can be displayed in the terminal.
