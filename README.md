@@ -71,7 +71,14 @@ Then add your `index.html` which imports the JavaScript module:
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/fira_code.min.css"
+    />
     <title>Ratzilla</title>
     <style>
       body {
@@ -83,9 +90,12 @@ Then add your `index.html` which imports the JavaScript module:
         justify-content: center;
         align-items: center;
         align-content: center;
-        font-family: "Courier New", Courier, monospace;
+        background-color: #121212;
+      }
+      pre {
+        font-family: "Fira Code", monospace;
         font-size: 16px;
-        background-color: #333;
+        margin: 0px;
       }
     </style>
   </head>
