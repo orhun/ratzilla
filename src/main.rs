@@ -27,12 +27,14 @@ impl App {
     const fn new() -> Self {
         Self {
             count: 0,
+
             ball: Circle {
                 x: 20.0,
                 y: 20.0,
                 radius: 5.0,
                 color: Color::Green,
             },
+
             vx: 1.0,
             vy: 1.0,
         }
@@ -42,9 +44,11 @@ impl App {
         Canvas::default()
             .marker(Marker::Dot)
             .block(Block::bordered().title("Pong"))
+
             .paint(|ctx| {
                 ctx.draw(&self.ball);
             })
+
             .x_bounds([0.0, 50.0])
             .y_bounds([0.0, 100.0])
     }
@@ -53,9 +57,11 @@ impl App {
         if self.ball.x < 10.0 || self.ball.x > 40.0 {
             self.vx = -self.vx;
         }
+
         if self.ball.y < 10.0 || self.ball.y > 100.0 {
             self.vy = -self.vy;
         }
+
         self.ball.x += self.vx;
         self.ball.y += self.vy;
     }
@@ -63,27 +69,35 @@ impl App {
 
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
     let app_state = Rc::new(RefCell::new(App::new()));
     let backend = DomBackend::new().unwrap();
     let terminal = Terminal::new(backend).unwrap();
+
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
+
         move |event| {
             let mut app_state = app_state_cloned.borrow_mut();
             match event.code {
+
                 KeyCode::Char('q') => {
                     let _ = set_document_title("Grind to win");
                 }
+
                 KeyCode::Char('r') => {
                     let _ = set_document_title("RATATUI ! ! !");
                 }
+
                 KeyCode::Char('a') => {
                     app_state.count = 0;
                     app_state.ball.color = Color::Green;
                 }
+
                 KeyCode::Char('b') => {
                     app_state.ball.color = Color::Red;
                 }
+
                 _ => {}
             }
         }
@@ -92,18 +106,22 @@ fn main() {
         let mut app_state = app_state.borrow_mut();
         app_state.count += 1;
         app_state.update();
+
         let horizontal =
             Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]);
+
         let [left, right] = horizontal.areas(f.area());
 
         f.render_widget(
             Paragraph::new(format!("Count: {}", app_state.count))
+
                 .alignment(Alignment::Center)
                 .block(
                     Block::bordered()
                         .title("Ratzilla".bold())
                         .border_style(Style::default().fg(Color::Yellow).bg(Color::Black)),
                 ),
+
             left,
         );
         f.render_widget(app_state.pong_canvas(), right);

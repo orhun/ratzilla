@@ -21,6 +21,7 @@ pub trait RenderOnWeb {
     /// TODO: Clarify and validate this.
     ///
     /// [`requestAnimationFrame`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+
     fn render_on_web<F>(self, render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static;
@@ -29,14 +30,17 @@ pub trait RenderOnWeb {
     ///
     /// This method takes a closure that will be called on every `keydown` event.
     fn on_key_event<F>(&self, mut callback: F)
+
     where
         F: FnMut(KeyEvent) + 'static,
     {
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
             callback(event.into());
         });
+
         let window = window().unwrap();
         let document = window.document().unwrap();
+
         document
             .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
             .unwrap();

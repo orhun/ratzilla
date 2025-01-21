@@ -24,20 +24,27 @@ use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
 ///
 /// In other words, it transforms the [`Cell`]s into `<span>`s which are then appended to a `<pre>`
 /// element.
+
 #[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
+    
     /// Current buffer.
     buffer: Vec<Vec<Cell>>,
+    
     /// Previous buffer.
     prev_buffer: Vec<Vec<Cell>>,
+    
     /// Cells.
     cells: Vec<Element>,
+    
     /// Grid element.
     grid: Element,
+    
     /// Window.
     window: Window,
+
     /// Document.
     document: Document,
 }
@@ -47,6 +54,7 @@ impl DomBackend {
     pub fn new() -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+    
         let mut backend = Self {
             initialized: Rc::new(RefCell::new(false)),
             buffer: vec![],
@@ -56,6 +64,7 @@ impl DomBackend {
             window,
             document,
         };
+
         backend.add_on_resize_listener();
         backend.reset_grid()?;
         Ok(backend)
@@ -67,8 +76,10 @@ impl DomBackend {
         let closure = Closure::<dyn FnMut(_)>::new(move |_: web_sys::Event| {
             initialized.replace(false);
         });
+        
         self.window
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
+        
         closure.forget();
     }
 
@@ -79,6 +90,7 @@ impl DomBackend {
         self.cells.clear();
         self.buffer = get_sized_buffer();
         self.prev_buffer = self.buffer.clone();
+        
         Ok(())
     }
 
@@ -89,24 +101,29 @@ impl DomBackend {
         for line in self.buffer.iter() {
             let mut line_cells: Vec<Element> = Vec::new();
             let mut hyperlink: Vec<Cell> = Vec::new();
+
             for (i, cell) in line.iter().enumerate() {
                 if cell.modifier.contains(HYPERLINK_MODIFIER) {
                     hyperlink.push(cell.clone());
+
                     // If the next cell is not part of the hyperlink, close it
                     if !line
                         .get(i + 1)
                         .map(|c| c.modifier.contains(HYPERLINK_MODIFIER))
                         .unwrap_or(false)
                     {
+
                         let anchor = create_anchor(&self.document, &hyperlink)?;
                         for link_cell in &hyperlink {
                             let span = create_span(&self.document, link_cell)?;
                             self.cells.push(span.clone());
                             anchor.append_child(&span)?;
                         }
+                        
                         line_cells.push(anchor);
                         hyperlink.clear();
                     }
+
                 } else {
                     let span = create_span(&self.document, cell)?;
                     self.cells.push(span.clone());
@@ -132,10 +149,12 @@ impl DomBackend {
     /// Compare the current buffer to the previous buffer and updates the grid accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
+
             for (x, cell) in line.iter().enumerate() {
                 if cell.modifier.contains(HYPERLINK_MODIFIER) {
                     continue;
                 }
+
                 if cell != &self.prev_buffer[y][x] {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     elem.set_inner_html(cell.symbol());
@@ -143,6 +162,7 @@ impl DomBackend {
                 }
             }
         }
+
         Ok(())
     }
 }
@@ -152,6 +172,7 @@ impl Backend for DomBackend {
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
+    
     {
         if !*self.initialized.borrow() {
             // Only runs on resize event.
@@ -165,11 +186,13 @@ impl Backend for DomBackend {
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
+            
             if y < self.buffer.len() {
                 let line = &mut self.buffer[y];
                 line.extend(
                     std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())),
                 );
+            
                 if x < line.len() {
                     line[x] = cell.clone();
                 }
@@ -182,6 +205,7 @@ impl Backend for DomBackend {
     ///
     /// This function is called after the [`draw`] function to actually
     /// render the content to the screen.
+
     fn flush(&mut self) -> IoResult<()> {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
@@ -191,29 +215,20 @@ impl Backend for DomBackend {
             // Set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
         }
+
         // Check if the buffer has changed since the last render and update the grid
         if self.buffer != self.prev_buffer {
             self.update_grid()?;
         }
+        
         self.prev_buffer = self.buffer.clone();
         Ok(())
     }
 
-    fn hide_cursor(&mut self) -> IoResult<()> {
-        Ok(())
-    }
-
-    fn show_cursor(&mut self) -> IoResult<()> {
-        Ok(())
-    }
-
-    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {
-        Ok((0, 0))
-    }
-
-    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {
-        Ok(())
-    }
+    fn hide_cursor(&mut self) -> IoResult<()> {Ok(())}
+    fn show_cursor(&mut self) -> IoResult<()> {Ok(())}
+    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {Ok((0, 0))}
+    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {Ok(())}
 
     fn clear(&mut self) -> IoResult<()> {
         self.buffer = get_sized_buffer();

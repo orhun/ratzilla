@@ -32,14 +32,18 @@ impl Canvas {
             .dyn_into::<web_sys::HtmlCanvasElement>()
             .map_err(|_| ())
             .expect("Unable to cast canvas element");
+
         canvas.set_width(1400);
         canvas.set_height(1000);
+
         let context_options = Map::new();
+
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
         context_options.set(
             &JsValue::from_str("desynchronized"),
             &Boolean::from(JsValue::TRUE),
         );
+
         let context = canvas
             .get_context_with_context_options("2d", &context_options)?
             .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
@@ -48,7 +52,9 @@ impl Canvas {
 
         context.set_font("16px monospace");
         context.set_text_baseline("top");
+
         let body = document.body().ok_or(Error::UnableToRetrieveBody)?;
+
         body.append_child(&element)?;
         Ok(Self {
             inner: canvas,
@@ -78,6 +84,8 @@ impl CanvasBackend {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
         let canvas = Canvas::new(document)?;
+        let mut modifier_style = String::new();
+        
         Ok(Self {
             buffer: get_sized_buffer_from_canvas(&canvas.inner),
             prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
@@ -98,6 +106,7 @@ impl CanvasBackend {
                 self.canvas.inner.client_height() as f64,
             );
         }
+
         self.canvas.context.translate(5_f64, 5_f64)?;
         let xmul = 10.0;
         let ymul = 19.0;
@@ -105,10 +114,12 @@ impl CanvasBackend {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
                     let colors = get_cell_color_for_canvas(cell);
+
                     self.canvas.context.set_fill_style_str(colors.1.as_str());
                     self.canvas
                         .context
                         .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+
                     self.canvas.context.set_fill_style_str(colors.0.as_str());
                     self.canvas.context.fill_text(
                         cell.symbol(),
@@ -118,6 +129,7 @@ impl CanvasBackend {
                 }
             }
         }
+
         self.canvas.context.translate(-5_f64, -5_f64)?;
         Ok(())
     }
@@ -126,6 +138,7 @@ impl CanvasBackend {
 impl Backend for CanvasBackend {
     // Populates the buffer with the given content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
+
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
@@ -136,24 +149,14 @@ impl Backend for CanvasBackend {
             line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
             line[x] = cell.clone();
         }
+
         Ok(())
     }
 
-    fn hide_cursor(&mut self) -> IoResult<()> {
-        Ok(())
-    }
-
-    fn show_cursor(&mut self) -> IoResult<()> {
-        Ok(())
-    }
-
-    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {
-        Ok((0, 0))
-    }
-
-    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {
-        Ok(())
-    }
+    fn hide_cursor(&mut self) -> IoResult<()> {Ok(())}
+    fn show_cursor(&mut self) -> IoResult<()> {Ok(())}
+    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {Ok((0, 0))}
+    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {Ok(())}
 
     fn clear(&mut self) -> IoResult<()> {
         self.buffer = get_sized_buffer();
@@ -181,6 +184,7 @@ impl Backend for CanvasBackend {
         if self.buffer != self.prev_buffer {
             self.update_grid(false)?;
         }
+
         self.prev_buffer = self.buffer.clone();
         Ok(())
     }

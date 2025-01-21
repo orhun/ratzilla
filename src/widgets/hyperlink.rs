@@ -1,4 +1,10 @@
-use ratatui::{buffer::Buffer, layout::Rect, style::Modifier, text::Span, widgets::Widget};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::Modifier,
+    text::Span,
+    widgets::Widget
+};
 
 /// Hyperlink modifier.
 ///
@@ -22,6 +28,7 @@ impl<'a> Hyperlink<'a> {
 
 impl Widget for Hyperlink<'_> {
     fn render(self, area: Rect, buf: &mut Buffer)
+
     where
         Self: Sized,
     {

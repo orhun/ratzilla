@@ -17,6 +17,7 @@ impl From<web_sys::KeyboardEvent> for KeyEvent {
         let ctrl = event.ctrl_key();
         let alt = event.alt_key();
         let shift = event.shift_key();
+
         KeyEvent {
             code: event.into(),
             ctrl,
@@ -67,14 +68,17 @@ pub enum KeyCode {
 impl From<web_sys::KeyboardEvent> for KeyCode {
     fn from(event: web_sys::KeyboardEvent) -> Self {
         let key = event.key();
+
         if key.len() == 1 {
             let char = key.chars().next();
+
             if let Some(char) = char {
                 return KeyCode::Char(char);
             } else {
                 return KeyCode::Unidentified;
             }
         }
+
         match key.as_str() {
             "F1" => KeyCode::F(1),
             "F2" => KeyCode::F(2),

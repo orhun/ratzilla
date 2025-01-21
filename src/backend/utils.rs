@@ -1,7 +1,4 @@
-use ratatui::{
-    buffer::Cell,
-    style::{Color, Modifier},
-};
+use ratatui::{buffer::Cell, style::{Color, Modifier}};
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
 use crate::error::Error;
@@ -19,10 +16,12 @@ pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, E
 /// Creates a new `<a>` element with the given cells.
 pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Element, Error> {
     let anchor = document.create_element("a")?;
+
     anchor.set_attribute(
         "href",
         &cells.iter().map(|c| c.symbol()).collect::<String>(),
     )?;
+
     anchor.set_attribute("style", &get_cell_style_as_css(&cells[0]))?;
     Ok(anchor)
 }
@@ -31,6 +30,7 @@ pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Eleme
 pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     let fg = ansi_to_rgb(cell.fg);
     let bg = ansi_to_rgb(cell.bg);
+    let mut modifier_style = String::new();
 
     let fg_style = match fg {
         Some(color) => format!("color: rgb({}, {}, {});", color.0, color.1, color.2),
@@ -45,22 +45,26 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
         None => "background-color: transparent;".to_string(),
     };
 
-    let mut modifier_style = String::new();
     if cell.modifier.contains(Modifier::BOLD) {
         modifier_style.push_str("font-weight: bold; ");
     }
+
     if cell.modifier.contains(Modifier::DIM) {
         modifier_style.push_str("opacity: 0.5; ");
     }
+
     if cell.modifier.contains(Modifier::ITALIC) {
         modifier_style.push_str("font-style: italic; ");
     }
+
     if cell.modifier.contains(Modifier::UNDERLINED) {
         modifier_style.push_str("text-decoration: underline; ");
     }
+
     if cell.modifier.contains(Modifier::HIDDEN) {
         modifier_style.push_str("visibility: hidden; ");
     }
+
     if cell.modifier.contains(Modifier::CROSSED_OUT) {
         modifier_style.push_str("text-decoration: line-through; ");
     }
@@ -129,8 +133,8 @@ fn get_raw_window_size() -> (u16, u16) {
                 .ok()
                 .and_then(js_val_to_int::<u16>)
                 .zip(s.inner_height().ok().and_then(js_val_to_int::<u16>))
-        })
-        .unwrap_or((120, 120))
+        
+        }).unwrap_or((120, 120))
 }
 
 /// Returns `true` if the screen is a mobile device.
@@ -160,6 +164,7 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     } else {
         get_window_size()
     };
+
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
@@ -167,5 +172,6 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
 pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
     let width = canvas.client_width() as u16 / 10_u16;
     let height = canvas.client_height() as u16 / 19_u16;
+
     vec![vec![Cell::default(); width as usize]; height as usize]
 }

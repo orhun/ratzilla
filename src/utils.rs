@@ -7,5 +7,6 @@ pub fn set_document_title(title: &str) -> Result<(), Error> {
         .document()
         .ok_or(Error::UnableToRetrieveDocument)?
         .set_title(title);
+
     Ok(())
 }
