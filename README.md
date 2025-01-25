@@ -129,9 +129,10 @@ Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 
 ## Examples
 
+- [Minimal](https://github.com/orhun/ratzilla/tree/main/examples/minimal)
 - [Demo](https://github.com/orhun/ratzilla/tree/main/examples/demo)
-- [Pong](https://github.com/orhun/ratzilla/examples/pong)
-- [Colors RGB](https://github.com/orhun/ratzilla/examples/colors_rgb)
+- [Pong](https://github.com/orhun/ratzilla/tree/main/examples/pong)
+- [Colors RGB](https://github.com/orhun/ratzilla/tree/main/examples/colors_rgb)
 
 ## Acknowledgements
 
