@@ -24,8 +24,8 @@ use ratzilla::ratatui::{
     Terminal,
 };
 
-use ratzilla::{DomBackend, WebRenderer};
 use ratzilla::event::KeyCode;
+use ratzilla::{DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
