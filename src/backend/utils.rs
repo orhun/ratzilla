@@ -137,7 +137,6 @@ pub(crate) fn get_raw_window_size() -> (u16, u16) {
 }
 
 /// Returns `true` if the screen is a mobile device.
-///
 // TODO: Improve this...
 fn is_mobile() -> bool {
     get_raw_screen_size().0 < 550

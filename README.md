@@ -13,9 +13,7 @@ cargo add ratzilla
 Here is a minimal example:
 
 ```rust no_run
-use std::cell::RefCell;
-use std::io;
-use std::rc::Rc;
+use std::{cell::RefCell, io, rc::Rc};
 
 use ratzilla::ratatui::{
     layout::Alignment,
@@ -24,8 +22,7 @@ use ratzilla::ratatui::{
     Terminal,
 };
 
-use ratzilla::event::KeyCode;
-use ratzilla::{DomBackend, WebRenderer};
+use ratzilla::{event::KeyCode, DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));

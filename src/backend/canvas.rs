@@ -1,19 +1,19 @@
 use std::io::Result as IoResult;
 
-use ratatui::backend::WindowSize;
-use ratatui::buffer::Cell;
-use ratatui::layout::Position;
-use ratatui::layout::Size;
-use ratatui::prelude::Backend;
-use ratatui::style::Color;
-use web_sys::js_sys::Boolean;
-use web_sys::js_sys::Map;
-use web_sys::wasm_bindgen::JsCast;
-use web_sys::wasm_bindgen::JsValue;
-use web_sys::window;
+use ratatui::{
+    backend::WindowSize,
+    buffer::Cell,
+    layout::{Position, Size},
+    prelude::Backend,
+    style::Color,
+};
+use web_sys::{
+    js_sys::{Boolean, Map},
+    wasm_bindgen::{JsCast, JsValue},
+    window,
+};
 
-use crate::backend::utils::*;
-use crate::error::Error;
+use crate::{backend::utils::*, error::Error};
 
 /// Canvas renderer.
 #[derive(Debug)]
@@ -106,7 +106,8 @@ impl CanvasBackend {
         self.canvas.background_color = color;
     }
 
-    // Compare the current buffer to the previous buffer and updates the canvas accordingly.
+    // Compare the current buffer to the previous buffer and updates the canvas
+    // accordingly.
     //
     // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
     fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
