@@ -48,7 +48,7 @@ jobs:
           for example in examples/*; do
             mkdir -p dist/$(basename "$example")
             pushd "$example"
-            trunk build --release
+            trunk build --release --public-url https://orhun.dev/ratzilla
             cp -r dist/* ../../dist/$(basename "$example")
             popd
           done
