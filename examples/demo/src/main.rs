@@ -13,7 +13,7 @@ use clap::Parser;
 use ratzilla::event::KeyCode;
 use ratzilla::ratatui::style::Color;
 use ratzilla::ratatui::Terminal;
-use ratzilla::{CanvasBackend, RenderOnWeb};
+use ratzilla::{CanvasBackend, WebRenderer};
 
 mod app;
 
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
             }
         }
     });
-    terminal.render_on_web(move |f| {
+    terminal.draw_web(move |f| {
         let mut app_state = app_state.borrow_mut();
         app_state.on_tick();
         ui::draw(f, &mut app_state);

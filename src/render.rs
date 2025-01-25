@@ -12,7 +12,7 @@ use crate::event::KeyEvent;
 ///
 /// It provides all the necessary methods to render the terminal on the web
 /// and also interact with the browser such as handling key events.
-pub trait RenderOnWeb {
+pub trait WebRenderer {
     /// Renders the terminal on the web.
     ///
     /// This method takes a closure that will be called on every update
@@ -21,7 +21,7 @@ pub trait RenderOnWeb {
     /// TODO: Clarify and validate this.
     ///
     /// [`requestAnimationFrame`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
-    fn render_on_web<F>(self, render_callback: F)
+    fn draw_web<F>(self, render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static;
 
@@ -52,12 +52,12 @@ pub trait RenderOnWeb {
     }
 }
 
-/// Implement [`RenderOnWeb`] for Ratatui's [`Terminal`].
-impl<T> RenderOnWeb for Terminal<T>
+/// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
+impl<T> WebRenderer for Terminal<T>
 where
     T: Backend + 'static,
 {
-    fn render_on_web<F>(mut self, mut render_callback: F)
+    fn draw_web<F>(mut self, mut render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static,
     {

@@ -9,7 +9,7 @@ use ratzilla::{
         widgets::Widget,
         Terminal,
     },
-    CanvasBackend, RenderOnWeb,
+    CanvasBackend, WebRenderer,
 };
 
 fn main() -> std::io::Result<()> {
@@ -17,7 +17,7 @@ fn main() -> std::io::Result<()> {
     let backend = CanvasBackend::new()?;
     let terminal = Terminal::new(backend)?;
     let mut app = ColorsWidget::default();
-    terminal.render_on_web(move |frame| {
+    terminal.draw_web(move |frame| {
         frame.render_widget(&mut app, frame.area());
     });
     Ok(())

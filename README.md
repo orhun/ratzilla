@@ -24,7 +24,7 @@ use ratzilla::ratatui::{
     Terminal,
 };
 
-use ratzilla::{DomBackend, RenderOnWeb};
+use ratzilla::{DomBackend, WebRenderer};
 use ratzilla::event::KeyCode;
 
 fn main() -> io::Result<()> {
@@ -42,7 +42,7 @@ fn main() -> io::Result<()> {
         }
     });
 
-    terminal.render_on_web(move |f| {
+    terminal.draw_web(move |f| {
         let counter = counter.borrow();
         f.render_widget(
             Paragraph::new(format!("Count: {counter}"))
