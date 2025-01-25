@@ -121,39 +121,17 @@ trunk serve
 
 Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 
+## Documentation
+
+- [API Documentation](https://docs.rs/ratzilla)
+- [Backends](https://docs.rs/ratzilla/latest/ratzilla/backend/index.html)
+- [Widgets](https://docs.rs/ratzilla/latest/ratzilla/widgets/index.html)
+
 ## Examples
 
 - [Demo](https://github.com/orhun/ratzilla/tree/main/examples/demo)
 - [Pong](https://github.com/orhun/ratzilla/examples/pong)
 - [Colors RGB](https://github.com/orhun/ratzilla/examples/colors_rgb)
-
-## Backends
-
-**Ratzilla** currently supports the following backends:
-
-1. [`DomBackend`]: Works by converting the cells to HTML elements (e.g. `<span>`, `<a>`, etc.) and rendering them in the DOM.
-2. [`CanvasBackend`]: Works by rendering the cells in a HTML canvas element.
-
-Both of these backends have their own pros and cons.
-
-The [`DomBackend`] is more flexible and easier to style, but it can be slower for large TUIs. The [`CanvasBackend`] is faster and more efficient, but does not support all the features of the [`DomBackend`] such as hyperlinks.
-
-## Widgets
-
-**Ratzilla** provides web-only widgets that you can use while building TUIs.
-
-### [`Hyperlink`]
-
-A widget that can be used to render hyperlinks.
-
-```rust no_run
-use ratzilla::widgets::Hyperlink;
-
-let link = Hyperlink::new("https://ratatui.rs");
-
-// Then you can render it as usual:
-// frame.render_widget(link, frame.area());
-```
 
 ## Acknowledgements
 

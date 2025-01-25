@@ -6,7 +6,16 @@ use ratatui::{buffer::Buffer, layout::Rect, style::Modifier, text::Span, widgets
 /// hyperlink.
 pub(crate) const HYPERLINK_MODIFIER: Modifier = Modifier::SLOW_BLINK;
 
-/// Hyperlink widget.
+/// A widget that can be used to render hyperlinks.
+///
+/// ```rust no_run
+/// use ratzilla::widgets::Hyperlink;
+///
+/// let link = Hyperlink::new("https://ratatui.rs");
+///
+/// // Then you can render it as usual:
+/// // frame.render_widget(link, frame.area());
+/// ```
 pub struct Hyperlink<'a> {
     /// Line.
     line: Span<'a>,
