@@ -1,0 +1,11 @@
+[package]
+name = "pong"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ratzilla = { path = "../../" }
+tachyonfx = { git = "https://github.com/orhun/tachyonfx", branch = "feat/wasm_support", default-features = false, features = ["web-time"] }
+console_error_panic_hook = "0.1.7"
+web-time = "1.1.0"
