@@ -1,10 +1,6 @@
-use ratatui::prelude::Backend;
-use ratatui::Frame;
-use ratatui::Terminal;
-use std::cell::RefCell;
-use std::rc::Rc;
-use web_sys::wasm_bindgen::prelude::*;
-use web_sys::window;
+use ratatui::{prelude::Backend, Frame, Terminal};
+use std::{cell::RefCell, rc::Rc};
+use web_sys::{wasm_bindgen::prelude::*, window};
 
 use crate::event::KeyEvent;
 
@@ -27,7 +23,8 @@ pub trait WebRenderer {
 
     /// Handles key events.
     ///
-    /// This method takes a closure that will be called on every `keydown` event.
+    /// This method takes a closure that will be called on every `keydown`
+    /// event.
     fn on_key_event<F>(&self, mut callback: F)
     where
         F: FnMut(KeyEvent) + 'static,

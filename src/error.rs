@@ -23,7 +23,8 @@ pub enum Error {
 
     /// Unable to retrieve canvas context.
     ///
-    /// This error occurs when `canvas.get_context_with_context_options("2d")` returns `None`.
+    /// This error occurs when `canvas.get_context_with_context_options("2d")`
+    /// returns `None`.
     #[error("Unable to retrieve canvas context")]
     UnableToRetrieveCanvasContext,
 

@@ -1,29 +1,24 @@
-use std::cell::RefCell;
-use std::io::Result as IoResult;
-use std::rc::Rc;
+use std::{cell::RefCell, io::Result as IoResult, rc::Rc};
 
-use ratatui::backend::WindowSize;
-use ratatui::buffer::Cell;
-use ratatui::layout::Position;
-use ratatui::layout::Size;
-use ratatui::prelude::Backend;
-use web_sys::wasm_bindgen::prelude::Closure;
-use web_sys::wasm_bindgen::JsCast;
-use web_sys::window;
-use web_sys::Document;
-use web_sys::Element;
-use web_sys::Window;
+use ratatui::{
+    backend::WindowSize,
+    buffer::Cell,
+    layout::{Position, Size},
+    prelude::Backend,
+};
+use web_sys::{
+    wasm_bindgen::{prelude::Closure, JsCast},
+    window, Document, Element, Window,
+};
 
-use crate::backend::utils::*;
-use crate::error::Error;
-use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
+use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
 
 /// DOM backend.
 ///
 /// This backend uses the DOM to render the content to the screen.
 ///
-/// In other words, it transforms the [`Cell`]s into `<span>`s which are then appended to a `<pre>`
-/// element.
+/// In other words, it transforms the [`Cell`]s into `<span>`s which are then
+/// appended to a `<pre>` element.
 #[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
@@ -84,7 +79,8 @@ impl DomBackend {
 
     /// Pre-render the content to the screen.
     ///
-    /// This function is called from [`flush`] once to render the initial content to the screen.
+    /// This function is called from [`flush`] once to render the initial
+    /// content to the screen.
     fn prerender(&mut self) -> Result<(), Error> {
         for line in self.buffer.iter() {
             let mut line_cells: Vec<Element> = Vec::new();
@@ -128,7 +124,8 @@ impl DomBackend {
         Ok(())
     }
 
-    /// Compare the current buffer to the previous buffer and updates the grid accordingly.
+    /// Compare the current buffer to the previous buffer and updates the grid
+    /// accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
@@ -179,8 +176,8 @@ impl Backend for DomBackend {
 
     /// Flush the content to the screen.
     ///
-    /// This function is called after the [`DomBackend::draw`] function to actually
-    /// render the content to the screen.
+    /// This function is called after the [`DomBackend::draw`] function to
+    /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
