@@ -179,7 +179,7 @@ impl Backend for DomBackend {
 
     /// Flush the content to the screen.
     ///
-    /// This function is called after the [`draw`] function to actually
+    /// This function is called after the [`DomBackend::draw`] function to actually
     /// render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         if !*self.initialized.borrow() {
