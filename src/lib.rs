@@ -24,4 +24,4 @@ pub use ratatui;
 
 pub use backend::canvas::CanvasBackend;
 pub use backend::dom::DomBackend;
-pub use render::RenderOnWeb;
+pub use render::WebRenderer;

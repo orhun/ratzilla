@@ -5,7 +5,7 @@ use ratzilla::event::KeyCode;
 use ratzilla::utils::set_document_title;
 use ratzilla::widgets::Hyperlink;
 use ratzilla::DomBackend;
-use ratzilla::RenderOnWeb;
+use ratzilla::WebRenderer;
 
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
@@ -86,7 +86,7 @@ fn main() -> std::io::Result<()> {
             }
         }
     });
-    terminal.render_on_web(move |f| {
+    terminal.draw_web(move |f| {
         let mut app_state = app_state.borrow_mut();
         app_state.count += 1;
         app_state.update();
