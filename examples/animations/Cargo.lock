@@ -256,7 +256,6 @@ dependencies = [
  "console_error_panic_hook",
  "ratzilla",
  "tachyonfx",
- "web-time",
 ]
 
 [[package]]
