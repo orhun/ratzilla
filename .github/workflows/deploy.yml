@@ -50,7 +50,11 @@ jobs:
             mkdir -p dist/"$example_name"
             pushd "$example"
             trunk build --release --public-url https://orhun.dev/ratzilla/"$example_name"
-            cp -r dist/* ../../dist/$(basename "$example")
+            if [ "$example_name" == "website" ]; then
+              cp -r dist/* ../../dist/
+            else
+              cp -r dist/* ../../dist/"$example_name"
+            fi
             popd
           done
       - name: Upload artifact
