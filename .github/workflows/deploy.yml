@@ -49,10 +49,11 @@ jobs:
             example_name=$(basename "$example")
             mkdir -p dist/"$example_name"
             pushd "$example"
-            trunk build --release --public-url https://orhun.dev/ratzilla/"$example_name"
             if [ "$example_name" == "website" ]; then
+              trunk build --release --public-url https://orhun.dev/ratzilla/
               cp -r dist/* ../../dist/
             else
+              trunk build --release --public-url https://orhun.dev/ratzilla/"$example_name"
               cp -r dist/* ../../dist/"$example_name"
             fi
             popd
