@@ -4,7 +4,10 @@ use ratatui::{
 };
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
-use crate::error::Error;
+use crate::{
+    error::Error,
+    utils::{get_screen_size, get_window_size, is_mobile},
+};
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -113,13 +116,6 @@ fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
     }
 }
 
-/// Calculates the number of characters that can fit in the window.
-pub(crate) fn get_window_size() -> (u16, u16) {
-    let (w, h) = get_raw_window_size();
-    // These are mildly magical numbers... make them more precise
-    (w / 10, h / 20)
-}
-
 /// Calculates the number of pixels that can fit in the window.
 pub(crate) fn get_raw_window_size() -> (u16, u16) {
     fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
@@ -136,33 +132,20 @@ pub(crate) fn get_raw_window_size() -> (u16, u16) {
         .unwrap_or((120, 120))
 }
 
-/// Returns `true` if the screen is a mobile device.
-// TODO: Improve this...
-fn is_mobile() -> bool {
-    get_raw_screen_size().0 < 550
-}
-
-/// Calculates the number of pixels that can fit in the window.
-fn get_raw_screen_size() -> (i32, i32) {
+/// Returns the number of pixels that can fit in the window.
+pub(crate) fn get_raw_screen_size() -> (i32, i32) {
     let s = web_sys::window().unwrap().screen().unwrap();
     (s.width().unwrap(), s.height().unwrap())
 }
 
-/// Calculates the number of characters that can fit in the window.
-fn get_screen_size() -> (u16, u16) {
-    let (w, h) = get_raw_screen_size();
-    // These are mildly magical numbers... make them more precise
-    (w as u16 / 10, h as u16 / 19)
-}
-
 /// Returns a buffer based on the screen size.
 pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
-    let (width, height) = if is_mobile() {
+    let size = if is_mobile() {
         get_screen_size()
     } else {
         get_window_size()
     };
-    vec![vec![Cell::default(); width as usize]; height as usize]
+    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
 }
 
 /// Returns a buffer based on the canvas size.
