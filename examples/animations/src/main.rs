@@ -16,8 +16,6 @@ fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = CanvasBackend::new()?;
     let terminal = Terminal::new(backend)?;
-
-    // Or you can use the provided effect combinators.
     let mut effect = fx::sequence(&[
         // first we "sweep in" the text from the left, before reversing the effect
         fx::ping_pong(fx::sweep_in(

@@ -1,6 +1,6 @@
 use std::io;
 
-use layout::Flex;
+use layout::{Flex, Offset};
 use ratzilla::{
     event::{KeyCode, KeyEvent},
     ratatui::{
@@ -8,11 +8,12 @@ use ratzilla::{
         widgets::{Block, BorderType, Clear, Paragraph, Wrap},
     },
     utils::open_url,
-    CanvasBackend, WebRenderer,
+    widgets::Hyperlink,
+    DomBackend, WebRenderer,
 };
 use tachyonfx::{
-    fx, CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion,
-    Shader,
+    fx::{self, RepeatMode},
+    CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion, Shader,
 };
 
 struct State {
@@ -33,6 +34,14 @@ impl Default for State {
                 )),
                 fx::coalesce((3000, Interpolation::SineOut)),
                 fx::sleep(1000),
+                fx::repeat(
+                    fx::hsl_shift(
+                        Some([120.0, 25.0, 25.0]),
+                        None,
+                        (5000, Interpolation::Linear),
+                    ),
+                    RepeatMode::Forever,
+                ),
             ]),
             menu_effect: fx::sequence(&[
                 fx::coalesce((3000, Interpolation::SineOut)),
@@ -44,7 +53,7 @@ impl Default for State {
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new()?;
+    let backend = DomBackend::new()?;
     let terminal = Terminal::new(backend)?;
     let mut state = State::default();
     terminal.on_key_event(move |key| handle_key_event(key));
@@ -53,11 +62,12 @@ fn main() -> io::Result<()> {
 }
 
 fn ui(f: &mut Frame<'_>, state: &mut State) {
-    if state.intro_effect.running() {
-        render_intro(f, state);
-    } else {
-        render_menu(f, state);
-    }
+    render_intro(f, state);
+    // if state.intro_effect.running() {
+    //     render_intro(f, state);
+    // } else {
+    //     render_menu(f, state);
+    // }
 }
 
 fn handle_key_event(key: KeyEvent) {
@@ -74,12 +84,14 @@ fn handle_key_event(key: KeyEvent) {
 
 fn render_intro(f: &mut Frame<'_>, state: &mut State) {
     Clear.render(f.area(), f.buffer_mut());
-    let area = f.area().inner_centered(25, 2);
+    let area = f.area().inner_centered(33, 2);
     let main_text = Text::from(vec![
-        Line::from("| R A T Z I L L A |"),
-        Line::from("Stomping through the web"),
+        Line::from("| R A T Z I L L A |").bold(),
+        Line::from("Stomping through the web").italic(),
     ]);
     f.render_widget(main_text.light_green().centered(), area);
+    let link = Hyperlink::new("https://github.com/orhun/ratzilla".red());
+    f.render_widget(link, area.offset(Offset { x: 0, y: 4 }));
     f.render_effect(&mut state.intro_effect, area, Duration::from_millis(40));
 }
 
