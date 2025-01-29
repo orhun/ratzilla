@@ -134,6 +134,7 @@ Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 - [Pong](https://github.com/orhun/ratzilla/tree/main/examples/pong) ([Preview](https://orhun.dev/ratzilla/pong))
 - [Colors RGB](https://github.com/orhun/ratzilla/tree/main/examples/colors_rgb) ([Preview](https://orhun.dev/ratzilla/colors_rgb))
 - [Animations](https://github.com/orhun/ratzilla/tree/main/examples/animations) ([Preview](https://orhun.dev/ratzilla/animations))
+- [World Map](https://github.com/orhun/ratzilla/tree/main/examples/world_map) ([Preview](https://orhun.dev/ratzilla/world_map))
 
 ## Acknowledgements
 
