@@ -119,7 +119,7 @@ Then serve it on your browser:
 trunk serve
 ```
 
-Now go to `http://localhost:8080` and enjoy TUIs in your browser!
+Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your browser!
 
 ## Documentation
 
