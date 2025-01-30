@@ -135,6 +135,12 @@ Now go to `http://localhost:8080` and enjoy TUIs in your browser!
 - [Colors RGB](https://github.com/orhun/ratzilla/tree/main/examples/colors_rgb) ([Preview](https://orhun.dev/ratzilla/colors_rgb))
 - [Animations](https://github.com/orhun/ratzilla/tree/main/examples/animations) ([Preview](https://orhun.dev/ratzilla/animations))
 
+## Websites built with Ratzilla
+
+- <https://orhun.dev/ratzilla> - The official website of Ratzilla
+- <https://terminalcollective.org> - Terminal Collective community website
+- <https://map.apt-swarm.orca.toys> - Map of apt-swarm p2p locations
+
 ## Acknowledgements
 
 Thanks to [Webatui] projects for the inspiration and the initial implementation of the essential parts of DOM backend.
