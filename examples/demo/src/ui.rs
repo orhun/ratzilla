@@ -1,6 +1,6 @@
 use ratzilla::ratatui::{
-    layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{Constraint, Layout, Margin, Rect},
+    style::{Color, Modifier, Style, Stylize},
     symbols,
     text::{self, Span},
     widgets::{
@@ -10,6 +10,8 @@ use ratzilla::ratatui::{
     },
     Frame,
 };
+use tachyonfx::{Duration, EffectRenderer};
+use tui_big_text::{BigText, PixelSize};
 
 use crate::app::App;
 
@@ -31,6 +33,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         2 => draw_third_tab(frame, app, chunks[1]),
         _ => {}
     };
+    let big_text = BigText::builder()
+        .pixel_size(PixelSize::Quadrant)
+        .lines(vec!["RATZILLA".white().into()])
+        .build();
+    frame.render_widget(
+        big_text,
+        frame.area().inner(Margin {
+            horizontal: frame.area().width / 2 - 15,
+            vertical: 0,
+        }),
+    );
+    frame.render_effect(&mut app.effect, frame.area(), Duration::from_millis(40));
 }
 
 fn draw_first_tab(frame: &mut Frame, app: &mut App, area: Rect) {

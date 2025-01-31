@@ -1,9 +1,13 @@
-use rand::SeedableRng;
 use rand::{
     distributions::{Distribution, Uniform},
     rngs::SmallRng,
+    SeedableRng,
 };
-use ratzilla::ratatui::widgets::ListState;
+use ratzilla::ratatui::{style::Color, widgets::ListState};
+use tachyonfx::{
+    fx::{self},
+    Effect, EffectTimer, Interpolation, Motion,
+};
 
 const TASKS: [&str; 24] = [
     "Item1", "Item2", "Item3", "Item4", "Item5", "Item6", "Item7", "Item8", "Item9", "Item10",
@@ -233,6 +237,7 @@ pub struct App<'a> {
     pub barchart: Vec<(&'a str, u64)>,
     pub servers: Vec<Server<'a>>,
     pub enhanced_graphics: bool,
+    pub effect: Effect,
 }
 
 impl<'a> App<'a> {
@@ -297,6 +302,25 @@ impl<'a> App<'a> {
                 },
             ],
             enhanced_graphics,
+            effect: fx::sequence(&[
+                fx::parallel(&[
+                    fx::sweep_in(
+                        Motion::LeftToRight,
+                        10,
+                        0,
+                        Color::Black,
+                        EffectTimer::from_ms(7000, Interpolation::QuadIn),
+                    ),
+                    fx::sweep_in(
+                        Motion::UpToDown,
+                        10,
+                        0,
+                        Color::Black,
+                        EffectTimer::from_ms(7000, Interpolation::QuadIn),
+                    ),
+                ]),
+                fx::coalesce((2000, Interpolation::SineOut)),
+            ]),
         }
     }
 
