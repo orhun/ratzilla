@@ -1,8 +1,15 @@
 [package]
 name = "ratzilla"
-version = "0.0.0-alpha.6"
+version = "0.0.1"
 description = "Build terminal-themed web applications with Ratatui and WebAssembly"
+authors = ["Orhun Parmaksız <orhunparmaksiz@gmail.com>"]
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/orhun/ratzilla"
+repository = "https://github.com/orhun/ratzilla"
+keywords = ["tui", "webassembly", "ratatui"]
+categories = ["wasm"]
+include = ["src/**/*", "Cargo.*", "LICENSE", "README.md", "CHANGELOG.md"]
 edition = "2021"
 
 [dependencies]
