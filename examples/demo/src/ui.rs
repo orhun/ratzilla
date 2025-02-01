@@ -21,10 +21,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         .tabs
         .titles
         .iter()
-        .map(|t| text::Line::from(Span::styled(*t, Style::default().fg(Color::Green))))
+        .map(|t| text::Line::from(Span::styled(*t, Style::default().fg(Color::LightGreen))))
         .collect::<Tabs>()
         .block(Block::bordered().title(app.title))
-        .highlight_style(Style::default().fg(Color::Yellow))
+        .highlight_style(Style::default().fg(Color::LightYellow))
         .select(app.tabs.index);
     frame.render_widget(tabs, chunks[0]);
     match app.tabs.index {
@@ -75,7 +75,7 @@ fn draw_gauges(frame: &mut Frame, app: &mut App, area: Rect) {
         .block(Block::new().title("Gauge:"))
         .gauge_style(
             Style::default()
-                .fg(Color::Magenta)
+                .fg(Color::LightMagenta)
                 .bg(Color::Black)
                 .add_modifier(Modifier::ITALIC | Modifier::BOLD),
         )
@@ -86,7 +86,7 @@ fn draw_gauges(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let sparkline = Sparkline::default()
         .block(Block::new().title("Sparkline:"))
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(Color::LightGreen))
         .data(&app.sparkline.points)
         .bar_set(if app.enhanced_graphics {
             symbols::bar::NINE_LEVELS
@@ -97,7 +97,7 @@ fn draw_gauges(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let line_gauge = LineGauge::default()
         .block(Block::new().title("LineGauge:"))
-        .filled_style(Style::default().fg(Color::Magenta))
+        .filled_style(Style::default().fg(Color::LightMagenta))
         .line_set(if app.enhanced_graphics {
             symbols::line::THICK
         } else {
@@ -137,10 +137,10 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             frame.render_stateful_widget(tasks, chunks[0], &mut app.tasks.state);
 
             // Draw logs
-            let info_style = Style::default().fg(Color::Blue);
-            let warning_style = Style::default().fg(Color::Yellow);
-            let error_style = Style::default().fg(Color::Magenta);
-            let critical_style = Style::default().fg(Color::Red);
+            let info_style = Style::default().fg(Color::Green);
+            let warning_style = Style::default().fg(Color::LightYellow);
+            let error_style = Style::default().fg(Color::LightMagenta);
+            let critical_style = Style::default().fg(Color::LightRed);
             let logs: Vec<ListItem> = app
                 .logs
                 .items
@@ -164,7 +164,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
         }
 
         let barchart = BarChart::default()
-            .block(Block::bordered().title("Bar chart"))
+            .block(Block::bordered().title("Bar Chart"))
             .data(&app.barchart)
             .bar_width(3)
             .bar_gap(2)
@@ -176,11 +176,11 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             .value_style(
                 Style::default()
                     .fg(Color::Black)
-                    .bg(Color::Green)
+                    .bg(Color::LightGreen)
                     .add_modifier(Modifier::ITALIC),
             )
             .label_style(Style::default().fg(Color::Yellow))
-            .bar_style(Style::default().fg(Color::Green));
+            .bar_style(Style::default().fg(Color::LightGreen));
         frame.render_widget(barchart, chunks[1]);
     }
     if app.show_chart {
@@ -202,7 +202,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
             Dataset::default()
                 .name("data2")
                 .marker(symbols::Marker::Dot)
-                .style(Style::default().fg(Color::Cyan))
+                .style(Style::default().fg(Color::White))
                 .data(&app.signals.sin1.points),
             Dataset::default()
                 .name("data3")
@@ -211,7 +211,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 } else {
                     symbols::Marker::Dot
                 })
-                .style(Style::default().fg(Color::Yellow))
+                .style(Style::default().fg(Color::LightCyan))
                 .data(&app.signals.sin2.points),
         ];
         let chart = Chart::new(datasets)
@@ -219,7 +219,7 @@ fn draw_charts(frame: &mut Frame, app: &mut App, area: Rect) {
                 Block::bordered().title(Span::styled(
                     "Chart",
                     Style::default()
-                        .fg(Color::Cyan)
+                        .fg(Color::LightCyan)
                         .add_modifier(Modifier::BOLD),
                 )),
             )
@@ -251,11 +251,11 @@ fn draw_text(frame: &mut Frame, area: Rect) {
         text::Line::from(""),
         text::Line::from(vec![
             Span::from("For example: "),
-            Span::styled("under", Style::default().fg(Color::Red)),
+            Span::styled("under", Style::default().fg(Color::LightRed)),
             Span::raw(" "),
-            Span::styled("the", Style::default().fg(Color::Green)),
+            Span::styled("the", Style::default().fg(Color::LightGreen)),
             Span::raw(" "),
-            Span::styled("rainbow", Style::default().fg(Color::Blue)),
+            Span::styled("rainbow", Style::default().fg(Color::LightCyan)),
             Span::raw("."),
         ]),
         text::Line::from(vec![
@@ -276,7 +276,7 @@ fn draw_text(frame: &mut Frame, area: Rect) {
     let block = Block::bordered().title(Span::styled(
         "Footer",
         Style::default()
-            .fg(Color::Magenta)
+            .fg(Color::LightMagenta)
             .add_modifier(Modifier::BOLD),
     ));
     let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
@@ -286,7 +286,7 @@ fn draw_text(frame: &mut Frame, area: Rect) {
 fn draw_second_tab(frame: &mut Frame, app: &mut App, area: Rect) {
     let chunks =
         Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)]).split(area);
-    let up_style = Style::default().fg(Color::Green);
+    let up_style = Style::default().fg(Color::LightGreen);
     let failure_style = Style::default()
         .fg(Color::Red)
         .add_modifier(Modifier::RAPID_BLINK | Modifier::CROSSED_OUT);
@@ -333,7 +333,7 @@ fn draw_second_tab(frame: &mut Frame, app: &mut App, area: Rect) {
                 x: app.servers[2].coords.1,
                 y: app.servers[2].coords.0,
                 radius: 10.0,
-                color: Color::Green,
+                color: Color::LightGreen,
             });
             for (i, s1) in app.servers.iter().enumerate() {
                 for s2 in &app.servers[i + 1..] {
@@ -348,7 +348,7 @@ fn draw_second_tab(frame: &mut Frame, app: &mut App, area: Rect) {
             }
             for server in &app.servers {
                 let color = if server.status == "Up" {
-                    Color::Green
+                    Color::LightGreen
                 } else {
                     Color::Red
                 };
@@ -378,7 +378,7 @@ fn draw_third_tab(frame: &mut Frame, _app: &mut App, area: Rect) {
         Color::Green,
         Color::Yellow,
         Color::Blue,
-        Color::Magenta,
+        Color::LightMagenta,
         Color::Cyan,
         Color::Gray,
         Color::DarkGray,
