@@ -5,13 +5,13 @@
 
 <p align="center">
     <a href="https://github.com/orhun/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/badge/github-orhun/ratzilla-3c8cba">
+        <img src="https://img.shields.io/badge/github-orhun/ratzilla-3c8cba?style=flat&logo=GitHub&labelColor=1D272B&color=3c8cba&logoColor=whit">
     </a>
     <a href="https://crates.io/crates/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/crates/v/ratzilla">
+        <img src="https://img.shields.io/crates/v/ratzilla?style=flat&logo=Rust&labelColor=1D272B&color=936c94&logoColor=white">
     </a>
     <a href="https://docs.rs/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/docsrs/ratzilla">
+        <img src="https://img.shields.io/docsrs/ratzilla?style=flat&logo=Rust&labelColor=1D272B&logoColor=white">
     </a>
 </p>
 
