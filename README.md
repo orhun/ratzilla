@@ -1,3 +1,20 @@
+<p align="center">
+<!-- Thanks to https://github.com/dekirisu for the logo -->
+<a href="https://github.com/orhun/ratzilla"><img src="assets/ratzilla.gif" width="500"></a>
+</p>
+
+<p align="center">
+    <a href="https://github.com/orhun/ratzilla" style="position:relative">
+        <img src="https://img.shields.io/badge/github-orhun/ratzilla-3c8cba">
+    </a>
+    <a href="https://crates.io/crates/ratzilla" style="position:relative">
+        <img src="https://img.shields.io/crates/v/ratzilla">
+    </a>
+    <a href="https://docs.rs/ratzilla" style="position:relative">
+        <img src="https://img.shields.io/docsrs/ratzilla">
+    </a>
+</p>
+
 # Ratzilla
 
 Build terminal-themed web applications with Rust and WebAssembly. Powered by [Ratatui].
