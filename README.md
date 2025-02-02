@@ -158,6 +158,7 @@ Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your 
 - <https://orhun.dev/ratzilla> - The official website of Ratzilla
 - <https://terminalcollective.org> - Terminal Collective community website
 - <https://map.apt-swarm.orca.toys> - Map of apt-swarm p2p locations
+- <http://timbeck.me> - Personal website of Tim Beck
 
 ## Acknowledgements
 
