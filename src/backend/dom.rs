@@ -31,6 +31,10 @@ pub struct DomBackend {
     cells: Vec<Element>,
     /// Grid element.
     grid: Element,
+    /// The parent of the grid element
+    grid_parent: Element,
+    /// The grid's id
+    grid_id: String,
     /// Window.
     window: Window,
     /// Document.
@@ -48,6 +52,28 @@ impl DomBackend {
             prev_buffer: vec![],
             cells: vec![],
             grid: document.create_element("div")?,
+            grid_parent: document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
+            grid_id: "grid".into(),
+            window,
+            document,
+        };
+        backend.add_on_resize_listener();
+        backend.reset_grid()?;
+        Ok(backend)
+    }
+
+    /// Constructs a new [`DomBackend`].
+    pub fn new_by_id(element_id: &str) -> Result<Self, Error> {
+        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
+        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+        let mut backend = Self {
+            initialized: Rc::new(RefCell::new(false)),
+            buffer: vec![],
+            prev_buffer: vec![],
+            cells: vec![],
+            grid: document.create_element("div")?,
+            grid_parent: document.get_element_by_id(element_id).ok_or(Error::UnableToRetrieveBody)?,
+            grid_id: element_id.to_string() + "_ratzilla_grid",
             window,
             document,
         };
@@ -70,7 +96,7 @@ impl DomBackend {
     /// Reset the grid and clear the cells.
     fn reset_grid(&mut self) -> Result<(), Error> {
         self.grid = self.document.create_element("div")?;
-        self.grid.set_attribute("id", "grid")?;
+        self.grid.set_attribute("id", &self.grid_id)?;
         self.cells.clear();
         self.buffer = get_sized_buffer();
         self.prev_buffer = self.buffer.clone();
@@ -151,7 +177,7 @@ impl Backend for DomBackend {
     {
         if !*self.initialized.borrow() {
             // Only runs on resize event.
-            if let Some(grid) = self.document.get_element_by_id("grid") {
+            if let Some(grid) = self.document.get_element_by_id(&self.grid_id) {
                 grid.remove();
                 self.reset_grid()?;
             }
@@ -181,8 +207,7 @@ impl Backend for DomBackend {
     fn flush(&mut self) -> IoResult<()> {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
-            let body = self.document.body().ok_or(Error::UnableToRetrieveBody)?;
-            body.append_child(&self.grid).map_err(Error::from)?;
+            self.grid_parent.append_child(&self.grid).map_err(Error::from)?;
             self.prerender()?;
             // Set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
