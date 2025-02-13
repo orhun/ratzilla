@@ -1,18 +1,17 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
-use ratzilla::event::KeyCode;
-use ratzilla::utils::set_document_title;
-use ratzilla::widgets::Hyperlink;
-use ratzilla::DomBackend;
-use ratzilla::WebRenderer;
+use ratzilla::{
+    event::KeyCode, utils::set_document_title, widgets::Hyperlink, DomBackend, WebRenderer,
+};
 
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     symbols::Marker,
-    widgets::canvas::{Canvas, Circle},
-    widgets::{Block, Paragraph, Widget},
+    widgets::{
+        canvas::{Canvas, Circle},
+        Block, Paragraph, Widget,
+    },
     Terminal,
 };
 
