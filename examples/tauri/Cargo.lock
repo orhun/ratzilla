@@ -280,15 +280,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pong"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "ratzilla",
- "tachyonfx",
-]
-
-[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,6 +437,15 @@ dependencies = [
  "ratatui",
  "simple-easing",
  "web-time",
+]
+
+[[package]]
+name = "tauri"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "ratzilla",
+ "tachyonfx",
 ]
 
 [[package]]

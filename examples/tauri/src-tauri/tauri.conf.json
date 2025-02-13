@@ -5,13 +5,13 @@
   "identifier": "com.tauri.dev",
   "build": {
     "frontendDist": "../dist",
-    "beforeDevCommand": "cargo trunk build",
+    "beforeDevCommand": "trunk build",
     "beforeBuildCommand": "cargo build"
   },
   "app": {
     "windows": [
       {
-        "title": "ratzilla",
+        "title": "Ratatauri",
         "width": 800,
         "height": 600,
         "resizable": true,

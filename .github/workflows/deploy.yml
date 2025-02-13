@@ -43,21 +43,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - name: Build website
         shell: bash
-        run: |
-          mkdir dist
-          for example in examples/*; do
-            example_name=$(basename "$example")
-            mkdir -p dist/"$example_name"
-            pushd "$example"
-            if [ "$example_name" == "website" ]; then
-              trunk build --release --public-url https://orhun.dev/ratzilla/
-              cp -r dist/* ../../dist/
-            else
-              trunk build --release --public-url https://orhun.dev/ratzilla/"$example_name"
-              cp -r dist/* ../../dist/"$example_name"
-            fi
-            popd
-          done
+        run: scripts/build-examples.sh
       - name: Upload artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
