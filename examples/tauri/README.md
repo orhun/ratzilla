@@ -7,4 +7,4 @@ $ trunk build
 $ cargo tauri dev
 ```
 
-Have fun
+Have fun!
