@@ -130,6 +130,12 @@ Install [trunk] to build and serve the web application.
 cargo install --locked trunk
 ```
 
+Add compilation target `wasm32-unknown-unknown`:
+
+```sh
+rustup target add wasm32-unknown-unknown
+```
+
 Then serve it on your browser:
 
 ```sh
