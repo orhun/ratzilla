@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.3 - 2025-03-03
+
+### 📚 Documentation
+
+- _(readme)_ Add tusistor website by @dawedawe in [#55](https://github.com/orhun/ratzilla/pull/55)
+- _(readme)_ Add link to FOSDEM 2025 talk by @orhun in [#57](https://github.com/orhun/ratzilla/pull/57)
+
+### ⚙️ Miscellaneous Tasks
+
+- _(deps)_ Bump dependencies
+- _(deps)_ Use stable version of tachyonfx (0.11.1) by @junkdog in [#56](https://github.com/orhun/ratzilla/pull/56)
+
+## 💖 New Contributors
+
+- @dawedawe made their first contribution in [#55](https://github.com/orhun/ratzilla/pull/55)
+- @junkdog made their first contribution in [#56](https://github.com/orhun/ratzilla/pull/56)
+- @orhun made their first contribution in [#57](https://github.com/orhun/ratzilla/pull/57)
+
+**Full Changelog**: https://github.com/orhun/ratzilla/compare/v0.0.2...0.0.3
+
 ## 0.0.2 - 2025-02-13
 
 ### 🚀 Features
