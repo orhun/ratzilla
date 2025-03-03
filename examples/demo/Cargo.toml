@@ -8,5 +8,5 @@ publish = false
 clap = { version = "4.5.23", features = ["derive"] }
 rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
 ratzilla = { path = "../../" }
-tachyonfx = { git = "https://github.com/orhun/tachyonfx", branch = "feat/wasm_support", default-features = false, features = ["web-time"] }
+tachyonfx = { version = "0.11.1", default-features = false, features = ["web-time"] }
 tui-big-text = "0.7.0"

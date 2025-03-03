@@ -6,5 +6,5 @@ publish = false
 
 [dependencies]
 ratzilla = { path = "../../" }
-tachyonfx = { git = "https://github.com/orhun/tachyonfx", branch = "feat/wasm_support", default-features = false, features = ["web-time"] }
+tachyonfx = { version = "0.11.1", default-features = false, features = ["web-time"] }
 console_error_panic_hook = "0.1.7"
