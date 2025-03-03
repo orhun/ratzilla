@@ -13,6 +13,9 @@
     <a href="https://docs.rs/ratzilla" style="position:relative">
         <img src="https://img.shields.io/docsrs/ratzilla?style=flat&logo=Rust&labelColor=1D272B&logoColor=white">
     </a>
+    <br>
+    <br>
+    <b>Watch the conference talk:</b> <a href="https://www.youtube.com/watch?v=iepbyYrF_YQ">Bringing Terminal Aesthetics to the Web With Rust (and Vice Versa)</a>
 </p>
 
 # Ratzilla
