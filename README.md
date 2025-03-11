@@ -1,6 +1,6 @@
 <p align="center">
 <!-- Thanks to https://github.com/dekirisu for the logo -->
-<a href="https://github.com/orhun/ratzilla"><img src="assets/ratzilla.gif" width="500"></a>
+<a href="https://github.com/orhun/ratzilla"><img src="https://raw.githubusercontent.com/orhun/ratzilla/refs/heads/main/assets/ratzilla.gif" width="500"></a>
 </p>
 
 <p align="center">
@@ -169,6 +169,7 @@ Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your 
 - <https://www.function-type.com/tusistor> - Resistor calculator
 - <http://timbeck.me> - Personal website of Tim Beck
 - <https://map.apt-swarm.orca.toys> - Map of apt-swarm p2p locations
+
 ## Acknowledgements
 
 Thanks to [Webatui] projects for the inspiration and the initial implementation of the essential parts of DOM backend.
