@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.4 - 2025-03-19
+
+### 🚀 Features
+
+- _(template)_ Add simple app template by @orhun in [#62](https://github.com/orhun/ratzilla/pull/62)
+
+### 📚 Documentation
+
+- _(readme)_ Use the full path for the demo image by @orhun
+
+**Full Changelog**: https://github.com/orhun/ratzilla/compare/v0.0.3...0.0.4
+
 ## 0.0.3 - 2025-03-03
 
 ### 📚 Documentation
