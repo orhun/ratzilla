@@ -24,6 +24,26 @@ Build terminal-themed web applications with Rust and WebAssembly. Powered by [Ra
 
 ## Quickstart
 
+### Templates
+
+Install [`cargo-generate`](https://github.com/cargo-generate/cargo-generate):
+
+```shell
+cargo install cargo-generate
+```
+
+Generate a new project:
+
+```shell
+cargo generate orhun/ratzilla
+```
+
+And then [serve the application on your browser](#serve) ➡️
+
+See [templates](./templates) for more information.
+
+### Manual Setup
+
 Add **Ratzilla** as a dependency in your `Cargo.toml`:
 
 ```sh
@@ -126,6 +146,10 @@ Then add your `index.html` which imports the JavaScript module:
 ```
 
 </details>
+
+And then [serve the application on your browser](#serve) ➡️
+
+## Serve
 
 Install [trunk] to build and serve the web application.
 

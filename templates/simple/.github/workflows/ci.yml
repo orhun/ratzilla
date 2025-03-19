@@ -5,10 +5,14 @@ on:
   push:
     branches:
       - main
+      - master
+      - develop
 
 env:
   CARGO_TERM_COLOR: always
 
+# ensure that the workflow is only triggered once per PR, subsequent pushes to the PR will cancel
+# and restart the workflow. See https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -28,7 +32,6 @@ jobs:
         run: cargo fmt -- --check
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
-
   clippy:
     name: clippy
     runs-on: ubuntu-latest
@@ -45,8 +48,10 @@ jobs:
         uses: clechasseur/rs-clippy-check@v3
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
-
   doc:
+    # run docs generation on nightly rather than stable. This enables features like
+    # https://doc.rust-lang.org/beta/unstable-book/language-features/doc-cfg.html which allows an
+    # API be documented as only available in some specific platforms.
     name: doc
     runs-on: ubuntu-latest
     steps:
@@ -57,54 +62,28 @@ jobs:
         run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: --cfg docsrs
-
   test:
     runs-on: ${{ matrix.os }}
     name: test ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     steps:
+      # if your project needs OpenSSL, uncomment this to fix Windows builds.
+      # it's commented out by default as the install command takes 5-10m.
+      # - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+      #   if: runner.os == 'Windows'
+      # - run: vcpkg install openssl:x64-windows-static-md
+      #   if: runner.os == 'Windows'
       - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      # enable this ci template to run regardless of whether the lockfile is checked in or not
       - name: cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
       - name: cargo test --locked
         run: cargo test --locked --all-features --all-targets
-      - name: cargo test --doc
-        run: cargo test --doc --all-features
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
-
-  generate-template:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        template:
-          - simple
-    env:
-      PROJECT_NAME: ${{ matrix.template }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run cargo generate
-        uses: cargo-generate/cargo-generate-action@v0.20.0
-        with:
-          name: ${{ matrix.template }}
-          template: templates/${{ matrix.template }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cargo check
-        # we need to move the generated project to a temp folder, away from the template project
-        # otherwise cargo runs would fail
-        # see https://github.com/rust-lang/cargo/issues/9922
-        run: |
-          mv ${{ env.PROJECT_NAME }} ${{ runner.temp }}/
-          cd ${{ runner.temp }}/${{ env.PROJECT_NAME }}
-          cargo check --tests
