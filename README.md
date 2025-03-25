@@ -3,20 +3,15 @@
 <a href="https://github.com/orhun/ratzilla"><img src="https://raw.githubusercontent.com/orhun/ratzilla/refs/heads/main/assets/ratzilla.gif" width="500"></a>
 </p>
 
-<p align="center">
-    <a href="https://github.com/orhun/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/badge/github-orhun/ratzilla-3c8cba?style=flat&logo=GitHub&labelColor=1D272B&color=3c8cba&logoColor=whit">
-    </a>
-    <a href="https://crates.io/crates/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/crates/v/ratzilla?style=flat&logo=Rust&labelColor=1D272B&color=936c94&logoColor=white">
-    </a>
-    <a href="https://docs.rs/ratzilla" style="position:relative">
-        <img src="https://img.shields.io/docsrs/ratzilla?style=flat&logo=Rust&labelColor=1D272B&logoColor=white">
-    </a>
-    <br>
-    <br>
-    <b>Watch the conference talk:</b> <a href="https://www.youtube.com/watch?v=iepbyYrF_YQ">Bringing Terminal Aesthetics to the Web With Rust (and Vice Versa)</a>
-</p>
+<div align="center">
+
+[![Repo](https://img.shields.io/badge/github-orhun/ratzilla-3c8cba?style=flat&logo=GitHub&labelColor=1D272B&color=3c8cba&logoColor=white)](https://github.com/orhun/ratzilla)
+[![Crate](https://img.shields.io/crates/v/ratzilla?style=flat&logo=Rust&labelColor=1D272B&color=936c94&logoColor=white)](https://crates.io/crates/ratzilla)
+[![Docs](https://img.shields.io/docsrs/ratzilla?style=flat&logo=Rust&labelColor=1D272B&logoColor=white)](https://docs.rs/ratzilla)
+
+**Watch the conference talk:** [Bringing Terminal Aesthetics to the Web With Rust (and Vice Versa)](https://www.youtube.com/watch?v=iepbyYrF_YQ)
+
+</div>
 
 # Ratzilla
 
