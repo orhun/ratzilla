@@ -30,8 +30,11 @@ pub fn open_url(url: &str, new_tab: bool) -> Result<(), Error> {
 
 /// Returns `true` if the screen is a mobile device.
 pub fn is_mobile() -> bool {
-    // TODO: Improve this...
-    get_raw_screen_size().0 < 550
+    let user_agent = web_sys::window().and_then(|w| w.navigator().user_agent().ok());
+    user_agent.is_some_and(|agent| {
+        let agent = agent.to_lowercase();
+        agent.contains("mobile") || agent.contains("tablet")
+    })
 }
 
 /// Returns the number of characters that can fit in the window (viewport of the browser or terminal).
