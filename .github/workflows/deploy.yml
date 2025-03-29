@@ -1,7 +1,6 @@
 name: Deploy to GitHub Pages
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -45,11 +44,9 @@ jobs:
         shell: bash
         run: scripts/build-examples.sh
       - name: Upload artifact
-        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
       - name: Deploy to GitHub Pages
-        if: github.event_name != 'pull_request'
         id: deployment
         uses: actions/deploy-pages@v4
