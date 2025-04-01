@@ -187,6 +187,7 @@ Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your 
 - <https://terminalcollective.org> - Terminal Collective community website
 - <https://www.function-type.com/tusistor> - Resistor calculator
 - <http://timbeck.me> - Personal website of Tim Beck
+- <https://jetpham.com> - Conway's Game of Life
 - <https://map.apt-swarm.orca.toys> - Map of apt-swarm p2p locations
 
 ## Acknowledgements
