@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.5 - 2025-04-01
+
+### 🐛 Bug Fixes
+
+- _(utils)_ Improve the mobile detection by @dawedawe in [#65](https://github.com/orhun/ratzilla/pull/65)
+- _(pages)_ Don't deploy website on pull requests by @orhun
+
+### 📚 Documentation
+
+- _(readme)_ Add jetpham website by @orhun in [#66](https://github.com/orhun/ratzilla/pull/66)
+- _(readme)_ Remove glitches between shields by @j-g00da in [#64](https://github.com/orhun/ratzilla/pull/64)
+
+### ⚙️ Miscellaneous Tasks
+
+- _(deps)_ Bump tachyonfx to 0.13.0 by @orhun in [#67](https://github.com/orhun/ratzilla/pull/67)
+
+## 💖 New Contributors
+
+- @j-g00da made their first contribution in [#64](https://github.com/orhun/ratzilla/pull/64)
+
+**Full Changelog**: https://github.com/orhun/ratzilla/compare/v0.0.4...0.0.5
+
 ## 0.0.4 - 2025-03-19
 
 ### 🚀 Features
