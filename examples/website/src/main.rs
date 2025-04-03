@@ -90,7 +90,7 @@ fn render_intro(f: &mut Frame<'_>, state: &mut State) {
         Line::from("Stomping through the web").italic(),
     ]);
     f.render_widget(main_text.light_green().centered(), area);
-    let link = Hyperlink::new("https://github.com/orhun/ratzilla".red());
+    let link = Hyperlink::new("ratzilla".red(), "https://github.com/orhun/ratzilla");
     f.render_widget(link, area.offset(Offset { x: 0, y: 4 }));
     f.render_effect(&mut state.intro_effect, area, Duration::from_millis(40));
 }

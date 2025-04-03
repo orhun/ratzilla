@@ -1,10 +1,5 @@
-use ratatui::{buffer::Buffer, layout::Rect, style::Modifier, text::Span, widgets::Widget};
-
-/// Hyperlink modifier.
-///
-/// When added as a modifier to a style, the styled element is marked as
-/// hyperlink.
-pub(crate) const HYPERLINK_MODIFIER: Modifier = Modifier::SLOW_BLINK;
+use log::info;
+use ratatui::{buffer::Buffer, layout::Rect, style::Style, text::Span, widgets::Widget};
 
 /// A widget that can be used to render hyperlinks.
 ///
@@ -16,6 +11,7 @@ pub(crate) const HYPERLINK_MODIFIER: Modifier = Modifier::SLOW_BLINK;
 /// // Then you can render it as usual:
 /// // frame.render_widget(link, frame.area());
 /// ```
+#[derive(Debug)]
 pub struct Hyperlink<'a> {
     /// Line.
     line: Span<'a>,
@@ -23,13 +19,16 @@ pub struct Hyperlink<'a> {
 
 impl<'a> Hyperlink<'a> {
     /// Constructs a new [`Hyperlink`] widget.
-    pub fn new<T>(url: T) -> Self
+    pub fn new<T, U>(content: T, url: U) -> Self
     where
         T: Into<Span<'a>>,
+        U: Into<&'static str>,
     {
-        Self {
-            line: url.into().style(HYPERLINK_MODIFIER),
-        }
+        let line = content
+            .into()
+            .patch_style(Style::new().hyperlink(url.into()));
+        // info!("span: {:#?}", line);
+        Self { line }
     }
 }
 

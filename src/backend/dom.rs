@@ -11,7 +11,7 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
+use crate::{backend::utils::*, error::Error};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -30,7 +30,7 @@ impl DomBackendOptions {
     ///
     /// - If the grid ID is not set, it returns `"grid"`.
     /// - If the grid ID is set, it returns the grid ID suffixed with
-    ///     `"_ratzilla_grid"`.
+    ///   `"_ratzilla_grid"`.
     pub fn grid_id(&self) -> String {
         match &self.grid_id {
             Some(id) => format!("{id}_ratzilla_grid"),
@@ -131,30 +131,10 @@ impl DomBackend {
     fn prerender(&mut self) -> Result<(), Error> {
         for line in self.buffer.iter() {
             let mut line_cells: Vec<Element> = Vec::new();
-            let mut hyperlink: Vec<Cell> = Vec::new();
-            for (i, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    hyperlink.push(cell.clone());
-                    // If the next cell is not part of the hyperlink, close it
-                    if !line
-                        .get(i + 1)
-                        .map(|c| c.modifier.contains(HYPERLINK_MODIFIER))
-                        .unwrap_or(false)
-                    {
-                        let anchor = create_anchor(&self.document, &hyperlink)?;
-                        for link_cell in &hyperlink {
-                            let span = create_span(&self.document, link_cell)?;
-                            self.cells.push(span.clone());
-                            anchor.append_child(&span)?;
-                        }
-                        line_cells.push(anchor);
-                        hyperlink.clear();
-                    }
-                } else {
-                    let span = create_span(&self.document, cell)?;
-                    self.cells.push(span.clone());
-                    line_cells.push(span);
-                }
+            for cell in line.iter() {
+                let span = create_span(&self.document, cell)?;
+                self.cells.push(span.clone());
+                line_cells.push(span);
             }
 
             // Create a <pre> element for the line
@@ -176,13 +156,20 @@ impl DomBackend {
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    continue;
-                }
                 if cell != &self.prev_buffer[y][x] {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    elem.set_inner_html(cell.symbol());
                     elem.set_attribute("style", &get_cell_style_as_css(cell))?;
+                    if let Some(anchor) = elem.first_element_child() {
+                        if let Some(url) = cell.hyperlink() {
+                            anchor.set_attribute("href", url)?;
+                            anchor.set_inner_html(cell.symbol());
+                        } else {
+                            anchor.remove();
+                            elem.set_inner_html(cell.symbol());
+                        }
+                    } else {
+                        elem.set_inner_html(cell.symbol());
+                    }
                 }
             }
         }
