@@ -22,5 +22,8 @@ mod render;
 // Re-export ratatui crate.
 pub use ratatui;
 
+// Re-export web_sys crate.
+pub use web_sys;
+
 pub use backend::{canvas::CanvasBackend, dom::DomBackend};
 pub use render::WebRenderer;
