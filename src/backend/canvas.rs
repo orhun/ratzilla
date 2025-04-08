@@ -126,16 +126,31 @@ impl CanvasBackend {
             for (x, cell) in line.iter().enumerate() {
                 if cell != &self.prev_buffer[y][x] || force_redraw {
                     let colors = get_cell_color_for_canvas(cell, self.canvas.background_color);
+                    // Save the current state of the canvas context
+                    self.canvas.context.save();
+
+                    // Background
                     self.canvas.context.set_fill_style_str(colors.1.as_str());
                     self.canvas
                         .context
                         .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+
+                    // Apply clipping for the text
+                    self.canvas.context.begin_path();
+                    self.canvas
+                        .context
+                        .rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+                    self.canvas.context.clip();
+
+                    // Foreground & text
                     self.canvas.context.set_fill_style_str(colors.0.as_str());
                     self.canvas.context.fill_text(
                         cell.symbol(),
                         x as f64 * xmul,
                         y as f64 * ymul,
                     )?;
+
+                    self.canvas.context.restore();
                 }
             }
         }
@@ -157,6 +172,28 @@ impl Backend for CanvasBackend {
             line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
             line[x] = cell.clone();
         }
+        Ok(())
+    }
+
+    /// Flush the content to the screen.
+    ///
+    /// This function is called after the [`CanvasBackend::draw`] function to
+    /// actually render the content to the screen.
+    fn flush(&mut self) -> IoResult<()> {
+        // Only runs once.
+        if !self.initialized {
+            self.update_grid(true)?;
+            self.prev_buffer = self.buffer.clone();
+            self.initialized = true;
+            return Ok(());
+        }
+
+        if self.buffer != self.prev_buffer {
+            self.update_grid(false)?;
+        }
+
+        self.prev_buffer = self.buffer.clone();
+
         Ok(())
     }
 
@@ -190,20 +227,6 @@ impl Backend for CanvasBackend {
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
         unimplemented!()
-    }
-
-    fn flush(&mut self) -> IoResult<()> {
-        if !self.initialized {
-            self.update_grid(true)?;
-            self.prev_buffer = self.buffer.clone();
-            self.initialized = true;
-            return Ok(());
-        }
-        if self.buffer != self.prev_buffer {
-            self.update_grid(false)?;
-        }
-        self.prev_buffer = self.buffer.clone();
-        Ok(())
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
