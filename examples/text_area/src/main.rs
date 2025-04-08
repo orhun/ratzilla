@@ -1,8 +1,11 @@
 use std::{cell::RefCell, io, rc::Rc};
 
-use ratatui::prelude::Stylize;
 use ratzilla::{
     event::{KeyCode, KeyEvent},
+    ratatui::{
+        prelude::*,
+        widgets::{Block, Borders, Paragraph},
+    },
     DomBackend, WebRenderer,
 };
 
@@ -10,7 +13,7 @@ fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     let backend = DomBackend::new()?;
-    let terminal = ratatui::Terminal::new(backend)?;
+    let terminal = Terminal::new(backend)?;
 
     let app = Rc::new(RefCell::new(App::new()));
 
@@ -43,8 +46,8 @@ impl<'a> App<'a> {
     fn new() -> Self {
         let mut textarea = tui_textarea::TextArea::default();
         textarea.set_block(
-            ratatui::widgets::Block::default()
-                .borders(ratatui::widgets::Borders::ALL)
+            Block::default()
+                .borders(Borders::ALL)
                 .title("Text Area Example"),
         );
 
@@ -54,23 +57,16 @@ impl<'a> App<'a> {
         }
     }
 
-    fn render(&self, frame: &mut ratatui::Frame) {
-        let chunks = ratatui::layout::Layout::vertical([
-            ratatui::layout::Constraint::Min(0),
-            ratatui::layout::Constraint::Length(3),
-        ])
-        .split(frame.area());
+    fn render(&self, frame: &mut Frame) {
+        let chunks =
+            Layout::vertical([Constraint::Min(0), Constraint::Length(3)]).split(frame.area());
 
-        let style = ratatui::style::Style::new().cyan().italic();
-        let status = ratatui::text::Span::styled(self.status_text.as_str(), style);
+        let style = Style::new().cyan().italic();
+        let status = Span::styled(self.status_text.as_str(), style);
 
-        let status = ratatui::widgets::Paragraph::new(status)
-            .block(
-                ratatui::widgets::Block::default()
-                    .borders(ratatui::widgets::Borders::ALL)
-                    .title("Status"),
-            )
-            .alignment(ratatui::layout::Alignment::Left);
+        let status = Paragraph::new(status)
+            .block(Block::default().borders(Borders::ALL).title("Status"))
+            .alignment(Alignment::Left);
 
         frame.render_widget(&self.textarea, chunks[0]);
         frame.render_widget(&status, chunks[1]);
@@ -80,7 +76,7 @@ impl<'a> App<'a> {
         self.status_text = std::format!("Last key pressed: {key_event:?}");
 
         if let Some(key) = try_convert_code(key_event.code) {
-            self.textarea.input(Input {
+            self.textarea.input(tui_textarea::Input {
                 key,
                 ctrl: key_event.ctrl,
                 alt: key_event.alt,
@@ -89,7 +85,6 @@ impl<'a> App<'a> {
         }
     }
 }
-
 
 fn try_convert_code(code: KeyCode) -> Option<tui_textarea::Key> {
     match code {
