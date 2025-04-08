@@ -45,7 +45,7 @@ impl<'a> App<'a> {
         textarea.set_block(
             ratatui::widgets::Block::default()
                 .borders(ratatui::widgets::Borders::ALL)
-                .title("Minimal Textarea Example"),
+                .title("Text Area Example"),
         );
 
         App {
@@ -79,24 +79,17 @@ impl<'a> App<'a> {
     fn handle_events(&mut self, key_event: KeyEvent) {
         self.status_text = std::format!("Last key pressed: {key_event:?}");
 
-        if let Some(input) = try_convert_event(key_event) {
-            self.textarea.input(input);
+        if let Some(key) = try_convert_code(key_event.code) {
+            self.textarea.input(Input {
+                key,
+                ctrl: key_event.ctrl,
+                alt: key_event.alt,
+                shift: key_event.shift,
+            });
         }
     }
 }
 
-fn try_convert_event(event: KeyEvent) -> Option<tui_textarea::Input> {
-    if let Some(key) = try_convert_code(event.code) {
-        Some(tui_textarea::Input {
-            key,
-            ctrl: event.ctrl,
-            alt: event.alt,
-            shift: event.shift,
-        })
-    } else {
-        None
-    }
-}
 
 fn try_convert_code(code: KeyCode) -> Option<tui_textarea::Key> {
     match code {
