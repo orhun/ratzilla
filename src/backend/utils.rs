@@ -19,7 +19,7 @@ pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, E
     if let Some(url) = cell.hyperlink() {
         let anchor = document.create_element("a")?;
         anchor.set_attribute("href", url)?;
-        anchor.set_attribute("style", "text-decoration: none; color: inherit;")?;
+        anchor.set_attribute("style", "text-decoration: none; color: inherit")?;
         anchor.set_inner_html(cell.symbol());
         span.append_child(&anchor)?;
     } else {
