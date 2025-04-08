@@ -65,6 +65,11 @@ where
                 self.autoresize().unwrap();
                 let mut frame = self.get_frame();
                 render_callback(&mut frame);
+                if let Some(position) = frame.cursor_position {
+                    self.set_cursor_position(position);
+                } else {
+                    self.hide_cursor();
+                }
                 self.flush().unwrap();
                 self.swap_buffers();
                 self.backend_mut().flush().unwrap();

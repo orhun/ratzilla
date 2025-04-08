@@ -66,6 +66,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cursor-issue"
+version = "0.1.0"
+dependencies = [
+ "ratzilla",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

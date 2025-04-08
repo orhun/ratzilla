@@ -7,7 +7,7 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast},
+    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
     window, Document, Element, Window,
 };
 
@@ -65,6 +65,8 @@ pub struct DomBackend {
     document: Document,
     /// Options.
     options: DomBackendOptions,
+    /// Cursor position.
+    cursor_position: Option<Position>,
 }
 
 impl DomBackend {
@@ -97,6 +99,7 @@ impl DomBackend {
             options,
             window,
             document,
+            cursor_position: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -222,6 +225,19 @@ impl Backend for DomBackend {
                 }
             }
         }
+
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                web_sys::console::log_1(&JsValue::from_str(
+                    format!("cursor {}, {}", x, y).as_str(),
+                ));
+                line[x].set_symbol("▌");
+            }
+        }
+
         Ok(())
     }
 
@@ -248,6 +264,7 @@ impl Backend for DomBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
+        self.cursor_position = None;
         Ok(())
     }
 
@@ -280,10 +297,22 @@ impl Backend for DomBackend {
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
-        unimplemented!()
+        match self.cursor_position {
+            None => Ok((0, 0).into()),
+            Some(position) => Ok(position),
+        }
     }
 
-    fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
-        unimplemented!()
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                line[x].reset();
+            }
+        }
+        self.cursor_position = Some(position.into());
+        Ok(())
     }
 }
