@@ -235,6 +235,7 @@ impl Backend for DomBackend {
                     format!("cursor {}, {}", x, y).as_str(),
                 ));
                 line[x].set_symbol("▌");
+                self.update_grid()?;
             }
         }
 
