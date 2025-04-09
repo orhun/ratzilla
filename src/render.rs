@@ -50,6 +50,8 @@ pub trait WebRenderer {
 }
 
 /// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
+///
+/// This implementation creates a loop that calls the [`Terminal::draw`] method.
 impl<T> WebRenderer for Terminal<T>
 where
     T: Backend + 'static,
@@ -62,12 +64,10 @@ where
         *callback.borrow_mut() = Some(Closure::wrap(Box::new({
             let cb = callback.clone();
             move || {
-                self.autoresize().unwrap();
-                let mut frame = self.get_frame();
-                render_callback(&mut frame);
-                self.flush().unwrap();
-                self.swap_buffers();
-                self.backend_mut().flush().unwrap();
+                self.draw(|frame| {
+                    render_callback(frame);
+                })
+                .unwrap();
                 Self::request_animation_frame(cb.borrow().as_ref().unwrap());
             }
         }) as Box<dyn FnMut()>));
