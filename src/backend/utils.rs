@@ -32,8 +32,12 @@ pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Eleme
 
 /// Converts a cell to a CSS style.
 pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
-    let fg = ansi_to_rgb(cell.fg);
-    let bg = ansi_to_rgb(cell.bg);
+    let mut fg = ansi_to_rgb(cell.fg);
+    let mut bg = ansi_to_rgb(cell.bg);
+
+    if cell.modifier.contains(Modifier::REVERSED) {
+        std::mem::swap(&mut fg, &mut bg);
+    }
 
     let fg_style = match fg {
         Some(color) => format!("color: rgb({}, {}, {});", color.0, color.1, color.2),
@@ -45,7 +49,15 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
             "background-color: rgb({}, {}, {});",
             color.0, color.1, color.2
         ),
-        None => "background-color: transparent;".to_string(),
+        None => {
+            // If the cell needs to be reversed but we don't have a valid background,
+            // then default the background to white.
+            if cell.modifier.contains(Modifier::REVERSED) {
+                "background-color: rgb(255, 255, 255);".to_string()
+            } else {
+                "background-color: transparent;".to_string()
+            }
+        }
     };
 
     let mut modifier_style = String::new();
@@ -73,8 +85,12 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 
 /// Converts a cell to a CSS style.
 pub(crate) fn get_cell_color_for_canvas(cell: &Cell, background_color: Color) -> (String, String) {
-    let fg = ansi_to_rgb(cell.fg);
-    let bg = ansi_to_rgb(cell.bg);
+    let mut fg = ansi_to_rgb(cell.fg);
+    let mut bg = ansi_to_rgb(cell.bg);
+
+    if cell.modifier.contains(Modifier::REVERSED) {
+        std::mem::swap(&mut fg, &mut bg);
+    }
 
     let fg_style = match fg {
         Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
