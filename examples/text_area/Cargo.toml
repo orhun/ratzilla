@@ -1,0 +1,10 @@
+[package]
+name = "text_area"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+console_error_panic_hook = "0.1.7"
+ratzilla = { path = "../../" }
+tui-textarea = { version = "0.7.0", default-features = false, features = ["ratatui"] }
