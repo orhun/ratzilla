@@ -12,22 +12,20 @@ use crate::{
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
-    span.set_inner_html(cell.symbol());
 
     let style = get_cell_style_as_css(cell);
     span.set_attribute("style", &style)?;
-    Ok(span)
-}
 
-/// Creates a new `<a>` element with the given cells.
-pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Element, Error> {
-    let anchor = document.create_element("a")?;
-    anchor.set_attribute(
-        "href",
-        &cells.iter().map(|c| c.symbol()).collect::<String>(),
-    )?;
-    anchor.set_attribute("style", &get_cell_style_as_css(&cells[0]))?;
-    Ok(anchor)
+    if let Some(url) = cell.hyperlink() {
+        let anchor = document.create_element("a")?;
+        anchor.set_attribute("href", url)?;
+        anchor.set_attribute("style", "text-decoration: none; color: inherit")?;
+        anchor.set_inner_html(cell.symbol());
+        span.append_child(&anchor)?;
+    } else {
+        span.set_inner_html(cell.symbol());
+    }
+    Ok(span)
 }
 
 /// Converts a cell to a CSS style.
