@@ -166,24 +166,18 @@ trunk serve
 
 Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your browser!
 
-## Documentation
+## Deploy
 
-- [API Documentation](https://docs.rs/ratzilla)
-- [Backends](https://docs.rs/ratzilla/latest/ratzilla/backend/index.html)
-- [Widgets](https://docs.rs/ratzilla/latest/ratzilla/widgets/index.html)
+To build the WASM bundle, you can run the following command:
 
-## Examples
+```sh
+trunk build --release
+```
 
-- [Minimal](https://github.com/orhun/ratzilla/tree/main/examples/minimal) ([Preview](https://orhun.dev/ratzilla/minimal))
-- [Demo](https://github.com/orhun/ratzilla/tree/main/examples/demo) ([Preview](https://orhun.dev/ratzilla/demo))
-- [Pong](https://github.com/orhun/ratzilla/tree/main/examples/pong) ([Preview](https://orhun.dev/ratzilla/pong))
-- [Colors RGB](https://github.com/orhun/ratzilla/tree/main/examples/colors_rgb) ([Preview](https://orhun.dev/ratzilla/colors_rgb))
-- [Animations](https://github.com/orhun/ratzilla/tree/main/examples/animations) ([Preview](https://orhun.dev/ratzilla/animations))
-- [World Map](https://github.com/orhun/ratzilla/tree/main/examples/world_map) ([Preview](https://orhun.dev/ratzilla/world_map))
+Then you can serve the server from the `dist` directory.
 
-## Deploying Ratzilla
-
-Build the wasm bundle using a build script such as:
+<details>
+  <summary>Example Build Script</summary>
 
 ```bash
 #!/bin/bash
@@ -201,11 +195,27 @@ cargo binstall --targets x86_64-unknown-linux-musl -y trunk
 # Build project with trunk
 trunk build --release
 ```
-You can then serve the server out of `dist`.
 
-### Deployment Templates
+</details>
 
-- <https://vercel.com/templates/other/ratzilla> - Ratzilla Vercel Template
+### Vercel
+
+There is a Vercel deployment template available for Ratzilla [here](https://vercel.com/templates/other/ratzilla).
+
+## Documentation
+
+- [API Documentation](https://docs.rs/ratzilla)
+- [Backends](https://docs.rs/ratzilla/latest/ratzilla/backend/index.html)
+- [Widgets](https://docs.rs/ratzilla/latest/ratzilla/widgets/index.html)
+
+## Examples
+
+- [Minimal](https://github.com/orhun/ratzilla/tree/main/examples/minimal) ([Preview](https://orhun.dev/ratzilla/minimal))
+- [Demo](https://github.com/orhun/ratzilla/tree/main/examples/demo) ([Preview](https://orhun.dev/ratzilla/demo))
+- [Pong](https://github.com/orhun/ratzilla/tree/main/examples/pong) ([Preview](https://orhun.dev/ratzilla/pong))
+- [Colors RGB](https://github.com/orhun/ratzilla/tree/main/examples/colors_rgb) ([Preview](https://orhun.dev/ratzilla/colors_rgb))
+- [Animations](https://github.com/orhun/ratzilla/tree/main/examples/animations) ([Preview](https://orhun.dev/ratzilla/animations))
+- [World Map](https://github.com/orhun/ratzilla/tree/main/examples/world_map) ([Preview](https://orhun.dev/ratzilla/world_map))
 
 ## Websites built with Ratzilla
 
