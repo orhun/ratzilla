@@ -166,6 +166,42 @@ trunk serve
 
 Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your browser!
 
+## Deploy
+
+To build the WASM bundle, you can run the following command:
+
+```sh
+trunk build --release
+```
+
+Then you can serve the server from the `dist` directory.
+
+<details>
+  <summary>Example Build Script</summary>
+
+```bash
+#!/bin/bash
+set -euo pipefail
+export HOME=/root
+
+# Install Rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -t wasm32-unknown-unknown --profile minimal
+source "$HOME/.cargo/env"
+
+# Install trunk using binstall
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+cargo binstall --targets x86_64-unknown-linux-musl -y trunk
+
+# Build project with trunk
+trunk build --release
+```
+
+</details>
+
+### Vercel
+
+There is a Vercel deployment template available for Ratzilla [here](https://vercel.com/templates/other/ratzilla).
+
 ## Documentation
 
 - [API Documentation](https://docs.rs/ratzilla)
@@ -205,6 +241,7 @@ Lastly, thanks to [Ratatui] for providing the core TUI components.
 [`Hyperlink`]: https://docs.rs/ratzilla/latest/ratzilla/widgets/struct.Hyperlink.html
 [Webatui]: https://github.com/TylerBloom/webatui
 [Martin Blasko]: https://github.com/MartinBspheroid
+[Vercel]: https://vercel
 
 ## Contributing
 
