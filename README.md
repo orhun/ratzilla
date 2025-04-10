@@ -181,6 +181,32 @@ Now go to [http://localhost:8080](http://localhost:8080) and enjoy TUIs in your 
 - [Animations](https://github.com/orhun/ratzilla/tree/main/examples/animations) ([Preview](https://orhun.dev/ratzilla/animations))
 - [World Map](https://github.com/orhun/ratzilla/tree/main/examples/world_map) ([Preview](https://orhun.dev/ratzilla/world_map))
 
+## Deploying Ratzilla
+
+Build the wasm bundle using a build script such as:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+export HOME=/root
+
+# Install Rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y -t wasm32-unknown-unknown --profile minimal
+source "$HOME/.cargo/env"
+
+# Install trunk using binstall
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+cargo binstall --targets x86_64-unknown-linux-musl -y trunk
+
+# Build project with trunk
+trunk build --release
+```
+You can then serve the server out of `dist`.
+
+### Deployment Templates
+
+- <https://vercel.com/templates/other/ratzilla> - Ratzilla Vercel Template
+
 ## Websites built with Ratzilla
 
 - <https://orhun.dev/ratzilla> - The official website of Ratzilla
@@ -205,6 +231,7 @@ Lastly, thanks to [Ratatui] for providing the core TUI components.
 [`Hyperlink`]: https://docs.rs/ratzilla/latest/ratzilla/widgets/struct.Hyperlink.html
 [Webatui]: https://github.com/TylerBloom/webatui
 [Martin Blasko]: https://github.com/MartinBspheroid
+[Vercel]: https://vercel
 
 ## Contributing
 
