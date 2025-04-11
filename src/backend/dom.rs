@@ -262,6 +262,15 @@ impl Backend for DomBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
+        if let Some(old_pos) = self.cursor_position {
+            let y = old_pos.y as usize;
+            let x = old_pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                line[x].reset();
+            }
+        }
+
         self.cursor_position = None;
         Ok(())
     }
