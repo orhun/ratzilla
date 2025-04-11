@@ -7,7 +7,7 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
+    wasm_bindgen::{prelude::Closure, JsCast},
     window, Document, Element, Window,
 };
 
@@ -226,16 +226,13 @@ impl Backend for DomBackend {
             }
         }
 
+        // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
             let y = pos.y as usize;
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                web_sys::console::log_1(&JsValue::from_str(
-                    format!("cursor {}, {}", x, y).as_str(),
-                ));
                 line[x].set_symbol("▌");
-                self.update_grid()?;
             }
         }
 
@@ -305,15 +302,16 @@ impl Backend for DomBackend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
+        let new_pos = position.into();
+        if let Some(old_pos) = self.cursor_position {
+            let y = old_pos.y as usize;
+            let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
-            if x < line.len() {
+            if x < line.len() && old_pos != new_pos {
                 line[x].reset();
             }
         }
-        self.cursor_position = Some(position.into());
+        self.cursor_position = Some(new_pos);
         Ok(())
     }
 }
