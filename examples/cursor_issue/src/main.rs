@@ -7,11 +7,12 @@ use ratzilla::ratatui::{
     Terminal,
 };
 
-use ratzilla::{event::KeyCode, DomBackend, WebRenderer};
+use ratzilla::{event::KeyCode, CanvasBackend, DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(4));
     let backend = DomBackend::new()?;
+    // let backend = CanvasBackend::new()?;
     let terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({
