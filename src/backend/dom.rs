@@ -191,20 +191,6 @@ impl DomBackend {
         }
         Ok(())
     }
-
-    fn call_on_cursor_cell<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut Cell),
-    {
-        if let Some(old_pos) = self.cursor_position {
-            let y = old_pos.y as usize;
-            let x = old_pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() {
-                f(&mut line[x]);
-            }
-        }
-    }
 }
 
 impl Backend for DomBackend {
@@ -241,9 +227,14 @@ impl Backend for DomBackend {
         }
 
         // Draw the cursor if set
-        self.call_on_cursor_cell(|cell| {
-            cell.set_symbol("▌");
-        });
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                line[x].set_symbol("▌");
+            }
+        }
 
         Ok(())
     }
@@ -271,9 +262,14 @@ impl Backend for DomBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        self.call_on_cursor_cell(|cell| {
-            cell.reset();
-        });
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                line[x].reset();
+            }
+        }
         self.cursor_position = None;
         Ok(())
     }
