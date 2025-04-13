@@ -67,6 +67,8 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Previous content at cursor position
+    prev_cursor_pos_content: Option<Cell>,
 }
 
 impl DomBackend {
@@ -100,6 +102,7 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
+            prev_cursor_pos_content: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -232,6 +235,9 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
+                if line[x].symbol() != "▌" {
+                    self.prev_cursor_pos_content = Some(line[x].clone());
+                }
                 line[x].set_symbol("▌");
             }
         }
@@ -267,7 +273,9 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                line[x].reset();
+                if let Some(prev_cell) = &self.prev_cursor_pos_content {
+                    line[x] = prev_cell.clone();
+                }
             }
         }
         self.cursor_position = None;
@@ -316,7 +324,9 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                line[x].reset();
+                if let Some(prev_cell) = &self.prev_cursor_pos_content {
+                    line[x] = prev_cell.clone();
+                }
             }
         }
         self.cursor_position = Some(new_pos);
