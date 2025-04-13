@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::Color,
+    style::{Color, Stylize},
 };
 use web_sys::{
     js_sys::{Boolean, Map},
@@ -81,8 +81,6 @@ pub struct CanvasBackend {
     canvas: Canvas,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// Previous content at cursor position
-    prev_cursor_pos_content: Option<Cell>,
 }
 
 impl CanvasBackend {
@@ -103,7 +101,6 @@ impl CanvasBackend {
             initialized: false,
             canvas,
             cursor_position: None,
-            prev_cursor_pos_content: None,
         })
     }
 
@@ -185,10 +182,8 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                if line[x].symbol() != "▌" {
-                    self.prev_cursor_pos_content = Some(line[x].clone());
-                }
-                line[x].set_symbol("▌");
+                let cursor_style = line[x].style().reversed();
+                line[x].set_style(cursor_style);
             }
         }
 
@@ -223,9 +218,8 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                if let Some(prev_cell) = &self.prev_cursor_pos_content {
-                    line[x] = prev_cell.clone();
-                }
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
             }
         }
         self.cursor_position = None;
@@ -274,9 +268,8 @@ impl Backend for CanvasBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                if let Some(prev_cell) = &self.prev_cursor_pos_content {
-                    line[x] = prev_cell.clone();
-                }
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
             }
         }
         self.cursor_position = Some(new_pos);

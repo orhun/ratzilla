@@ -5,6 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
+    style::Stylize,
 };
 use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast},
@@ -67,8 +68,6 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// Previous content at cursor position
-    prev_cursor_pos_content: Option<Cell>,
 }
 
 impl DomBackend {
@@ -102,7 +101,6 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
-            prev_cursor_pos_content: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -235,10 +233,8 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                if line[x].symbol() != "▌" {
-                    self.prev_cursor_pos_content = Some(line[x].clone());
-                }
-                line[x].set_symbol("▌");
+                let cursor_style = line[x].style().reversed();
+                line[x].set_style(cursor_style);
             }
         }
 
@@ -273,9 +269,8 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                if let Some(prev_cell) = &self.prev_cursor_pos_content {
-                    line[x] = prev_cell.clone();
-                }
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
             }
         }
         self.cursor_position = None;
@@ -324,9 +319,8 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                if let Some(prev_cell) = &self.prev_cursor_pos_content {
-                    line[x] = prev_cell.clone();
-                }
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
             }
         }
         self.cursor_position = Some(new_pos);
