@@ -1,5 +1,6 @@
 use std::{cell::RefCell, io, rc::Rc};
 
+use ratzilla::backend::dom::CursorShape;
 use ratzilla::event::KeyEvent;
 use ratzilla::ratatui::layout::{Constraint, Layout, Position};
 use ratzilla::ratatui::style::{Modifier, Style, Stylize};
@@ -14,7 +15,7 @@ use ratzilla::ratatui::{
 use ratzilla::{event::KeyCode, DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
-    let backend = DomBackend::new()?;
+    let backend = DomBackend::new()?.set_cursor_shape(CursorShape::SteadyUnderScore);
     let terminal = Terminal::new(backend)?;
 
     let app = Rc::new(RefCell::new(App::new()));

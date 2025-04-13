@@ -14,17 +14,32 @@ use web_sys::{
 
 use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
 
+/// Cursor shapes.
+#[derive(Debug, Default)]
+pub enum CursorShape {
+    /// A non blinking block cursor shape.
+    #[default]
+    SteadyBlock,
+    /// A non blinking underscore cursor shape
+    SteadyUnderScore,
+}
+
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
 pub struct DomBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
 }
 
 impl DomBackendOptions {
     /// Constructs a new [`DomBackendOptions`].
-    pub fn new(grid_id: Option<String>) -> Self {
-        Self { grid_id }
+    pub fn new(grid_id: Option<String>, cursor_shape: CursorShape) -> Self {
+        Self {
+            grid_id,
+            cursor_shape,
+        }
     }
 
     /// Returns the grid ID.
@@ -37,6 +52,11 @@ impl DomBackendOptions {
             Some(id) => format!("{id}_ratzilla_grid"),
             None => "grid".to_string(),
         }
+    }
+
+    /// Returns the [`CursorShape`].
+    pub fn cursor_shape(&self) -> &CursorShape {
+        &self.cursor_shape
     }
 }
 
@@ -78,7 +98,16 @@ impl DomBackend {
 
     /// Constructs a new [`DomBackend`] and uses the given element ID for the grid.
     pub fn new_by_id(id: &str) -> Result<Self, Error> {
-        Self::new_with_options(DomBackendOptions::new(Some(id.to_string())))
+        Self::new_with_options(DomBackendOptions::new(
+            Some(id.to_string()),
+            CursorShape::default(),
+        ))
+    }
+
+    /// Set the [`CursorShape`].
+    pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.options.cursor_shape = shape;
+        self
     }
 
     /// Constructs a new [`DomBackend`] with the given options.
@@ -233,7 +262,10 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = line[x].style().reversed();
+                let cursor_style = match self.options.cursor_shape {
+                    CursorShape::SteadyBlock => line[x].style().reversed(),
+                    CursorShape::SteadyUnderScore => line[x].style().underlined(),
+                };
                 line[x].set_style(cursor_style);
             }
         }
@@ -269,8 +301,11 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = match self.options.cursor_shape {
+                    CursorShape::SteadyBlock => line[x].style().not_reversed(),
+                    CursorShape::SteadyUnderScore => line[x].style().not_underlined(),
+                };
+                line[x].set_style(style);
             }
         }
         self.cursor_position = None;
@@ -319,8 +354,11 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = match self.options.cursor_shape {
+                    CursorShape::SteadyBlock => line[x].style().not_reversed(),
+                    CursorShape::SteadyUnderScore => line[x].style().not_underlined(),
+                };
+                line[x].set_style(style);
             }
         }
         self.cursor_position = Some(new_pos);
