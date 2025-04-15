@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::Stylize,
+    style::{Style, Stylize},
 };
 use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast},
@@ -22,6 +22,22 @@ pub enum CursorShape {
     SteadyBlock,
     /// A non blinking underscore cursor shape
     SteadyUnderScore,
+}
+
+impl CursorShape {
+    fn to_hide(&self, style: Style) -> Style {
+        match self {
+            CursorShape::SteadyBlock => style.not_reversed(),
+            CursorShape::SteadyUnderScore => style.not_underlined(),
+        }
+    }
+
+    fn to_show(&self, style: Style) -> Style {
+        match self {
+            CursorShape::SteadyBlock => style.reversed(),
+            CursorShape::SteadyUnderScore => style.underlined(),
+        }
+    }
 }
 
 /// Options for the [`DomBackend`].
@@ -262,10 +278,7 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = match self.options.cursor_shape {
-                    CursorShape::SteadyBlock => line[x].style().reversed(),
-                    CursorShape::SteadyUnderScore => line[x].style().underlined(),
-                };
+                let cursor_style = self.options.cursor_shape().to_show(line[x].style());
                 line[x].set_style(cursor_style);
             }
         }
@@ -301,10 +314,7 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let style = match self.options.cursor_shape {
-                    CursorShape::SteadyBlock => line[x].style().not_reversed(),
-                    CursorShape::SteadyUnderScore => line[x].style().not_underlined(),
-                };
+                let style = self.options.cursor_shape.to_hide(line[x].style());
                 line[x].set_style(style);
             }
         }
@@ -354,10 +364,7 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let style = match self.options.cursor_shape {
-                    CursorShape::SteadyBlock => line[x].style().not_reversed(),
-                    CursorShape::SteadyUnderScore => line[x].style().not_underlined(),
-                };
+                let style = self.options.cursor_shape.to_hide(line[x].style());
                 line[x].set_style(style);
             }
         }
