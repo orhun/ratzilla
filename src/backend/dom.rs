@@ -5,40 +5,13 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Style, Stylize},
 };
 use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast},
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
-
-/// Supported cursor shapes.
-#[derive(Debug, Default)]
-pub enum CursorShape {
-    /// A non blinking block cursor shape.
-    #[default]
-    SteadyBlock,
-    /// A non blinking underscore cursor shape
-    SteadyUnderScore,
-}
-
-impl CursorShape {
-    fn to_hide(&self, style: Style) -> Style {
-        match self {
-            CursorShape::SteadyBlock => style.not_reversed(),
-            CursorShape::SteadyUnderScore => style.not_underlined(),
-        }
-    }
-
-    fn to_show(&self, style: Style) -> Style {
-        match self {
-            CursorShape::SteadyBlock => style.reversed(),
-            CursorShape::SteadyUnderScore => style.underlined(),
-        }
-    }
-}
+use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -278,7 +251,7 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = self.options.cursor_shape().to_show(line[x].style());
+                let cursor_style = self.options.cursor_shape().show(line[x].style());
                 line[x].set_style(cursor_style);
             }
         }
@@ -314,7 +287,7 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let style = self.options.cursor_shape.to_hide(line[x].style());
+                let style = self.options.cursor_shape.hide(line[x].style());
                 line[x].set_style(style);
             }
         }
@@ -364,7 +337,7 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let style = self.options.cursor_shape.to_hide(line[x].style());
+                let style = self.options.cursor_shape.hide(line[x].style());
                 line[x].set_style(style);
             }
         }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, io, rc::Rc};
 
-use ratzilla::backend::dom::CursorShape;
+use ratzilla::backend::cursor::CursorShape;
 use ratzilla::event::KeyEvent;
 use ratzilla::ratatui::layout::{Constraint, Layout, Position};
 use ratzilla::ratatui::style::{Modifier, Style, Stylize};
