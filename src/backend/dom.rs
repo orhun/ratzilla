@@ -11,19 +11,24 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
+use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
 pub struct DomBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
 }
 
 impl DomBackendOptions {
     /// Constructs a new [`DomBackendOptions`].
-    pub fn new(grid_id: Option<String>) -> Self {
-        Self { grid_id }
+    pub fn new(grid_id: Option<String>, cursor_shape: CursorShape) -> Self {
+        Self {
+            grid_id,
+            cursor_shape,
+        }
     }
 
     /// Returns the grid ID.
@@ -36,6 +41,11 @@ impl DomBackendOptions {
             Some(id) => format!("{id}_ratzilla_grid"),
             None => "grid".to_string(),
         }
+    }
+
+    /// Returns the [`CursorShape`].
+    pub fn cursor_shape(&self) -> &CursorShape {
+        &self.cursor_shape
     }
 }
 
@@ -65,6 +75,8 @@ pub struct DomBackend {
     document: Document,
     /// Options.
     options: DomBackendOptions,
+    /// Cursor position.
+    cursor_position: Option<Position>,
 }
 
 impl DomBackend {
@@ -75,7 +87,16 @@ impl DomBackend {
 
     /// Constructs a new [`DomBackend`] and uses the given element ID for the grid.
     pub fn new_by_id(id: &str) -> Result<Self, Error> {
-        Self::new_with_options(DomBackendOptions::new(Some(id.to_string())))
+        Self::new_with_options(DomBackendOptions::new(
+            Some(id.to_string()),
+            CursorShape::default(),
+        ))
+    }
+
+    /// Set the [`CursorShape`].
+    pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.options.cursor_shape = shape;
+        self
     }
 
     /// Constructs a new [`DomBackend`] with the given options.
@@ -97,6 +118,7 @@ impl DomBackend {
             options,
             window,
             document,
+            cursor_position: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -222,6 +244,18 @@ impl Backend for DomBackend {
                 }
             }
         }
+
+        // Draw the cursor if set
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                let cursor_style = self.options.cursor_shape().show(line[x].style());
+                line[x].set_style(cursor_style);
+            }
+        }
+
         Ok(())
     }
 
@@ -248,6 +282,16 @@ impl Backend for DomBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                let style = self.options.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
+            }
+        }
+        self.cursor_position = None;
         Ok(())
     }
 
@@ -280,10 +324,24 @@ impl Backend for DomBackend {
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
-        unimplemented!()
+        match self.cursor_position {
+            None => Ok((0, 0).into()),
+            Some(position) => Ok(position),
+        }
     }
 
-    fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
-        unimplemented!()
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
+        let new_pos = position.into();
+        if let Some(old_pos) = self.cursor_position {
+            let y = old_pos.y as usize;
+            let x = old_pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() && old_pos != new_pos {
+                let style = self.options.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
+            }
+        }
+        self.cursor_position = Some(new_pos);
+        Ok(())
     }
 }

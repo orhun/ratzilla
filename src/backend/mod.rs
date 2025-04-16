@@ -17,3 +17,6 @@ pub mod dom;
 
 /// Backend utilities.
 pub(crate) mod utils;
+
+/// Cursor shapes.
+pub mod cursor;

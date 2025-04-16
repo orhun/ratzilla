@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::Color,
+    style::{Color, Stylize},
 };
 use web_sys::{
     js_sys::{Boolean, Map},
@@ -79,6 +79,8 @@ pub struct CanvasBackend {
     prev_buffer: Vec<Vec<Cell>>,
     /// Canvas.
     canvas: Canvas,
+    /// Cursor position.
+    cursor_position: Option<Position>,
 }
 
 impl CanvasBackend {
@@ -98,6 +100,7 @@ impl CanvasBackend {
             prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
             initialized: false,
             canvas,
+            cursor_position: None,
         })
     }
 
@@ -172,6 +175,18 @@ impl Backend for CanvasBackend {
             line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
             line[x] = cell.clone();
         }
+
+        // Draw the cursor if set
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                let cursor_style = line[x].style().reversed();
+                line[x].set_style(cursor_style);
+            }
+        }
+
         Ok(())
     }
 
@@ -198,6 +213,16 @@ impl Backend for CanvasBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() {
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
+            }
+        }
+        self.cursor_position = None;
         Ok(())
     }
 
@@ -230,10 +255,24 @@ impl Backend for CanvasBackend {
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
-        unimplemented!()
+        match self.cursor_position {
+            None => Ok((0, 0).into()),
+            Some(position) => Ok(position),
+        }
     }
 
-    fn set_cursor_position<P: Into<Position>>(&mut self, _: P) -> IoResult<()> {
-        unimplemented!()
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
+        let new_pos = position.into();
+        if let Some(old_pos) = self.cursor_position {
+            let y = old_pos.y as usize;
+            let x = old_pos.x as usize;
+            let line = &mut self.buffer[y];
+            if x < line.len() && old_pos != new_pos {
+                let not_rev_style = line[x].style().not_reversed();
+                line[x].set_style(not_rev_style);
+            }
+        }
+        self.cursor_position = Some(new_pos);
+        Ok(())
     }
 }

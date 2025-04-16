@@ -222,13 +222,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "minimal"
-version = "0.1.0"
-dependencies = [
- "ratzilla",
-]
-
-[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -462,6 +455,13 @@ name = "unicode-width"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
+
+[[package]]
+name = "user-input"
+version = "0.1.0"
+dependencies = [
+ "ratzilla",
+]
 
 [[package]]
 name = "wasm-bindgen"
