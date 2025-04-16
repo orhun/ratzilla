@@ -14,7 +14,7 @@ use web_sys::{
 
 use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
 
-/// Cursor shapes.
+/// Supported cursor shapes.
 #[derive(Debug, Default)]
 pub enum CursorShape {
     /// A non blinking block cursor shape.
