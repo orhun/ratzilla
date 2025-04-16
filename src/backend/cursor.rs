@@ -3,7 +3,7 @@ use ratatui::style::{Style, Stylize};
 /// Supported cursor shapes.
 #[derive(Debug, Default)]
 pub enum CursorShape {
-    /// A non blinking block cursor shape (■).
+    /// A non blinking block cursor shape (█).
     #[default]
     SteadyBlock,
     /// A non blinking underscore cursor shape (_).
