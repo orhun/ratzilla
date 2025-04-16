@@ -134,13 +134,13 @@ WebAssembly) as a JavaScript module.
     </style>
   </head>
   <body>
-  <!-- (optional) subscribe to the application started event -->
-  <script type="module">
-    window.addEventListener("TrunkApplicationStarted", (_) => {
-      // window.wasmBindings.* are now available
-      console.log("application initialized");
-    });
-  </script>
+    <!-- (optional) subscribe to the application started event -->
+    <script type="module">
+      window.addEventListener("TrunkApplicationStarted", (_) => {
+        // #[wasm_bindgen] functions are now bound to window.wasmBindings.*
+        console.log("application initialized");
+      });
+    </script>
   </body>
 </html>
 ```
