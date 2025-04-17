@@ -93,7 +93,8 @@ fn main() -> io::Result<()> {
 }
 ```
 
-Then add your `index.html` which imports the JavaScript module:
+Add your `index.html`. During build, `trunk` will automatically inject and initialize your Rust code (compiled to
+WebAssembly) as a JavaScript module.
 
 <details>
   <summary>index.html</summary>
@@ -111,6 +112,7 @@ Then add your `index.html` which imports the JavaScript module:
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/firacode/6.2.0/fira_code.min.css"
     />
+    <link data-trunk rel="rust"/>
     <title>Ratzilla</title>
     <style>
       body {
@@ -132,9 +134,12 @@ Then add your `index.html` which imports the JavaScript module:
     </style>
   </head>
   <body>
+    <!-- (optional) subscribe to the application started event -->
     <script type="module">
-      import init from "./pkg/ratzilla.js";
-      init();
+      window.addEventListener("TrunkApplicationStarted", (_) => {
+        // #[wasm_bindgen] functions are now bound to window.wasmBindings.*
+        console.log("application initialized");
+      });
     </script>
   </body>
 </html>
