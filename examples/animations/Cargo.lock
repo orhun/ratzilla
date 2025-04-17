@@ -9,6 +9,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "animations"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "ratzilla",
+ "tachyonfx",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,15 +303,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pong"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "ratzilla",
- "tachyonfx",
-]
-
-[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "ratzilla"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "console_error_panic_hook",
  "ratatui",

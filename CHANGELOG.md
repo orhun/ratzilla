@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.0.6 - 2025-04-17
+
+### 🚀 Features
+
+- _(dom)_ Add cursor support by @dawedawe in [#77](https://github.com/orhun/ratzilla/pull/77)
+- _(example)_ Add demo2 example by @orhun in [#45](https://github.com/orhun/ratzilla/pull/45)
+
+### 🐛 Bug Fixes
+
+- _(examples)_ Remove failing ratzilla.js imports from examples by @junkdog in [#81](https://github.com/orhun/ratzilla/pull/81)
+- _(canvas)_ Add clipping for each cell to avoid overflow by @orhun in [#76](https://github.com/orhun/ratzilla/pull/76)
+- _(examples)_ Fix some package names in examples by @dawedawe in [#69](https://github.com/orhun/ratzilla/pull/69)
+
+### 🚜 Refactor
+
+- _(render)_ Simplify rendering to less depend on ratatui internals by @orhun in [#78](https://github.com/orhun/ratzilla/pull/78)
+
+### 📚 Documentation
+
+- _(readme)_ Add deployment information by @jetpham in [#79](https://github.com/orhun/ratzilla/pull/79)
+- _(examples)_ Add text input example using tui-textarea by @reubeno in [#74](https://github.com/orhun/ratzilla/pull/74)
+
+### ⚙️ Miscellaneous Tasks
+
+- _(example)_ Remove unnecessary import from user_input example by @orhun
+- _(lib)_ Re-export web-sys crate by @orhun in [#71](https://github.com/orhun/ratzilla/pull/71)
+- _(example)_ Disable big-text in demo temporarily by @orhun
+
+## 💖 New Contributors
+
+- @jetpham made their first contribution in [#79](https://github.com/orhun/ratzilla/pull/79)
+- @reubeno made their first contribution in [#74](https://github.com/orhun/ratzilla/pull/74)
+
+**Full Changelog**: https://github.com/orhun/ratzilla/compare/v0.0.5...0.0.6
+
 ## 0.0.5 - 2025-04-01
 
 ### 🐛 Bug Fixes
