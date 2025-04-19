@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Color, Stylize},
+    style::{Color, Modifier},
 };
 use web_sys::{
     js_sys::{Boolean, Map},
@@ -13,7 +13,7 @@ use web_sys::{
     window,
 };
 
-use crate::{backend::utils::*, error::Error};
+use crate::{backend::utils::*, error::Error, CursorShape};
 
 /// Canvas renderer.
 #[derive(Debug)]
@@ -81,6 +81,8 @@ pub struct CanvasBackend {
     canvas: Canvas,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
 }
 
 impl CanvasBackend {
@@ -101,12 +103,24 @@ impl CanvasBackend {
             initialized: false,
             canvas,
             cursor_position: None,
+            cursor_shape: CursorShape::SteadyBlock,
         })
     }
 
     /// Sets the background color of the canvas.
     pub fn set_background_color(&mut self, color: Color) {
         self.canvas.background_color = color;
+    }
+
+    /// Returns the [`CursorShape`].
+    pub fn cursor_shape(&self) -> &CursorShape {
+        &self.cursor_shape
+    }
+
+    /// Set the [`CursorShape`].
+    pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.cursor_shape = shape;
+        self
     }
 
     // Compare the current buffer to the previous buffer and updates the canvas
@@ -153,6 +167,12 @@ impl CanvasBackend {
                         y as f64 * ymul,
                     )?;
 
+                    if cell.modifier.contains(Modifier::UNDERLINED) {
+                        self.canvas
+                            .context
+                            .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
+                    }
+
                     self.canvas.context.restore();
                 }
             }
@@ -182,7 +202,7 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = line[x].style().reversed();
+                let cursor_style = self.cursor_shape.show(line[x].style());
                 line[x].set_style(cursor_style);
             }
         }
@@ -218,8 +238,8 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = self.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
             }
         }
         self.cursor_position = None;
@@ -268,8 +288,8 @@ impl Backend for CanvasBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = self.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
             }
         }
         self.cursor_position = Some(new_pos);
