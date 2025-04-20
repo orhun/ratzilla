@@ -167,10 +167,16 @@ impl CanvasBackend {
                         y as f64 * ymul,
                     )?;
 
-                    if cell.modifier.contains(Modifier::UNDERLINED) {
-                        self.canvas
-                            .context
-                            .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
+                    // draw an underline if CursorShape::SteadyUnderScore was used
+                    if let Some(pos) = self.cursor_position {
+                        if pos.y as usize == y
+                            && pos.x as usize == x
+                            && cell.modifier.contains(Modifier::UNDERLINED)
+                        {
+                            self.canvas
+                                .context
+                                .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
+                        }
                     }
 
                     self.canvas.context.restore();
