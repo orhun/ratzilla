@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Color, Stylize},
+    style::{Color, Modifier},
 };
 use web_sys::{
     js_sys::{Boolean, Map},
@@ -13,7 +13,7 @@ use web_sys::{
     window,
 };
 
-use crate::{backend::utils::*, error::Error};
+use crate::{backend::utils::*, error::Error, CursorShape};
 
 /// Canvas renderer.
 #[derive(Debug)]
@@ -81,6 +81,8 @@ pub struct CanvasBackend {
     canvas: Canvas,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
     /// Draw cell boundaries with specified color.
     debug_mode: Option<String>,
 }
@@ -103,6 +105,7 @@ impl CanvasBackend {
             initialized: false,
             canvas,
             cursor_position: None,
+            cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
         })
     }
@@ -110,6 +113,17 @@ impl CanvasBackend {
     /// Sets the background color of the canvas.
     pub fn set_background_color(&mut self, color: Color) {
         self.canvas.background_color = color;
+    }
+
+    /// Returns the [`CursorShape`].
+    pub fn cursor_shape(&self) -> &CursorShape {
+        &self.cursor_shape
+    }
+
+    /// Set the [`CursorShape`].
+    pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.cursor_shape = shape;
+        self
     }
 
     /// Enable or disable debug mode to draw cells with a specified color.
@@ -176,6 +190,18 @@ impl CanvasBackend {
                         y as f64 * ymul,
                     )?;
 
+                    // Draw an underline if `CursorShape::SteadyUnderScore` was used
+                    if let Some(pos) = self.cursor_position {
+                        if pos.y as usize == y
+                            && pos.x as usize == x
+                            && cell.modifier.contains(Modifier::UNDERLINED)
+                        {
+                            self.canvas
+                                .context
+                                .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
+                        }
+                    }
+
                     // Draw the cell boundaries for debugging
                     if let Some(color) = &self.debug_mode {
                         self.canvas.context.set_stroke_style_str(color);
@@ -216,7 +242,7 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = line[x].style().reversed();
+                let cursor_style = self.cursor_shape.show(line[x].style());
                 line[x].set_style(cursor_style);
             }
         }
@@ -252,8 +278,8 @@ impl Backend for CanvasBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = self.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
             }
         }
         self.cursor_position = None;
@@ -302,8 +328,8 @@ impl Backend for CanvasBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let not_rev_style = line[x].style().not_reversed();
-                line[x].set_style(not_rev_style);
+                let style = self.cursor_shape.hide(line[x].style());
+                line[x].set_style(style);
             }
         }
         self.cursor_position = Some(new_pos);
