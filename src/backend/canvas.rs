@@ -81,8 +81,8 @@ pub struct CanvasBackend {
     canvas: Canvas,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// Draw cell boundaries when true.
-    debug_mode: bool,
+    /// Draw cell boundaries with specified color.
+    debug_mode: Option<String>,
 }
 
 impl CanvasBackend {
@@ -103,7 +103,7 @@ impl CanvasBackend {
             initialized: false,
             canvas,
             cursor_position: None,
-            debug_mode: false,
+            debug_mode: None,
         })
     }
 
@@ -112,9 +112,15 @@ impl CanvasBackend {
         self.canvas.background_color = color;
     }
 
-    /// Enable or disable debug mode to draw cell boundaries.
-    pub fn set_debug_mode(&mut self, debug: bool) {
-        self.debug_mode = debug;
+    /// Enable or disable debug mode to draw cells with a specified color.
+    ///
+    /// Examples:
+    /// ```
+    /// set_debug_mode(Some("#666"));
+    /// set_debug_mode(Some("red"));
+    /// ```
+    pub fn set_debug_mode<T: Into<String>>(&mut self, color: Option<T>) {
+        self.debug_mode = color.map(Into::into);
     }
 
     // Compare the current buffer to the previous buffer and updates the canvas
@@ -162,8 +168,8 @@ impl CanvasBackend {
                     )?;
 
                     // Debug: draw cell boundary
-                    if self.debug_mode {
-                        self.canvas.context.set_stroke_style_str("#666");
+                    if let Some(color) = &self.debug_mode {
+                        self.canvas.context.set_stroke_style_str(color);
                         self.canvas.context.stroke_rect(
                             x as f64 * xmul,
                             y as f64 * ymul,
