@@ -83,6 +83,8 @@ pub struct CanvasBackend {
     cursor_position: Option<Position>,
     /// The cursor shape.
     cursor_shape: CursorShape,
+    /// Draw cell boundaries with specified color.
+    debug_mode: Option<String>,
 }
 
 impl CanvasBackend {
@@ -104,6 +106,7 @@ impl CanvasBackend {
             canvas,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
+            debug_mode: None,
         })
     }
 
@@ -121,6 +124,26 @@ impl CanvasBackend {
     pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
         self.cursor_shape = shape;
         self
+    }
+
+    /// Enable or disable debug mode to draw cells with a specified color.
+    ///
+    /// The format of the color is the same as the CSS color format, e.g.:
+    /// - `#666`
+    /// - `#ff0000`
+    /// - `red`
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use ratzilla::CanvasBackend;
+    /// let mut backend = CanvasBackend::new().unwrap();
+    ///
+    /// backend.set_debug_mode(Some("#666"));
+    /// backend.set_debug_mode(Some("red"));
+    /// ```
+    pub fn set_debug_mode<T: Into<String>>(&mut self, color: Option<T>) {
+        self.debug_mode = color.map(Into::into);
     }
 
     // Compare the current buffer to the previous buffer and updates the canvas
@@ -177,6 +200,17 @@ impl CanvasBackend {
                                 .context
                                 .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
                         }
+                    }
+
+                    // Draw the cell boundaries for debugging
+                    if let Some(color) = &self.debug_mode {
+                        self.canvas.context.set_stroke_style_str(color);
+                        self.canvas.context.stroke_rect(
+                            x as f64 * xmul,
+                            y as f64 * ymul,
+                            xmul,
+                            ymul,
+                        );
                     }
 
                     self.canvas.context.restore();
