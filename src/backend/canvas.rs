@@ -114,10 +114,19 @@ impl CanvasBackend {
 
     /// Enable or disable debug mode to draw cells with a specified color.
     ///
-    /// Examples:
-    /// ```
-    /// set_debug_mode(Some("#666"));
-    /// set_debug_mode(Some("red"));
+    /// The format of the color is the same as the CSS color format, e.g.:
+    /// - `#666`
+    /// - `#ff0000`
+    /// - `red`
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use ratzilla::CanvasBackend;
+    /// let mut backend = CanvasBackend::new().unwrap();
+    ///
+    /// backend.set_debug_mode(Some("#666"));
+    /// backend.set_debug_mode(Some("red"));
     /// ```
     pub fn set_debug_mode<T: Into<String>>(&mut self, color: Option<T>) {
         self.debug_mode = color.map(Into::into);
@@ -167,7 +176,7 @@ impl CanvasBackend {
                         y as f64 * ymul,
                     )?;
 
-                    // Debug: draw cell boundary
+                    // Draw the cell boundaries for debugging
                     if let Some(color) = &self.debug_mode {
                         self.canvas.context.set_stroke_style_str(color);
                         self.canvas.context.stroke_rect(
