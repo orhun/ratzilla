@@ -167,7 +167,7 @@ impl CanvasBackend {
                         y as f64 * ymul,
                     )?;
 
-                    // draw an underline if CursorShape::SteadyUnderScore was used
+                    // Draw an underline if `CursorShape::SteadyUnderScore` was used
                     if let Some(pos) = self.cursor_position {
                         if pos.y as usize == y
                             && pos.x as usize == x
