@@ -54,8 +54,6 @@ pub fn get_screen_size() -> Size {
     (w as u16 / 10, h as u16 / 19).into()
 }
 
-
-
 /// Calls a global JavaScript function by name, with a custom `this` context and an arbitrary number of arguments.
 ///
 /// This function looks up the property `window[name]` on the global window, checks that it is a JavaScript
@@ -112,11 +110,7 @@ pub fn get_screen_size() -> Size {
 /// # Ok(())
 /// # }
 /// ```
-pub fn call_js_function_with_context<S, I, T>(
-    name: S,
-    this: T,
-    args: I,
-) -> Result<JsValue, Error>
+pub fn call_js_function_with_context<S, I, T>(name: S, this: T, args: I) -> Result<JsValue, Error>
 where
     S: AsRef<str>,
     T: Into<JsValue>,
@@ -124,11 +118,8 @@ where
     I::Item: Into<JsValue>,
 {
     let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
-    let func_val = Reflect::get(&window, &JsValue::from_str(name.as_ref()))
-        .map_err(Error::from)?;
-    let func = func_val
-        .dyn_into::<Function>()
-        .map_err(Error::from)?;
+    let func_val = Reflect::get(&window, &JsValue::from_str(name.as_ref())).map_err(Error::from)?;
+    let func = func_val.dyn_into::<Function>().map_err(Error::from)?;
     let param_array: Array = args.into_iter().map(Into::into).collect();
     let ctx = this.into();
     let result = func.apply(&ctx, &param_array).map_err(Error::from)?;
@@ -171,10 +162,7 @@ where
 /// # Ok(())
 /// # }
 /// ```
-pub fn call_js_function<S, I>(
-    name: S,
-    args: I,
-) -> Result<JsValue, Error>
+pub fn call_js_function<S, I>(name: S, args: I) -> Result<JsValue, Error>
 where
     S: AsRef<str>,
     I: IntoIterator,
