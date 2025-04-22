@@ -86,8 +86,8 @@ pub fn get_screen_size() -> Size {
 ///
 /// ```no_run
 /// # use wasm_bindgen::JsValue;
-/// # use crate::utils::call_js_function_with_context;
-/// # use crate::error::Error;
+/// # use ratzilla::utils::call_js_function_with_context;
+/// # use ratzilla::error::Error;
 /// # fn example() -> Result<(), Error> {
 /// // Suppose `myObj` is a JS object you want to be the `this` value.
 /// let my_obj = JsValue::from(js_sys::Object::new());
@@ -103,8 +103,9 @@ pub fn get_screen_size() -> Size {
 /// Calling a function without caring about `this`:
 ///
 /// ```no_run
-/// # use crate::utils::call_js_function_with_context;
-/// # use crate::error::Error;
+/// # use ratzilla::utils::call_js_function_with_context;
+/// # use ratzilla::error::Error;
+/// # use wasm_bindgen::JsValue;
 /// # fn example() -> Result<(), Error> {
 /// // This will set `this` to `null` which in non-strict mode defaults to the global object.
 /// let result = call_js_function_with_context("alert", JsValue::NULL, ["Hello from Rust"])?;
@@ -162,8 +163,8 @@ where
 /// Calling a global function like `alert`:
 ///
 /// ```no_run
-/// # use crate::utils::call_js_function;
-/// # use crate::error::Error;
+/// # use ratzilla::utils::call_js_function;
+/// # use ratzilla::error::Error;
 /// # fn example() -> Result<(), Error> {
 /// // Calls alert("Hello World!") on the global window.
 /// call_js_function("alert", ["Hello World!"])?;
