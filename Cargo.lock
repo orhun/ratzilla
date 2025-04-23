@@ -298,10 +298,8 @@ name = "ratzilla"
 version = "0.0.6"
 dependencies = [
  "console_error_panic_hook",
- "js-sys",
  "ratatui",
  "thiserror",
- "wasm-bindgen",
  "web-sys",
 ]
 

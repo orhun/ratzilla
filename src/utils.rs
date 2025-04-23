@@ -5,8 +5,8 @@ use crate::{
     error::Error,
 };
 
-use js_sys::{Array, Function, Reflect};
-use wasm_bindgen::{prelude::*, JsValue};
+use web_sys::js_sys::{Array, Function, Reflect};
+use web_sys::wasm_bindgen::{prelude::*, JsValue};
 
 /// Sets the document title.
 pub fn set_document_title(title: &str) -> Result<(), Error> {
@@ -59,6 +59,12 @@ pub fn get_screen_size() -> Size {
 /// This function looks up the property `window[name]` on the global window, checks that it is a JavaScript
 /// function, and then calls it using `Function.prototype.apply`.
 ///
+/// # Parameters
+///
+/// * `name` - The name of the JavaScript function (as a property on the global `window` object).
+/// * `this` - The value to use as the `this` binding during the function invocation.
+/// * `args` - An iterable list of arguments to pass to the function.
+///
 /// # Type Parameters
 ///
 /// * `S: AsRef<str>` – A type that can be converted to a string slice; used for the name of the function.
@@ -66,29 +72,26 @@ pub fn get_screen_size() -> Size {
 /// * `I: IntoIterator` – An iterable collection of function arguments.
 /// * `I::Item: Into<JsValue>` – Each argument can be converted into a `JsValue`.
 ///
-/// # Parameters
+/// # Errors
 ///
-/// * `name` - The name of the JavaScript function (as a property on the global `window` object).
-/// * `this` - The value to use as the `this` binding during the function invocation.
-/// * `args` - An iterable list of arguments to pass to the function.
-///
-/// # Returns
-///
-/// * `Ok(JsValue)` with the result of the function call if successful.
-/// * `Err(Error)` if the window is not available, if the function is not found,
-///   or if the function call fails (e.g. due to a JavaScript exception).
+/// * `Error::UnableToRetrieveWindow` if the global `window` object cannot be retrieved.
+/// * `Error::JsValue(JsValue)` if any of the following JavaScript operations throw:
+///   - retrieving the property via `Reflect::get`
+///   - converting the property to a [`Function`] via `.dyn_into::<Function>()`
+///   - invoking the function via `Function::apply`
 ///
 /// # Examples
 ///
 /// Calling a global JS function with a custom context:
 ///
 /// ```no_run
-/// # use wasm_bindgen::JsValue;
+/// # use web_sys::wasm_bindgen::JsValue;
 /// # use ratzilla::utils::call_js_function_with_context;
 /// # use ratzilla::error::Error;
+/// use web_sys::js_sys::Object;
 /// # fn example() -> Result<(), Error> {
 /// // Suppose `myObj` is a JS object you want to be the `this` value.
-/// let my_obj = JsValue::from(js_sys::Object::new());
+/// let my_obj = JsValue::from(Object::new());
 /// let result = call_js_function_with_context(
 ///     "myJsFunction",  // JavaScript global function name
 ///     my_obj,          // custom `this` context
@@ -103,10 +106,14 @@ pub fn get_screen_size() -> Size {
 /// ```no_run
 /// # use ratzilla::utils::call_js_function_with_context;
 /// # use ratzilla::error::Error;
-/// # use wasm_bindgen::JsValue;
+/// # use ratzilla::utils::call_js_function;
+/// # use web_sys::wasm_bindgen::JsValue;
 /// # fn example() -> Result<(), Error> {
 /// // This will set `this` to `null` which in non-strict mode defaults to the global object.
 /// let result = call_js_function_with_context("alert", JsValue::NULL, ["Hello from Rust"])?;
+/// //Note that we also have a `call_js_function` function that defaults `this` to `null`.
+/// let result = call_js_function("alert", ["Hello from Rust"])?;
+/// // This is equivalent to the above call.
 /// # Ok(())
 /// # }
 /// ```
@@ -118,11 +125,10 @@ where
     I::Item: Into<JsValue>,
 {
     let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
-    let func_val = Reflect::get(&window, &JsValue::from_str(name.as_ref())).map_err(Error::from)?;
-    let func = func_val.dyn_into::<Function>().map_err(Error::from)?;
+    let func_val = Reflect::get(&window, &JsValue::from_str(name.as_ref()))?;
+    let func = func_val.dyn_into::<Function>()?;
     let param_array: Array = args.into_iter().map(Into::into).collect();
-    let ctx = this.into();
-    let result = func.apply(&ctx, &param_array).map_err(Error::from)?;
+    let result = func.apply(&this.into(), &param_array)?;
     Ok(result)
 }
 
@@ -133,21 +139,19 @@ where
 /// binding. Passing `null` as `this` means that in non‑strict mode, JavaScript will default to
 /// using the global `window` object.
 ///
+/// # Parameters
+///
+/// * `name` - The name of the JavaScript function (a property on the global `window` object).
+/// * `args` - An iterable list of arguments to pass to the function call.
+///
 /// # Type Parameters
 ///
 /// * `S: AsRef<str>` – Type for representing the name of the function.
 /// * `I: IntoIterator` – An iterable collection of function arguments.
 /// * `I::Item: Into<JsValue>` – Each argument can be converted into a `JsValue`.
 ///
-/// # Parameters
-///
-/// * `name` - The name of the JavaScript function (a property on the global `window` object).
-/// * `args` - An iterable list of arguments to pass to the function call.
-///
-/// # Returns
-///
-/// * `Ok(JsValue)` if the function is successfully called.
-/// * `Err(Error)` if the lookup or invocation fails.
+/// # Errors
+/// See [`call_js_function_with_context`] for error details.
 ///
 /// # Examples
 ///
