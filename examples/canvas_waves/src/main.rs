@@ -2,28 +2,26 @@
 
 mod wave_effect;
 
-use tachyonfx::{EffectRenderer, IntoEffect};
 use ratzilla::{
-    backend::canvas::CanvasBackendOptions,
-    ratatui::Terminal,
-    CanvasBackend, 
-    WebRenderer,
+    backend::canvas::CanvasBackendOptions, ratatui::Terminal, CanvasBackend, WebRenderer,
 };
-use crate::wave_effect::WaveInterference;
+use tachyonfx::{EffectRenderer, IntoEffect};
+use wave_effect::WaveInterference;
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new_with_options(CanvasBackendOptions::new().grid_id("container"))?;
+    let backend =
+        CanvasBackend::new_with_options(CanvasBackendOptions::new().grid_id("container"))?;
     let terminal = Terminal::new(backend)?;
-    
+
     let mut effect = WaveInterference::new().into_effect();
     let mut last_tick = web_time::Instant::now();
-    
+
     terminal.draw_web(move |frame| {
         let now = web_time::Instant::now();
         let elapsed = now.duration_since(last_tick);
         last_tick = now;
-        
+
         frame.render_effect(&mut effect, frame.area(), elapsed.into());
     });
     Ok(())

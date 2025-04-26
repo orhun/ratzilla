@@ -1,5 +1,6 @@
 use std::io::Result as IoResult;
 
+use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -12,7 +13,6 @@ use web_sys::{
     wasm_bindgen::{JsCast, JsValue},
     window,
 };
-use crate::{backend::utils::*, error::Error, CursorShape};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -34,7 +34,7 @@ impl CanvasBackendOptions {
         self.grid_id = Some(id.to_string());
         self
     }
-    
+
     /// Sets the size of the canvas, in pixels.
     pub fn size(mut self, size: (u32, u32)) -> Self {
         self.size = Some(size);
@@ -131,7 +131,6 @@ impl CanvasBackend {
 
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(options: CanvasBackendOptions) -> Result<Self, Error> {
-
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
 
@@ -143,9 +142,10 @@ impl CanvasBackend {
             None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
         };
 
-        let (width, height) = options.size
+        let (width, height) = options
+            .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
-        
+
         let canvas = Canvas::new(document, parent, width, height, Color::Black)?;
         Ok(Self {
             buffer: get_sized_buffer_from_canvas(&canvas.inner),
