@@ -1,4 +1,6 @@
 use bitvec::prelude::BitVec;
+use compact_str::CompactString;
+use ratatui::layout::Rect;
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -232,20 +234,45 @@ impl CanvasBackend {
         let xmul = 10.0;
         let ymul = 19.0;
 
+        let draw_region = |(rect, color): (Rect, Color)| {
+            let color = get_canvas_color(color, self.canvas.background_color);
+
+            self.canvas.context.set_fill_style_str(&color);
+            self.canvas.context.fill_rect(
+                rect.x as f64 * xmul,
+                rect.y as f64 * ymul,
+                rect.width as f64 * xmul,
+                rect.height as f64 * ymul,
+            );
+        };
+
+        let actual_bg_color = |cell: &Cell| {
+            if cell.modifier.contains(Modifier::REVERSED) {
+                cell.fg
+            } else {
+                cell.bg
+            }
+        };
+
         let mut idx = 0;
         for (y, line) in self.buffer.iter().enumerate() {
+            let mut row_renderer = RowColorOptimizer::new();
             for (x, cell) in line.iter().enumerate() {
                 if changed_cells[idx] {
-                    let c = get_canvas_bg_color(cell, self.canvas.background_color);
-
-                    self.canvas.context.set_fill_style_str(&c);
-                    self.canvas
-                        .context
-                        .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+                    // only calls draw_region if the color is different from the previous one
+                    row_renderer
+                        .process_color((x, y), actual_bg_color(cell))
+                        .map(draw_region);
+                } else {
+                    // cell is unchanged so we must flush any held region
+                    // to avoid clearing the foreground (symbol) of the cell
+                    row_renderer.flush().map(draw_region);
                 }
 
                 idx += 1;
             }
+            // flush the remaining region after traversing the row
+            row_renderer.flush().map(draw_region);
         }
 
         self.canvas.context.restore();
@@ -413,5 +440,53 @@ impl Backend for CanvasBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+/// Optimizes canvas rendering by batching adjacent cells with the same color into a single rectangle.
+///
+/// This reduces the number of draw calls to the canvas API by coalescing adjacent cells
+/// with identical colors into larger rectangles, which is particularly beneficial for
+/// wasm where calls are quiteexpensive.
+struct RowColorOptimizer {
+    /// The currently accumulating region and its color
+    pending_region: Option<(Rect, Color)>,
+}
+
+impl RowColorOptimizer {
+    /// Creates a new empty optimizer with no pending region.
+    fn new() -> Self {
+        Self {
+            pending_region: None,
+        }
+    }
+
+    /// Processes a cell with the given position and color.
+    fn process_color(&mut self, pos: (usize, usize), color: Color) -> Option<(Rect, Color)> {
+        if let Some((active_rect, active_color)) = self.pending_region.as_mut() {
+            if active_color == &color {
+                // same color, extend the rectangle
+                active_rect.width += 1;
+            } else {
+                // different color, flush the previous region and start a new one
+                let region = *active_rect;
+                let region_color = *active_color;
+                *active_rect = Rect::new(pos.0 as _, pos.1 as _, 1, 1);
+                *active_color = color;
+
+                return Some((region, region_color));
+            }
+        } else {
+            // first color, create a new rectangle
+            let rect = Rect::new(pos.0 as _, pos.1 as _, 1, 1);
+            self.pending_region = Some((rect, color));
+        }
+
+        None
+    }
+
+    /// Finalizes and returns the current pending region, if any.
+    fn flush(&mut self) -> Option<(Rect, Color)> {
+        self.pending_region.take()
     }
 }
