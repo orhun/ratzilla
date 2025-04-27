@@ -1,5 +1,5 @@
+use bitvec::bitvec;
 use bitvec::prelude::BitVec;
-use compact_str::CompactString;
 use ratatui::layout::Rect;
 use ratatui::{
     backend::WindowSize,
@@ -79,6 +79,8 @@ pub struct CanvasBackend {
     buffer: Vec<Vec<Cell>>,
     /// Previous buffer.
     prev_buffer: Vec<Vec<Cell>>,
+    /// Changed buffer cells
+    changed_cells: BitVec,
     /// Canvas.
     canvas: Canvas,
     /// Cursor position.
@@ -101,10 +103,14 @@ impl CanvasBackend {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
         let canvas = Canvas::new(document, width, height, Color::Black)?;
+        let buffer = get_sized_buffer_from_canvas(&canvas.inner);
+        let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
+
         Ok(Self {
-            buffer: get_sized_buffer_from_canvas(&canvas.inner),
-            prev_buffer: get_sized_buffer_from_canvas(&canvas.inner),
+            prev_buffer: buffer.clone(),
+            buffer,
             initialized: false,
+            changed_cells,
             canvas,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
@@ -166,9 +172,9 @@ impl CanvasBackend {
         // the draw_* functions each traverses the buffer once, instead of
         // traversing it once per cell; this is done to reduce the number of
         // wasm calls per cell.
-        let changed_cells = self.resolve_changed_cells(force_redraw);
-        self.draw_background(&changed_cells)?;
-        self.draw_symbols(&changed_cells)?;
+        self.resolve_changed_cells(force_redraw);
+        self.draw_background()?;
+        self.draw_symbols()?;
         self.draw_cursor()?;
         self.draw_debug()?;
 
@@ -176,22 +182,21 @@ impl CanvasBackend {
         Ok(())
     }
 
-    /// Builds a compact bitset representation of the changed cells.
-    fn resolve_changed_cells(&self, force_redraw: bool) -> BitVec {
-        let mut changed_cells: BitVec = BitVec::new();
+    /// Updates the representation of the changed cells.
+    fn resolve_changed_cells(&mut self, force_redraw: bool) {
+        let changed_cells = &mut self.changed_cells;
         let mut idx = 0;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 let prev_cell = &self.prev_buffer[y][x];
-                changed_cells.push(force_redraw || cell != prev_cell);
+                changed_cells.set(idx, force_redraw || cell != prev_cell);
                 idx += 1;
             }
         }
-
-        changed_cells
     }
 
-    fn draw_symbols(&mut self, changed_cells: &BitVec) -> Result<(), Error> {
+    fn draw_symbols(&mut self) -> Result<(), Error> {
+        let changed_cells = &self.changed_cells;
         self.canvas.context.save();
 
         let xmul = 10.0;
@@ -228,7 +233,8 @@ impl CanvasBackend {
         Ok(())
     }
 
-    fn draw_background(&mut self, changed_cells: &BitVec) -> Result<(), Error> {
+    fn draw_background(&mut self) -> Result<(), Error> {
+        let changed_cells = &self.changed_cells;
         self.canvas.context.save();
 
         let xmul = 10.0;
