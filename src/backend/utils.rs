@@ -1,3 +1,4 @@
+use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
@@ -84,7 +85,7 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 }
 
 /// Converts a cell to a CSS style.
-pub(crate) fn get_cell_color_for_canvas(cell: &Cell, background_color: Color) -> (String, String) {
+pub(crate) fn get_cell_color_for_canvas(cell: &Cell, background_color: Color) -> (CompactString, CompactString) {
     let mut fg = ansi_to_rgb(cell.fg);
     let mut bg = ansi_to_rgb(cell.bg);
 
@@ -93,19 +94,49 @@ pub(crate) fn get_cell_color_for_canvas(cell: &Cell, background_color: Color) ->
     }
 
     let fg_style = match fg {
-        Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
-        None => "rgb(255, 255, 255)".to_string(),
+        Some(color) => format_compact!("rgb({}, {}, {})", color.0, color.1, color.2),
+        None => CompactString::const_new("rgb(255, 255, 255)"),
     };
 
     let bg_style = match bg {
-        Some(color) => format!("rgb({}, {}, {})", color.0, color.1, color.2),
-        None => match background_color {
-            Color::Rgb(r, g, b) => format!("rgb({}, {}, {})", r, g, b),
-            _ => "rgb(0, 0, 0)".to_string(),
+        Some(color) => format_compact!("rgb({}, {}, {})", color.0, color.1, color.2),
+        None => match ansi_to_rgb(background_color) {
+            Some((0, 0, 0)) => CompactString::const_new("rgb(0, 0, 0)"), 
+            Some((r, g, b)) => format_compact!("rgb({}, {}, {})", r, g, b),
+            None => CompactString::const_new("rgb(0, 0, 0)"),
         },
     };
 
     (fg_style, bg_style)
+}
+
+/// Converts a Color to a CSS style.
+pub(crate) fn get_canvas_fg_color(
+    cell: &Cell,
+    fallback_color: Color,
+) -> CompactString {
+    let color = if cell.modifier.contains(Modifier::REVERSED) { cell.bg } else { cell.fg };
+    get_canvas_color(color, fallback_color)
+}
+
+/// Converts a Color to a CSS style.
+pub(crate) fn get_canvas_bg_color(
+    cell: &Cell,
+    fallback_color: Color,
+) -> CompactString {
+    let color = if cell.modifier.contains(Modifier::REVERSED) { cell.fg } else { cell.bg };
+    get_canvas_color(color, fallback_color)
+}
+
+/// Converts a Color to a CSS style.
+pub(crate) fn get_canvas_color(
+    color: Color,
+    fallback_color: Color,
+) -> CompactString {
+    let color = ansi_to_rgb(color)
+        .unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
+    
+    format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
 }
 
 /// Converts an ANSI color to an RGB tuple.

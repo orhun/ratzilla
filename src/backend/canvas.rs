@@ -1,5 +1,5 @@
 use std::io::Result as IoResult;
-
+use bitvec::prelude::BitVec;
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -160,20 +160,54 @@ impl CanvasBackend {
             );
         }
         self.canvas.context.translate(5_f64, 5_f64)?;
-        let xmul = 10.0;
-        let ymul = 19.0;
+        
+        // the draw_* functions each traverses the buffer once, instead of
+        // traversing it once per cell; this is done to reduce the number of
+        // wasm calls per cell.
+        let changed_cells = self.resolve_changed_cells(force_redraw);
+        self.draw_background(&changed_cells)?;
+        self.draw_symbols(&changed_cells)?;
+        self.draw_cursor()?;
+        self.draw_debug()?;
+        
+        self.canvas.context.translate(-5_f64, -5_f64)?;
+        Ok(())
+    }
+
+    /// Builds a compact bitset representation of the changed cells.
+    fn resolve_changed_cells(
+        &self,
+        force_redraw: bool,
+    ) -> BitVec {
+
+        let mut changed_cells: BitVec = BitVec::new();
+        let mut idx = 0;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
-                if cell != &self.prev_buffer[y][x] || force_redraw {
-                    let colors = get_cell_color_for_canvas(cell, self.canvas.background_color);
-                    // Save the current state of the canvas context
-                    self.canvas.context.save();
+                let prev_cell = &self.prev_buffer[y][x];
+                changed_cells.push(force_redraw || cell != prev_cell);
+                idx += 1;
+            }
+        }
+        
+        changed_cells
+    }
 
-                    // Background
-                    self.canvas.context.set_fill_style_str(colors.1.as_str());
-                    self.canvas
-                        .context
-                        .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+    fn draw_symbols(
+        &mut self,
+        changed_cells: &BitVec,
+    ) -> Result<(), Error> {
+        self.canvas.context.save();
+
+        let xmul = 10.0;
+        let ymul = 19.0;
+        
+        let mut idx = 0;
+        for (y, line) in self.buffer.iter().enumerate() {
+            for (x, cell) in line.iter().enumerate() {
+                // skip empty cells
+                if changed_cells[idx] && cell.symbol() != " " {
+                    let c = get_canvas_fg_color(cell, self.canvas.background_color);
 
                     // Apply clipping for the text
                     self.canvas.context.begin_path();
@@ -182,42 +216,104 @@ impl CanvasBackend {
                         .rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
                     self.canvas.context.clip();
 
-                    // Foreground & text
-                    self.canvas.context.set_fill_style_str(colors.0.as_str());
+                    self.canvas.context.set_fill_style_str(&c);
                     self.canvas.context.fill_text(
                         cell.symbol(),
                         x as f64 * xmul,
                         y as f64 * ymul,
                     )?;
-
-                    // Draw an underline if `CursorShape::SteadyUnderScore` was used
-                    if let Some(pos) = self.cursor_position {
-                        if pos.y as usize == y
-                            && pos.x as usize == x
-                            && cell.modifier.contains(Modifier::UNDERLINED)
-                        {
-                            self.canvas
-                                .context
-                                .fill_text("_", x as f64 * xmul, y as f64 * ymul)?;
-                        }
-                    }
-
-                    // Draw the cell boundaries for debugging
-                    if let Some(color) = &self.debug_mode {
-                        self.canvas.context.set_stroke_style_str(color);
-                        self.canvas.context.stroke_rect(
-                            x as f64 * xmul,
-                            y as f64 * ymul,
-                            xmul,
-                            ymul,
-                        );
-                    }
-
-                    self.canvas.context.restore();
                 }
+                
+                idx += 1;
             }
         }
-        self.canvas.context.translate(-5_f64, -5_f64)?;
+        
+        self.canvas.context.restore();
+        
+        Ok(())
+    }
+
+    fn draw_background(
+        &mut self,
+        changed_cells: &BitVec,
+    ) -> Result<(), Error> {
+        self.canvas.context.save();
+
+        let xmul = 10.0;
+        let ymul = 19.0;
+        
+        let mut idx = 0;
+        for (y, line) in self.buffer.iter().enumerate() {
+            for (x, cell) in line.iter().enumerate() {
+                if changed_cells[idx] {
+                    let c = get_canvas_bg_color(cell, self.canvas.background_color);
+
+                    self.canvas.context.set_fill_style_str(&c);
+                    self.canvas
+                        .context
+                        .fill_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+                }
+                
+                idx += 1;
+            }
+        }
+        
+        self.canvas.context.restore();
+        
+        Ok(())
+    }
+
+    fn draw_cursor(
+        &mut self,
+    ) -> Result<(), Error> {
+        if let Some(pos) = self.cursor_position {
+            let cell = &self.buffer[pos.y as usize][pos.x as usize];
+            
+            if cell.modifier.contains(Modifier::UNDERLINED) {
+                let xmul = 10.0;
+                let ymul = 19.0;
+                
+                self.canvas.context.save();
+                
+                self.canvas
+                    .context
+                    .fill_text("_", pos.x as f64 * xmul, pos.y as f64 * ymul)?;
+                
+                self.canvas.context.restore();
+            }
+        }
+        
+        Ok(())
+    }
+
+    fn draw_debug(
+        &mut self,
+    ) -> Result<(), Error> {
+        if self.debug_mode.is_none() {
+            return Ok(());
+        }
+        
+        self.canvas.context.save();
+
+        let xmul = 10.0;
+        let ymul = 19.0;
+        
+        let color = self.debug_mode.as_ref().unwrap();
+        for (y, line) in self.buffer.iter().enumerate() {
+            for (x, _) in line.iter().enumerate() {
+                // Draw the cell boundaries for debugging
+                self.canvas.context.set_stroke_style_str(color);
+                self.canvas.context.stroke_rect(
+                    x as f64 * xmul,
+                    y as f64 * ymul,
+                    xmul,
+                    ymul,
+                );
+            }
+        }
+        
+        self.canvas.context.restore();
+        
         Ok(())
     }
 }
