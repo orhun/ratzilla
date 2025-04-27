@@ -84,35 +84,6 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
-/// Converts a cell to a CSS style.
-pub(crate) fn get_cell_color_for_canvas(
-    cell: &Cell,
-    background_color: Color,
-) -> (CompactString, CompactString) {
-    let mut fg = ansi_to_rgb(cell.fg);
-    let mut bg = ansi_to_rgb(cell.bg);
-
-    if cell.modifier.contains(Modifier::REVERSED) {
-        std::mem::swap(&mut fg, &mut bg);
-    }
-
-    let fg_style = match fg {
-        Some(color) => format_compact!("rgb({}, {}, {})", color.0, color.1, color.2),
-        None => CompactString::const_new("rgb(255, 255, 255)"),
-    };
-
-    let bg_style = match bg {
-        Some(color) => format_compact!("rgb({}, {}, {})", color.0, color.1, color.2),
-        None => match ansi_to_rgb(background_color) {
-            Some((0, 0, 0)) => CompactString::const_new("rgb(0, 0, 0)"),
-            Some((r, g, b)) => format_compact!("rgb({}, {}, {})", r, g, b),
-            None => CompactString::const_new("rgb(0, 0, 0)"),
-        },
-    };
-
-    (fg_style, bg_style)
-}
-
 /// Converts a Color to a CSS style.
 pub(crate) fn get_canvas_fg_color(cell: &Cell, fallback_color: Color) -> CompactString {
     let color = if cell.modifier.contains(Modifier::REVERSED) {
