@@ -1,6 +1,8 @@
-use bitvec::bitvec;
-use bitvec::prelude::BitVec;
+use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
+use std::io::Result as IoResult;
+
+use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -8,14 +10,39 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use std::io::Result as IoResult;
 use web_sys::{
     js_sys::{Boolean, Map},
     wasm_bindgen::{JsCast, JsValue},
     window,
 };
 
-use crate::{backend::utils::*, error::Error, CursorShape};
+/// Options for the [`CanvasBackend`].
+#[derive(Debug, Default)]
+pub struct CanvasBackendOptions {
+    /// The element ID.
+    grid_id: Option<String>,
+    /// Override the automatically detected size.
+    size: Option<(u32, u32)>,
+}
+
+impl CanvasBackendOptions {
+    /// Constructs a new [`CanvasBackendOptions`].
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Sets the element id of the canvas' parent element.
+    pub fn grid_id(mut self, id: &str) -> Self {
+        self.grid_id = Some(id.to_string());
+        self
+    }
+
+    /// Sets the size of the canvas, in pixels.
+    pub fn size(mut self, size: (u32, u32)) -> Self {
+        self.size = Some(size);
+        self
+    }
+}
 
 /// Canvas renderer.
 #[derive(Debug)]
@@ -32,6 +59,7 @@ impl Canvas {
     /// Constructs a new [`Canvas`].
     fn new(
         document: web_sys::Document,
+        parent_element: web_sys::Element,
         width: u32,
         height: u32,
         background_color: Color,
@@ -55,11 +83,9 @@ impl Canvas {
             .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
             .dyn_into::<web_sys::CanvasRenderingContext2d>()
             .expect("Unable to cast canvas context");
-
         context.set_font("16px monospace");
         context.set_text_baseline("top");
-        let body = document.body().ok_or(Error::UnableToRetrieveBody)?;
-        body.append_child(&element)?;
+        parent_element.append_child(&element)?;
         Ok(Self {
             inner: canvas,
             context,
@@ -100,12 +126,32 @@ impl CanvasBackend {
 
     /// Constructs a new [`CanvasBackend`] with the given size.
     pub fn new_with_size(width: u32, height: u32) -> Result<Self, Error> {
+        Self::new_with_options(CanvasBackendOptions {
+            size: Some((width, height)),
+            ..Default::default()
+        })
+    }
+
+    /// Constructs a new [`CanvasBackend`] with the given options.
+    pub fn new_with_options(options: CanvasBackendOptions) -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-        let canvas = Canvas::new(document, width, height, Color::Black)?;
+
+        // parent element of canvas; uses <body> unless specified
+        let parent = match options.grid_id.as_ref() {
+            Some(id) => document
+                .get_element_by_id(id)
+                .ok_or(Error::UnableToRetrieveBody)?,
+            None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
+        };
+
+        let (width, height) = options
+            .size
+            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
+
+        let canvas = Canvas::new(document, parent, width, height, Color::Black)?;
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
-
         Ok(Self {
             prev_buffer: buffer.clone(),
             buffer,
