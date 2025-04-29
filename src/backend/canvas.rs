@@ -243,7 +243,6 @@ impl CanvasBackend {
 
     fn draw_symbols(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
-        self.canvas.context.save();
 
         let xmul = 10.0;
         let ymul = 19.0;
@@ -253,6 +252,7 @@ impl CanvasBackend {
             for (x, cell) in line.iter().enumerate() {
                 // skip empty cells
                 if changed_cells[idx] && cell.symbol() != " " {
+        self.canvas.context.save();
                     let c = get_canvas_fg_color(cell, self.canvas.background_color);
 
                     // Apply clipping for the text
@@ -261,20 +261,20 @@ impl CanvasBackend {
                         .context
                         .rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
                     self.canvas.context.clip();
-
+                    
                     self.canvas.context.set_fill_style_str(&c);
                     self.canvas.context.fill_text(
                         cell.symbol(),
                         x as f64 * xmul,
                         y as f64 * ymul,
                     )?;
+        self.canvas.context.restore();
                 }
 
                 idx += 1;
             }
         }
 
-        self.canvas.context.restore();
 
         Ok(())
     }
