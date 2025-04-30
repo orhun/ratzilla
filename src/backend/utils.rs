@@ -95,16 +95,6 @@ pub(crate) fn get_canvas_fg_color(cell: &Cell, fallback_color: Color) -> Compact
 }
 
 /// Converts a Color to a CSS style.
-pub(crate) fn get_canvas_bg_color(cell: &Cell, fallback_color: Color) -> CompactString {
-    let color = if cell.modifier.contains(Modifier::REVERSED) {
-        cell.fg
-    } else {
-        cell.bg
-    };
-    get_canvas_color(color, fallback_color)
-}
-
-/// Converts a Color to a CSS style.
 pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
     let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
 

@@ -244,37 +244,35 @@ impl CanvasBackend {
     fn draw_symbols(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
 
-        let xmul = 10.0;
-        let ymul = 19.0;
-
         let mut idx = 0;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 // skip empty cells
                 if changed_cells[idx] && cell.symbol() != " " {
-        self.canvas.context.save();
-                    let c = get_canvas_fg_color(cell, self.canvas.background_color);
+                    self.canvas.context.save();
+
+                    let c = get_canvas_fg_color(cell, Color::White);
 
                     // Apply clipping for the text
                     self.canvas.context.begin_path();
                     self.canvas
                         .context
-                        .rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+                        .rect(x as f64 * X_MUL, y as f64 * Y_MUL, X_MUL, Y_MUL);
                     self.canvas.context.clip();
-                    
+
                     self.canvas.context.set_fill_style_str(&c);
                     self.canvas.context.fill_text(
                         cell.symbol(),
-                        x as f64 * xmul,
-                        y as f64 * ymul,
+                        x as f64 * X_MUL,
+                        y as f64 * Y_MUL,
                     )?;
-        self.canvas.context.restore();
+
+                    self.canvas.context.restore();
                 }
 
                 idx += 1;
             }
         }
-
 
         Ok(())
     }
@@ -283,18 +281,15 @@ impl CanvasBackend {
         let changed_cells = &self.changed_cells;
         self.canvas.context.save();
 
-        let xmul = 10.0;
-        let ymul = 19.0;
-
         let draw_region = |(rect, color): (Rect, Color)| {
             let color = get_canvas_color(color, self.canvas.background_color);
 
             self.canvas.context.set_fill_style_str(&color);
             self.canvas.context.fill_rect(
-                rect.x as f64 * xmul,
-                rect.y as f64 * ymul,
-                rect.width as f64 * xmul,
-                rect.height as f64 * ymul,
+                rect.x as f64 * X_MUL,
+                rect.y as f64 * Y_MUL,
+                rect.width as f64 * X_MUL,
+                rect.height as f64 * Y_MUL,
             );
         };
 
@@ -337,14 +332,11 @@ impl CanvasBackend {
             let cell = &self.buffer[pos.y as usize][pos.x as usize];
 
             if cell.modifier.contains(Modifier::UNDERLINED) {
-                let xmul = 10.0;
-                let ymul = 19.0;
-
                 self.canvas.context.save();
 
                 self.canvas
                     .context
-                    .fill_text("_", pos.x as f64 * xmul, pos.y as f64 * ymul)?;
+                    .fill_text("_", pos.x as f64 * X_MUL, pos.y as f64 * Y_MUL)?;
 
                 self.canvas.context.restore();
             }
@@ -360,9 +352,6 @@ impl CanvasBackend {
 
         self.canvas.context.save();
 
-        let xmul = 10.0;
-        let ymul = 19.0;
-
         let color = self.debug_mode.as_ref().unwrap();
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, _) in line.iter().enumerate() {
@@ -370,7 +359,7 @@ impl CanvasBackend {
                 self.canvas.context.set_stroke_style_str(color);
                 self.canvas
                     .context
-                    .stroke_rect(x as f64 * xmul, y as f64 * ymul, xmul, ymul);
+                    .stroke_rect(x as f64 * X_MUL, y as f64 * Y_MUL, X_MUL, Y_MUL);
             }
         }
 
@@ -542,3 +531,6 @@ impl RowColorOptimizer {
         self.pending_region.take()
     }
 }
+
+const X_MUL: f64 = 10.0;
+const Y_MUL: f64 = 19.0;
