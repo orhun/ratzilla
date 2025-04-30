@@ -17,7 +17,7 @@ pub struct WaveInterference {
     /// Optional rectangular area to apply the effect to
     area: Option<Rect>,
     /// Cell filter to control which cells are affected
-    cell_filter: CellFilter,
+    cell_filter: Option<CellFilter>,
     /// Color space to use for color calculations
     color_space: ColorSpace,
 }
@@ -55,7 +55,7 @@ impl WaveInterference {
             ],
             hue_shift_speed: 30.0,
             area: None,
-            cell_filter: CellFilter::All,
+            cell_filter: None,
             color_space: ColorSpace::Hsl,
         }
     }
