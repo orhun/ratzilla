@@ -35,6 +35,11 @@ pub struct CanvasBackendOptions {
     grid_id: Option<String>,
     /// Override the automatically detected size.
     size: Option<(u32, u32)>,
+    /// Always clip foreground drawing to the cell rectangle. Helpful when
+    /// dealing with out-of-bounds rendering from problematic fonts. Enabling
+    /// this option may cause some performance issues when dealing with large
+    /// numbers of simultaneous changes.
+    always_clip_cells: bool,
 }
 
 impl CanvasBackendOptions {
@@ -113,6 +118,11 @@ impl Canvas {
 pub struct CanvasBackend {
     /// Whether the canvas has been initialized.
     initialized: bool,
+    /// Always clip foreground drawing to the cell rectangle. Helpful when
+    /// dealing with out-of-bounds rendering from problematic fonts. Enabling
+    /// this option may cause some performance issues when dealing with large
+    /// numbers of simultaneous changes.
+    always_clip_cells: bool,
     /// Current buffer.
     buffer: Vec<Vec<Cell>>,
     /// Previous buffer.
@@ -166,6 +176,7 @@ impl CanvasBackend {
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
         Ok(Self {
             prev_buffer: buffer.clone(),
+            always_clip_cells: options.always_clip_cells,
             buffer,
             initialized: false,
             changed_cells,
@@ -258,44 +269,71 @@ impl CanvasBackend {
         }
     }
 
-    /// Draws the symbols on the canvas.
+    /// Draws the text symbols on the canvas.
     ///
-    /// It also clips the text to the cell's rectangle to avoid drawing outside the
-    /// cell.
+    /// This method renders the textual content of each cell in the buffer, optimizing canvas operations
+    /// by minimizing state changes across the WebAssembly boundary.
+    ///
+    /// # Optimization Strategy
+    ///
+    /// Rather than saving/restoring the canvas context for every cell (which would be expensive),
+    /// this implementation:
+    ///   1. Only processes cells that have changed since the last render
+    ///   2. Tracks the last foreground color used to avoid unnecessary style changes
+    ///   3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
+    ///     or when `always_clip_cells` is enabled
     fn draw_symbols(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
         let mut index = 0;
+
+        self.canvas.context.save();
+        let mut last_color = None;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 // Skip empty cells
                 if changed_cells[index] && cell.symbol() != " " {
-                    self.canvas.context.save();
+                    let color = actual_fg_color(cell);
 
-                    let color = get_canvas_fg_color(cell, Color::White);
+                    // We need to reset the canvas context state in two scenarios:
+                    // 1. When we need to create a clipping path (for potentially problematic glyphs)
+                    // 2. When the text color changes
+                    if self.always_clip_cells || !cell.symbol().is_ascii() {
+                        self.canvas.context.restore();
+                        self.canvas.context.save();
 
-                    // Apply clipping for the text
-                    self.canvas.context.begin_path();
-                    self.canvas.context.rect(
-                        x as f64 * CELL_WIDTH,
-                        y as f64 * CELL_HEIGHT,
-                        CELL_WIDTH,
-                        CELL_HEIGHT,
-                    );
-                    self.canvas.context.clip();
+                        self.canvas.context.begin_path();
+                        self.canvas.context.rect(
+                            x as f64 * CELL_WIDTH,
+                            y as f64 * CELL_HEIGHT,
+                            CELL_WIDTH,
+                            CELL_HEIGHT,
+                        );
+                        self.canvas.context.clip();
 
-                    self.canvas.context.set_fill_style_str(&color);
+                        last_color = None; // reset last color to avoid clipping
+                        let color = get_canvas_color(color, Color::White);
+                        self.canvas.context.set_fill_style_str(&color);
+                    } else if last_color != Some(color) {
+                        self.canvas.context.restore();
+                        self.canvas.context.save();
+
+                        last_color = Some(color);
+
+                        let color = get_canvas_color(color, Color::White);
+                        self.canvas.context.set_fill_style_str(&color);
+                    }
+
                     self.canvas.context.fill_text(
                         cell.symbol(),
                         x as f64 * CELL_WIDTH,
                         y as f64 * CELL_HEIGHT,
                     )?;
-
-                    self.canvas.context.restore();
                 }
 
                 index += 1;
             }
         }
+        self.canvas.context.restore();
 
         Ok(())
     }
@@ -321,14 +359,6 @@ impl CanvasBackend {
                 rect.width as f64 * CELL_WIDTH,
                 rect.height as f64 * CELL_HEIGHT,
             );
-        };
-
-        let actual_bg_color = |cell: &Cell| {
-            if cell.modifier.contains(Modifier::REVERSED) {
-                cell.fg
-            } else {
-                cell.bg
-            }
         };
 
         let mut index = 0;
