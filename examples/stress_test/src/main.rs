@@ -111,11 +111,9 @@ fn main() -> std::io::Result<()> {
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD);
 
-        frame.render_widget(Clear, Rect::new(0, 0, 11, 1));
-        frame.render_widget(
-            Line::from(Span::from(fps)).style(fps_style),
-            Rect::new(0, 0, 12, 1),
-        );
+        let fps_area = Rect::new(0, 0, 11, 1);
+        frame.render_widget(Clear, fps_area);
+        frame.render_widget(Line::from(Span::from(fps)).style(fps_style), fps_area);
     });
 
     Ok(())
