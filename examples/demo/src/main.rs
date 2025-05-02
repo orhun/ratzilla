@@ -17,6 +17,7 @@ use ratzilla::{CanvasBackend, WebRenderer};
 
 mod app;
 
+mod effects;
 mod ui;
 
 /// Demo
@@ -58,10 +59,11 @@ fn main() -> Result<()> {
             }
         }
     });
+
     terminal.draw_web(move |f| {
         let mut app_state = app_state.borrow_mut();
-        app_state.on_tick();
-        ui::draw(f, &mut app_state);
+        let elapsed = app_state.on_tick();
+        ui::draw(elapsed, f, &mut app_state);
     });
 
     Ok(())
