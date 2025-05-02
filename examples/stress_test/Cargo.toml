@@ -1,0 +1,11 @@
+[package]
+name = "stress-test"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "A stress test for the foreground rendering of the CanvasBackend"
+
+[dependencies]
+ratzilla = { path = "../../" }
+console_error_panic_hook = "0.1.7"
+web-time = "1.1.0"
