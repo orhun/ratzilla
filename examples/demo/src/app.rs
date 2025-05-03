@@ -1,13 +1,11 @@
+use crate::effects;
 use rand::{
     distributions::{Distribution, Uniform},
     rngs::SmallRng,
     SeedableRng,
 };
-use ratzilla::ratatui::{style::Color, widgets::ListState};
-use tachyonfx::{
-    fx::{self},
-    Effect, EffectTimer, Interpolation, Motion,
-};
+use ratzilla::ratatui::widgets::ListState;
+use tachyonfx::{Duration, EffectManager};
 
 const TASKS: [&str; 24] = [
     "Item1", "Item2", "Item3", "Item4", "Item5", "Item6", "Item7", "Item8", "Item9", "Item10",
@@ -237,7 +235,14 @@ pub struct App<'a> {
     pub barchart: Vec<(&'a str, u64)>,
     pub servers: Vec<Server<'a>>,
     pub enhanced_graphics: bool,
-    pub effect: Effect,
+    pub effects: EffectManager<EffectKey>,
+    pub last_frame: web_time::Instant,
+}
+
+#[derive(Clone, Copy, Debug, Default, Ord, PartialOrd, Eq, PartialEq)]
+pub enum EffectKey {
+    #[default]
+    ChangeTab,
 }
 
 impl<'a> App<'a> {
@@ -248,6 +253,10 @@ impl<'a> App<'a> {
         let sin1_points = sin_signal.by_ref().take(100).collect();
         let mut sin_signal2 = SinSignal::new(0.1, 2.0, 10.0);
         let sin2_points = sin_signal2.by_ref().take(200).collect();
+
+        let mut effects = EffectManager::default();
+        effects.add_effect(effects::startup());
+        effects.add_effect(effects::pulsate_selected_tab());
         App {
             title,
             should_quit: false,
@@ -302,25 +311,8 @@ impl<'a> App<'a> {
                 },
             ],
             enhanced_graphics,
-            effect: fx::sequence(&[
-                fx::parallel(&[
-                    fx::sweep_in(
-                        Motion::LeftToRight,
-                        10,
-                        0,
-                        Color::Black,
-                        EffectTimer::from_ms(7000, Interpolation::QuadIn),
-                    ),
-                    fx::sweep_in(
-                        Motion::UpToDown,
-                        10,
-                        0,
-                        Color::Black,
-                        EffectTimer::from_ms(7000, Interpolation::QuadIn),
-                    ),
-                ]),
-                fx::coalesce((2000, Interpolation::SineOut)),
-            ]),
+            effects,
+            last_frame: web_time::Instant::now(),
         }
     }
 
@@ -334,10 +326,12 @@ impl<'a> App<'a> {
 
     pub fn on_right(&mut self) {
         self.tabs.next();
+        self.add_transition_tab_effect();
     }
 
     pub fn on_left(&mut self) {
         self.tabs.previous();
+        self.add_transition_tab_effect();
     }
 
     pub fn on_key(&mut self, c: char) {
@@ -352,7 +346,7 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn on_tick(&mut self) {
+    pub fn on_tick(&mut self) -> Duration {
         // Update progress
         self.progress += 0.001;
         if self.progress > 1.0 {
@@ -367,5 +361,17 @@ impl<'a> App<'a> {
 
         let event = self.barchart.pop().unwrap();
         self.barchart.insert(0, event);
+
+        // calculate elapsed time since last frame
+        let now = web_time::Instant::now();
+        let elapsed = now.duration_since(self.last_frame).as_millis() as u32;
+        self.last_frame = now;
+
+        Duration::from_millis(elapsed)
+    }
+
+    fn add_transition_tab_effect(&mut self) {
+        let effect = effects::change_tab();
+        self.effects.add_unique_effect(EffectKey::ChangeTab, effect);
     }
 }

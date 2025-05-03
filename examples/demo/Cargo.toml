@@ -8,5 +8,6 @@ publish = false
 clap = { version = "4.5.23", features = ["derive"] }
 rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
 ratzilla = { path = "../../" }
-tachyonfx = { version = "0.11.0", default-features = false, features = ["web-time"] }
+tachyonfx = { version = "0.15.0", default-features = false, features = ["web-time"] }
+web-time = "1.1.0"
 # tui-big-text = "0.6.1"

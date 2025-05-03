@@ -1,6 +1,6 @@
 use ratzilla::ratatui::{
-    layout::{Constraint, Layout, Margin, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
     symbols,
     text::{self, Span},
     widgets::{
@@ -10,12 +10,12 @@ use ratzilla::ratatui::{
     },
     Frame,
 };
-use tachyonfx::{Duration, EffectRenderer};
+use tachyonfx::Duration;
 // use tui_big_text::{BigText, PixelSize};
 
 use crate::app::App;
 
-pub fn draw(frame: &mut Frame, app: &mut App) {
+pub fn draw(elapsed: Duration, frame: &mut Frame, app: &mut App) {
     let chunks = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).split(frame.area());
     let tabs = app
         .tabs
@@ -44,7 +44,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     //         vertical: 0,
     //     }),
     // );
-    frame.render_effect(&mut app.effect, frame.area(), Duration::from_millis(40));
+    let area = frame.area();
+    app.effects
+        .process_effects(elapsed, frame.buffer_mut(), area);
 }
 
 fn draw_first_tab(frame: &mut Frame, app: &mut App, area: Rect) {
