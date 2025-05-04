@@ -172,7 +172,7 @@ const COLORS: [Color; 22] = [
 
 const LOREM_IPSUM: [&str; 69] = [
     "lorem",
-    " ipsum",
+    "ipsum",
     "dolor",
     "sit",
     "amet",
