@@ -15,7 +15,7 @@ use web_time::Instant;
 pub struct FpsRecorder {
     /// Current position in the ring buffer
     tail: usize,
-    /// Ring buffer of frame timestamps. Length is a power of 2 for 
+    /// Ring buffer of frame timestamps. Length is a power of 2 for
     /// fast modulus operations.
     recorded_frame: [Instant; 16], // ^2 len far fast modulus
 }
@@ -24,7 +24,7 @@ pub struct FpsRecorder {
 ///
 /// `FpsStats` renders the current FPS value as text in a Ratatui buffer.
 /// It supports customizing the style of both the label and the value.
-/// 
+///
 /// This widget only fills the widget's required area and does not handle
 /// layout or resizing.
 pub struct FpsStats<'a> {
@@ -93,7 +93,6 @@ impl FpsRecorder {
 }
 
 impl<'a> FpsStats<'a> {
-    
     /// Creates a new FPS statistics widget.
     ///
     /// # Arguments
@@ -139,7 +138,7 @@ impl<'a> FpsStats<'a> {
 impl Widget for FpsStats<'_> {
     /// Renders the FPS widget to the provided buffer.
     ///
-    /// Draws the "FPS: " label with the main style, followed by the 
+    /// Draws the "FPS: " label with the main style, followed by the
     /// numeric FPS value with the fps_value_style. The value is
     /// formatted to one decimal place with a fixed width.
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -147,7 +146,8 @@ impl Widget for FpsStats<'_> {
         let area = area.intersection(buf.area);
 
         // draw the FPS label
-        "FPS: ".chars()
+        "FPS: "
+            .chars()
             .enumerate()
             .take(area.width as usize) // OOB protection
             .for_each(|(i, ch)| {
@@ -169,4 +169,3 @@ impl Widget for FpsStats<'_> {
             });
     }
 }
-

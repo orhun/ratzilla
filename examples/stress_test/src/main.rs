@@ -4,10 +4,10 @@
 //! capabilities of the `CanvasBackend` in Ratzilla. It displays large amounts
 //! of lorem ipsum text with different coloring strategies while monitoring
 //! the frames per second (FPS).
-//! 
+//!
 //! There are four different text rendering strategies, declared in descending
 //! order of performance.
-//! 
+//!
 mod fps;
 
 use crate::fps::{FpsRecorder, FpsStats};
@@ -26,10 +26,10 @@ fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = CanvasBackend::new()?;
     let terminal = Terminal::new(backend)?;
-    
+
     let mut fps_recorder = FpsRecorder::new();
     let mut rendered_frames = 0; // used for screen cycling
-    
+
     // style for the FPS display (upper-left corner)
     let fps_style = Style::default()
         .bg(Color::White)
@@ -74,13 +74,13 @@ fn main() -> std::io::Result<()> {
 struct WidgetCache {
     /// Widgets that render text in white
     white: Vec<Paragraph<'static>>,
-    
+
     /// Widgets that color words starting with 'e'
     colorize_e_words: Vec<Paragraph<'static>>,
-    
+
     /// Widgets that color words based on first character
     colorize_some: Vec<Paragraph<'static>>,
-    
+
     /// Widgets that color words based on their hash
     colorize_words: Vec<Paragraph<'static>>,
 }
@@ -88,7 +88,7 @@ struct WidgetCache {
 impl WidgetCache {
     /// Number of different text rendering strategies
     const SCREEN_TYPES: usize = 4;
-    
+
     /// Number of pre-generated cycled screens per strategy
     const CACHED_SCREENS: usize = 10;
 
@@ -140,7 +140,7 @@ impl WidgetCache {
 
     fn get(&self, style_type: usize, index: usize) -> &Paragraph<'static> {
         debug_assert!(style_type < Self::SCREEN_TYPES);
-        
+
         let index = index % Self::CACHED_SCREENS;
         match style_type {
             0 => &self.white[index],
