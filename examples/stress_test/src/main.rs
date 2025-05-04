@@ -1,29 +1,95 @@
-// This example is a stress test for the foreground rendering of the CanvasBackend.
-
+//! # Ratzilla Canvas Rendering Stress Test
+//!
+//! This example demonstrates a stress test for the foreground text rendering
+//! capabilities of the `CanvasBackend` in Ratzilla. It displays large amounts
+//! of lorem ipsum text with different coloring strategies while monitoring
+//! the frames per second (FPS).
+//! 
+//! There are four different text rendering strategies, declared in descending
+//! order of performance.
+//! 
 mod fps;
 
+use crate::fps::{FpsRecorder, FpsStats};
 use ratzilla::ratatui::layout::Size;
 use ratzilla::ratatui::style::{Modifier, Style, Styled};
 use ratzilla::ratatui::text::{Line, Span};
-use ratzilla::ratatui::widgets::{Clear, Paragraph, Wrap};
+use ratzilla::ratatui::widgets::{Paragraph, Wrap};
 use ratzilla::{
-    ratatui::{layout::Rect, style::Color, widgets::Widget, Terminal},
+    ratatui::{style::Color, widgets::Widget, Terminal},
     CanvasBackend, WebRenderer,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use web_time::Instant;
-use crate::fps::{FpsRecorder, FpsStats};
 
+fn main() -> std::io::Result<()> {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    let backend = CanvasBackend::new()?;
+    let terminal = Terminal::new(backend)?;
+    
+    let mut fps_recorder = FpsRecorder::new();
+    let mut rendered_frames = 0; // used for screen cycling
+    
+    // style for the FPS display (upper-left corner)
+    let fps_style = Style::default()
+        .bg(Color::White)
+        .fg(Color::Black)
+        .add_modifier(Modifier::BOLD);
+
+    // style index for the text
+    let span_op_index = Rc::new(RefCell::new(0usize));
+
+    // update the style index on any key event
+    let span_op_index_key_event = span_op_index.clone();
+    terminal.on_key_event(move |_| {
+        let cell = span_op_index_key_event.as_ref();
+        let next_index = cell.borrow().clone() + 1;
+        *cell.borrow_mut() = next_index % WidgetCache::SCREEN_TYPES;
+    });
+
+    // Pre-generate widgets for better performance; in particular,
+    // this avoids excessive GC pressure in the JS heap.
+    let widget_cache = WidgetCache::new(terminal.size().unwrap());
+
+    terminal.draw_web(move |frame| {
+        // retrieve and render cached paragraph widget
+        let p = widget_cache.get(*span_op_index.as_ref().borrow(), rendered_frames);
+        frame.render_widget(p, frame.area());
+        rendered_frames += 1;
+
+        // record and display FPS
+        fps_recorder.record();
+        FpsStats::new(&fps_recorder)
+            .main_style(fps_style)
+            .fps_value_style(fps_style)
+            .render(frame.area(), frame.buffer_mut())
+    });
+
+    Ok(())
+}
+
+/// Caches pre-generated widgets for different text rendering strategies.
+/// A number of paragraphs are pregenerated per style type to avoid
+/// measuring the performance of the widget generation overhead.
 struct WidgetCache {
+    /// Widgets that render text in white
     white: Vec<Paragraph<'static>>,
+    
+    /// Widgets that color words starting with 'e'
     colorize_e_words: Vec<Paragraph<'static>>,
+    
+    /// Widgets that color words based on first character
     colorize_some: Vec<Paragraph<'static>>,
+    
+    /// Widgets that color words based on their hash
     colorize_words: Vec<Paragraph<'static>>,
 }
 
 impl WidgetCache {
+    /// Number of different text rendering strategies
     const SCREEN_TYPES: usize = 4;
+    
+    /// Number of pre-generated cycled screens per strategy
     const CACHED_SCREENS: usize = 10;
 
     fn new(area: Size) -> Self {
@@ -57,22 +123,24 @@ impl WidgetCache {
         }
 
         let area = (area.width * area.height) as u32;
-        let p = |f: fn(&'static str, Span<'static>) -> Span<'static>| {
-            (0..10)
+        let paragraph = |f: fn(&'static str, Span<'static>) -> Span<'static>| {
+            (0..Self::CACHED_SCREENS)
                 .into_iter()
                 .map(|i| lorem_ipsum_paragraph(area, i * Self::CACHED_SCREENS, f))
                 .collect::<Vec<_>>()
         };
 
         Self {
-            white: p(white),
-            colorize_e_words: p(colorize_e_words),
-            colorize_some: p(colorize_some),
-            colorize_words: p(colorize_words),
+            white: paragraph(white),
+            colorize_e_words: paragraph(colorize_e_words),
+            colorize_some: paragraph(colorize_some),
+            colorize_words: paragraph(colorize_words),
         }
     }
 
     fn get(&self, style_type: usize, index: usize) -> &Paragraph<'static> {
+        debug_assert!(style_type < Self::SCREEN_TYPES);
+        
         let index = index % Self::CACHED_SCREENS;
         match style_type {
             0 => &self.white[index],
@@ -83,45 +151,7 @@ impl WidgetCache {
     }
 }
 
-fn main() -> std::io::Result<()> {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new()?;
-    let terminal = Terminal::new(backend)?;
-
-    let mut fps_recorder = FpsRecorder::new();
-    let mut rendered_frames = 0;
-
-    let span_op_index = Rc::new(RefCell::new(0usize));
-
-    let span_op_index_key_event = span_op_index.clone();
-    terminal.on_key_event(move |event| {
-        let cell = span_op_index_key_event.as_ref();
-        let next_index = cell.borrow().clone() + 1;
-        *cell.borrow_mut() = next_index % WidgetCache::SCREEN_TYPES;
-    });
-
-    let widget_cache = WidgetCache::new(terminal.size().unwrap());
-
-    terminal.draw_web(move |frame| {
-        let p = widget_cache.get(*span_op_index.as_ref().borrow(), rendered_frames);
-        frame.render_widget(p, frame.area());
-        rendered_frames += 1;
-        fps_recorder.record();
-
-        let fps_style = Style::default()
-            .bg(Color::White)
-            .fg(Color::Black)
-            .add_modifier(Modifier::BOLD);
-        
-        FpsStats::new(&fps_recorder)
-            .main_style(fps_style)
-            .fps_value_style(fps_style)
-            .render(frame.area(), frame.buffer_mut())
-    });
-
-    Ok(())
-}
-
+/// Generates a paragraph of lorem ipsum text with a specified length and word offset.
 fn lorem_ipsum_paragraph(
     text_len: u32,
     word_offset: usize,
@@ -132,6 +162,7 @@ fn lorem_ipsum_paragraph(
     Paragraph::new(Line::from_iter(spans)).wrap(Wrap { trim: true })
 }
 
+/// Generates an iterator of lorem ipsum words, with a specified length and word offset.
 fn lorem_ipsum(len: usize, word_offset: usize) -> impl Iterator<Item = &'static str> {
     let mut acc = 0;
 
