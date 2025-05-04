@@ -385,6 +385,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stress-test"
 version = "0.1.0"
 dependencies = [
+ "compact_str 0.9.0",
  "console_error_panic_hook",
  "ratzilla",
  "web-time",

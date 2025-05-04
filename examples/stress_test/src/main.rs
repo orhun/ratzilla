@@ -1,5 +1,7 @@
 // This example is a stress test for the foreground rendering of the CanvasBackend.
 
+mod fps;
+
 use ratzilla::ratatui::layout::Size;
 use ratzilla::ratatui::style::{Modifier, Style, Styled};
 use ratzilla::ratatui::text::{Line, Span};
@@ -11,6 +13,7 @@ use ratzilla::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use web_time::Instant;
+use crate::fps::{FpsRecorder, FpsStats};
 
 struct WidgetCache {
     white: Vec<Paragraph<'static>>,
@@ -85,7 +88,7 @@ fn main() -> std::io::Result<()> {
     let backend = CanvasBackend::new()?;
     let terminal = Terminal::new(backend)?;
 
-    let mut fps_stats = FpsStats::new();
+    let mut fps_recorder = FpsRecorder::new();
     let mut rendered_frames = 0;
 
     let span_op_index = Rc::new(RefCell::new(0usize));
@@ -103,17 +106,17 @@ fn main() -> std::io::Result<()> {
         let p = widget_cache.get(*span_op_index.as_ref().borrow(), rendered_frames);
         frame.render_widget(p, frame.area());
         rendered_frames += 1;
-        fps_stats.record();
-        let fps = format!(" FPS: {:.1}", fps_stats.fps());
+        fps_recorder.record();
 
         let fps_style = Style::default()
             .bg(Color::White)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD);
-
-        let fps_area = Rect::new(0, 0, 11, 1);
-        frame.render_widget(Clear, fps_area);
-        frame.render_widget(Line::from(Span::from(fps)).style(fps_style), fps_area);
+        
+        FpsStats::new(&fps_recorder)
+            .main_style(fps_style)
+            .fps_value_style(fps_style)
+            .render(frame.area(), frame.buffer_mut())
     });
 
     Ok(())
@@ -241,31 +244,3 @@ const LOREM_IPSUM: [&str; 69] = [
     "est",
     "laborum",
 ];
-
-struct FpsStats {
-    tail: usize,
-    recorded_frame: [Instant; 10],
-}
-
-impl FpsStats {
-    fn new() -> Self {
-        Self {
-            tail: 0,
-            recorded_frame: [Instant::now(); 10],
-        }
-    }
-
-    fn record(&mut self) {
-        self.recorded_frame[self.tail] = Instant::now();
-        self.tail = (self.tail + 1) % self.recorded_frame.len();
-    }
-
-    fn fps(&self) -> f32 {
-        let elapsed = Instant::now()
-            .duration_since(self.recorded_frame[self.tail])
-            .as_secs_f32()
-            .max(0.001); // avoid division by zero
-
-        self.recorded_frame.len() as f32 / elapsed
-    }
-}
