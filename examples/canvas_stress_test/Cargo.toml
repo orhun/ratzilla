@@ -1,5 +1,5 @@
 [package]
-name = "stress-test"
+name = "canvas-stress-test"
 version = "0.1.0"
 edition = "2021"
 publish = false
