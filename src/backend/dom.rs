@@ -196,18 +196,61 @@ impl DomBackend {
     /// Compare the current buffer to the previous buffer and updates the grid
     /// accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    continue;
+        for y in 0..self.buffer.len() {
+            // Check if line needs rebuilding (any hyperlink changes)
+            let needs_rebuild = (0..self.buffer[y].len()).any(|x| {
+                let old_cell = &self.prev_buffer[y][x];
+                let new_cell = &self.buffer[y][x];
+                new_cell != old_cell && (
+                    new_cell.modifier.contains(HYPERLINK_MODIFIER) ||
+                        old_cell.modifier.contains(HYPERLINK_MODIFIER)
+                )
+            });
+
+            if needs_rebuild {
+                // Rebuild entire line
+                let line = &self.buffer[y];
+                let pre = self.grid.children().item(y as u32).ok_or(Error::UnableToRetrieveChildElement)?;
+                pre.set_inner_html("");
+
+                let mut x = 0;
+                while x < line.len() {
+                    if line[x].modifier.contains(HYPERLINK_MODIFIER) {
+                        // Handle hyperlink group
+                        let start_x = x;
+                        while x + 1 < line.len() && line[x + 1].modifier.contains(HYPERLINK_MODIFIER) {
+                            x += 1;
+                        }
+
+                        let hyperlink_cells = &line[start_x..=x];
+                        let anchor = create_anchor(&self.document, hyperlink_cells)?;
+
+                        for i in start_x..=x {
+                            let span = create_span(&self.document, &line[i])?;
+                            self.cells[y * line.len() + i] = span.clone();
+                            anchor.append_child(&span)?;
+                        }
+                        pre.append_child(&anchor)?;
+                    } else {
+                        // Handle regular cell
+                        let span = create_span(&self.document, &line[x])?;
+                        self.cells[y * line.len() + x] = span.clone();
+                        pre.append_child(&span)?;
+                    }
+                    x += 1;
                 }
-                if cell != &self.prev_buffer[y][x] {
-                    let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_style_as_css(cell))?;
+            } else {
+                // Just update changed cells directly
+                for x in 0..self.buffer[y].len() {
+                    if self.buffer[y][x] != self.prev_buffer[y][x] {
+                        let span = &self.cells[y * self.buffer[y].len() + x];
+                        span.set_inner_html(self.buffer[y][x].symbol());
+                        span.set_attribute("style", &get_cell_style_as_css(&self.buffer[y][x]))?;
+                    }
                 }
             }
         }
+
         Ok(())
     }
 }
