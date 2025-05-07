@@ -293,6 +293,7 @@ impl CanvasBackend {
             for (x, cell) in line.iter().enumerate() {
                 // Skip empty cells
                 if !changed_cells[index] || cell.symbol() == " " {
+                    index += 1;
                     continue;
                 }
                 let color = actual_fg_color(cell);
