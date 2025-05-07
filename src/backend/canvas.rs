@@ -278,10 +278,11 @@ impl CanvasBackend {
     ///
     /// Rather than saving/restoring the canvas context for every cell (which would be expensive),
     /// this implementation:
-    ///   1. Only processes cells that have changed since the last render
-    ///   2. Tracks the last foreground color used to avoid unnecessary style changes
-    ///   3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
-    ///     or when `always_clip_cells` is enabled
+    ///
+    /// 1. Only processes cells that have changed since the last render.
+    /// 2. Tracks the last foreground color used to avoid unnecessary style changes
+    /// 3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
+    /// or when `always_clip_cells` is enabled.
     fn draw_symbols(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
         let mut index = 0;
@@ -291,44 +292,45 @@ impl CanvasBackend {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 // Skip empty cells
-                if changed_cells[index] && cell.symbol() != " " {
-                    let color = actual_fg_color(cell);
+                if !changed_cells[index] || cell.symbol() == " " {
+                    continue;
+                }
+                let color = actual_fg_color(cell);
 
-                    // We need to reset the canvas context state in two scenarios:
-                    // 1. When we need to create a clipping path (for potentially problematic glyphs)
-                    // 2. When the text color changes
-                    if self.always_clip_cells || !cell.symbol().is_ascii() {
-                        self.canvas.context.restore();
-                        self.canvas.context.save();
+                // We need to reset the canvas context state in two scenarios:
+                // 1. When we need to create a clipping path (for potentially problematic glyphs)
+                // 2. When the text color changes
+                if self.always_clip_cells || !cell.symbol().is_ascii() {
+                    self.canvas.context.restore();
+                    self.canvas.context.save();
 
-                        self.canvas.context.begin_path();
-                        self.canvas.context.rect(
-                            x as f64 * CELL_WIDTH,
-                            y as f64 * CELL_HEIGHT,
-                            CELL_WIDTH,
-                            CELL_HEIGHT,
-                        );
-                        self.canvas.context.clip();
-
-                        last_color = None; // reset last color to avoid clipping
-                        let color = get_canvas_color(color, Color::White);
-                        self.canvas.context.set_fill_style_str(&color);
-                    } else if last_color != Some(color) {
-                        self.canvas.context.restore();
-                        self.canvas.context.save();
-
-                        last_color = Some(color);
-
-                        let color = get_canvas_color(color, Color::White);
-                        self.canvas.context.set_fill_style_str(&color);
-                    }
-
-                    self.canvas.context.fill_text(
-                        cell.symbol(),
+                    self.canvas.context.begin_path();
+                    self.canvas.context.rect(
                         x as f64 * CELL_WIDTH,
                         y as f64 * CELL_HEIGHT,
-                    )?;
+                        CELL_WIDTH,
+                        CELL_HEIGHT,
+                    );
+                    self.canvas.context.clip();
+
+                    last_color = None; // reset last color to avoid clipping
+                    let color = get_canvas_color(color, Color::White);
+                    self.canvas.context.set_fill_style_str(&color);
+                } else if last_color != Some(color) {
+                    self.canvas.context.restore();
+                    self.canvas.context.save();
+
+                    last_color = Some(color);
+
+                    let color = get_canvas_color(color, Color::White);
+                    self.canvas.context.set_fill_style_str(&color);
                 }
+
+                self.canvas.context.fill_text(
+                    cell.symbol(),
+                    x as f64 * CELL_WIDTH,
+                    y as f64 * CELL_HEIGHT,
+                )?;
 
                 index += 1;
             }

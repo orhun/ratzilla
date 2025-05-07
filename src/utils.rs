@@ -5,8 +5,10 @@ use crate::{
     error::Error,
 };
 
-use web_sys::js_sys::{Array, Function, Reflect};
-use web_sys::wasm_bindgen::{prelude::*, JsValue};
+use web_sys::{
+    js_sys::{Array, Function, Reflect},
+    wasm_bindgen::{prelude::*, JsValue},
+};
 
 /// Sets the document title.
 pub fn set_document_title(title: &str) -> Result<(), Error> {

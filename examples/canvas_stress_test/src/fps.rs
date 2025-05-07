@@ -1,8 +1,5 @@
 use compact_str::format_compact;
-use ratzilla::ratatui::buffer::Buffer;
-use ratzilla::ratatui::layout::Rect;
-use ratzilla::ratatui::style::Style;
-use ratzilla::ratatui::widgets::Widget;
+use ratzilla::ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 use web_time::Instant;
 
 /// Records and calculates frames per second.

@@ -7,20 +7,20 @@
 //!
 //! There are four different text rendering strategies, declared in descending
 //! order of performance.
-//!
 mod fps;
 
 use crate::fps::{FpsRecorder, FpsStats};
-use ratzilla::ratatui::layout::Size;
-use ratzilla::ratatui::style::{Modifier, Style, Styled};
-use ratzilla::ratatui::text::{Line, Span};
-use ratzilla::ratatui::widgets::{Paragraph, Wrap};
 use ratzilla::{
-    ratatui::{style::Color, widgets::Widget, Terminal},
+    ratatui::{
+        layout::Size,
+        style::{Color, Modifier, Style, Styled},
+        text::{Line, Span},
+        widgets::{Paragraph, Widget, Wrap},
+        Terminal,
+    },
     CanvasBackend, WebRenderer,
 };
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -69,6 +69,7 @@ fn main() -> std::io::Result<()> {
 }
 
 /// Caches pre-generated widgets for different text rendering strategies.
+///
 /// A number of paragraphs are pregenerated per style type to avoid
 /// measuring the performance of the widget generation overhead.
 struct WidgetCache {
