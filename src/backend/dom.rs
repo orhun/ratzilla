@@ -207,46 +207,56 @@ impl DomBackend {
                 )
             });
 
-            if needs_rebuild {
-                // Rebuild entire line
-                let line = &self.buffer[y];
-                let pre = self.grid.children().item(y as u32).ok_or(Error::UnableToRetrieveChildElement)?;
-                pre.set_inner_html("");
+            self.update_line(y, needs_rebuild)?;
+        }
 
-                let mut x = 0;
-                while x < line.len() {
-                    if line[x].modifier.contains(HYPERLINK_MODIFIER) {
-                        // Handle hyperlink group
-                        let start_x = x;
-                        while x + 1 < line.len() && line[x + 1].modifier.contains(HYPERLINK_MODIFIER) {
-                            x += 1;
-                        }
+        Ok(())
+    }
 
-                        let hyperlink_cells = &line[start_x..=x];
-                        let anchor = create_anchor(&self.document, hyperlink_cells)?;
+    /// Updates a single line of the grid, either by completely rebuilding it
+    /// or by updating only the changed cells.
+    fn update_line(&mut self, y: usize, needs_rebuild: bool) -> Result<(), Error> {
+        let line = &self.buffer[y];
+        let pre = self.grid.children().item(y as u32).ok_or(Error::UnableToRetrieveChildElement)?;
 
-                        for i in start_x..=x {
-                            let span = create_span(&self.document, &line[i])?;
-                            self.cells[y * line.len() + i] = span.clone();
-                            anchor.append_child(&span)?;
-                        }
-                        pre.append_child(&anchor)?;
-                    } else {
-                        // Handle regular cell
-                        let span = create_span(&self.document, &line[x])?;
-                        self.cells[y * line.len() + x] = span.clone();
-                        pre.append_child(&span)?;
+        // Rebuilding required when there is Hyperlink in the line
+        if needs_rebuild {
+            // Rebuild entire line
+            pre.set_inner_html("");
+
+            let mut x = 0;
+            while x < line.len() {
+                if line[x].modifier.contains(HYPERLINK_MODIFIER) {
+                    // Handle hyperlink group
+                    let start_x = x;
+                    while x + 1 < line.len() && line[x + 1].modifier.contains(HYPERLINK_MODIFIER) {
+                        x += 1;
                     }
-                    x += 1;
+
+                    let hyperlink_cells = &line[start_x..=x];
+                    let anchor = create_anchor(&self.document, hyperlink_cells)?;
+
+                    for i in start_x..=x {
+                        let span = create_span(&self.document, &line[i])?;
+                        self.cells[y * line.len() + i] = span.clone();
+                        anchor.append_child(&span)?;
+                    }
+                    pre.append_child(&anchor)?;
+                } else {
+                    // Handle regular cell
+                    let span = create_span(&self.document, &line[x])?;
+                    self.cells[y * line.len() + x] = span.clone();
+                    pre.append_child(&span)?;
                 }
-            } else {
-                // Just update changed cells directly
-                for x in 0..self.buffer[y].len() {
-                    if self.buffer[y][x] != self.prev_buffer[y][x] {
-                        let span = &self.cells[y * self.buffer[y].len() + x];
-                        span.set_inner_html(self.buffer[y][x].symbol());
-                        span.set_attribute("style", &get_cell_style_as_css(&self.buffer[y][x]))?;
-                    }
+                x += 1;
+            }
+        } else {
+            // Just update changed cells directly
+            for x in 0..line.len() {
+                if self.buffer[y][x] != self.prev_buffer[y][x] {
+                    let span = &self.cells[y * line.len() + x];
+                    span.set_inner_html(self.buffer[y][x].symbol());
+                    span.set_attribute("style", &get_cell_style_as_css(&self.buffer[y][x]))?;
                 }
             }
         }
