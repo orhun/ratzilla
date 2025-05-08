@@ -37,14 +37,14 @@ fn main() -> std::io::Result<()> {
         .add_modifier(Modifier::BOLD);
 
     // style index for the text
-    let span_op_index = Rc::new(RefCell::new(0usize));
+    let text_stye = Rc::new(RefCell::new(0usize));
 
-    // update the style index on any key event
-    let span_op_index_key_event = span_op_index.clone();
+    // any key event changes the text style
+    let text_style_key_event = text_stye.clone();
     terminal.on_key_event(move |_| {
-        let cell = span_op_index_key_event.as_ref();
-        let next_index = cell.borrow().clone() + 1;
-        *cell.borrow_mut() = next_index % WidgetCache::SCREEN_TYPES;
+        let current = text_style_key_event.as_ref();
+        let next = current.borrow().clone() + 1;
+        *current.borrow_mut() = next % WidgetCache::SCREEN_TYPES;
     });
 
     // Pre-generate widgets for better performance; in particular,
@@ -53,7 +53,7 @@ fn main() -> std::io::Result<()> {
 
     terminal.draw_web(move |frame| {
         // retrieve and render cached paragraph widget
-        let p = widget_cache.get(*span_op_index.as_ref().borrow(), rendered_frames);
+        let p = widget_cache.get(*text_stye.as_ref().borrow(), rendered_frames);
         frame.render_widget(p, frame.area());
         rendered_frames += 1;
 
@@ -139,6 +139,7 @@ impl WidgetCache {
         }
     }
 
+    /// Retrieves a pre-generated paragraph widget based on the style type and index.
     fn get(&self, style_type: usize, index: usize) -> &Paragraph<'static> {
         debug_assert!(style_type < Self::SCREEN_TYPES);
 
