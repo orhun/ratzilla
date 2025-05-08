@@ -139,30 +139,12 @@ impl Widget for FpsStats<'_> {
     /// numeric FPS value with the fps_value_style. The value is
     /// formatted to one decimal place with a fixed width.
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // avoid out-of-bounds by ensuring the area is within the buffer area
-        let area = area.intersection(buf.area);
-
         // draw the FPS label
-        "FPS: "
-            .chars()
-            .enumerate()
-            .take(area.width as usize) // OOB protection
-            .for_each(|(i, ch)| {
-                let cell = &mut buf[(area.x + i as u16, area.y)];
-                cell.set_char(ch);
-                cell.set_style(self.main_style);
-            });
+        buf.set_string(area.x, area.y, "FPS: ", self.main_style);
 
         // draw the FPS value
         const FPS_OFFSET: u16 = "FPS: ".len() as u16;
-        format_compact!("{:5.1}", self.recorder.fps())
-            .chars()
-            .enumerate()
-            .take(area.width.saturating_sub(FPS_OFFSET) as usize)
-            .for_each(|(i, ch)| {
-                let cell = &mut buf[(area.x + FPS_OFFSET + i as u16, area.y)];
-                cell.set_char(ch);
-                cell.set_style(self.fps_value_style);
-            });
+        let fps = format_compact!("{:5.1}", self.recorder.fps());
+        buf.set_string(area.x + FPS_OFFSET, area.y, fps, self.fps_value_style);
     }
 }
