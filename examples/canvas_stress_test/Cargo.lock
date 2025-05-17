@@ -33,6 +33,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
+name = "canvas-stress-test"
+version = "0.1.0"
+dependencies = [
+ "compact_str 0.9.0",
+ "console_error_panic_hook",
+ "ratzilla",
+ "web-time",
+]
+
+[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,16 +390,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "stress-test"
-version = "0.1.0"
-dependencies = [
- "compact_str 0.9.0",
- "console_error_panic_hook",
- "ratzilla",
- "web-time",
-]
 
 [[package]]
 name = "strsim"

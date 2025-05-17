@@ -123,19 +123,22 @@ impl WidgetCache {
             span.set_style(style)
         }
 
-        let area = (area.width * area.height) as u32;
-        let paragraph = |f: fn(&'static str, Span<'static>) -> Span<'static>| {
-            (0..Self::CACHED_SCREENS)
+        fn prepare_walls_of_text(
+            cells: u32,
+            f: fn(&'static str, Span<'static>) -> Span<'static>
+        ) -> Vec<Paragraph<'static>> {
+            (0..WidgetCache::CACHED_SCREENS)
                 .into_iter()
-                .map(|i| lorem_ipsum_paragraph(area, i * Self::CACHED_SCREENS, f))
+                .map(|i| lorem_ipsum_paragraph(cells, i * WidgetCache::CACHED_SCREENS, f))
                 .collect::<Vec<_>>()
-        };
+        }
 
+        let cell_count = (area.width * area.height) as u32;
         Self {
-            white: paragraph(white),
-            colorize_e_words: paragraph(colorize_e_words),
-            colorize_some: paragraph(colorize_some),
-            colorize_words: paragraph(colorize_words),
+            white: prepare_walls_of_text(cell_count, white),
+            colorize_e_words: prepare_walls_of_text(cell_count, colorize_e_words),
+            colorize_some: prepare_walls_of_text(cell_count, colorize_some),
+            colorize_words: prepare_walls_of_text(cell_count, colorize_words),
         }
     }
 
