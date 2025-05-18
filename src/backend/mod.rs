@@ -15,6 +15,9 @@ pub mod canvas;
 /// DOM backend.
 pub mod dom;
 
+/// WebGL2 backend.
+pub mod webgl2;
+
 /// Backend utilities.
 pub(crate) mod utils;
 
