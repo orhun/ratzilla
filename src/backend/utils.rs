@@ -84,14 +84,22 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
-/// Converts a Color to a CSS style.
-pub(crate) fn get_canvas_fg_color(cell: &Cell, fallback_color: Color) -> CompactString {
-    let color = if cell.modifier.contains(Modifier::REVERSED) {
+/// Returns the actual foreground color of a cell, considering the `REVERSED` modifier.
+pub(crate) fn actual_fg_color(cell: &Cell) -> Color {
+    if cell.modifier.contains(Modifier::REVERSED) {
         cell.bg
     } else {
         cell.fg
-    };
-    get_canvas_color(color, fallback_color)
+    }
+}
+
+/// Returns the actual background color of a cell, considering the `REVERSED` modifier.
+pub(crate) fn actual_bg_color(cell: &Cell) -> Color {
+    if cell.modifier.contains(Modifier::REVERSED) {
+        cell.fg
+    } else {
+        cell.bg
+    }
 }
 
 /// Converts a Color to a CSS style.
