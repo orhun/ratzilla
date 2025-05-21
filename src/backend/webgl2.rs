@@ -1,7 +1,6 @@
 use bitvec::{bitvec, prelude::BitVec};
 use std::io::Result as IoResult;
 use std::mem::swap;
-use compact_str::format_compact;
 use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,
@@ -11,18 +10,6 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
-
-/// Width of a single cell.
-///
-/// This will be used for multiplying the cell's x position to get the actual pixel
-/// position on the canvas.
-const CELL_WIDTH: f64 = 10.0;
-
-/// Height of a single cell.
-///
-/// This will be used for multiplying the cell's y position to get the actual pixel
-/// position on the canvas.
-const CELL_HEIGHT: f64 = 19.0;
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -53,12 +40,12 @@ impl WebGl2BackendOptions {
 }
 
 /// WebGl2 renderer.
-// #[derive(Debug)]
+#[derive(Debug)]
 struct WebGl2 {
+    /// The WebGL2 renderer.
     renderer: webgl2::Renderer,
+    /// Drawable representation of the terminal
     terminal_grid: webgl2::TerminalGrid,
-    /// WebGl2 element.
-    // inner: web_sys::HtmlCanvasElement,
     /// Background color.
     background_color: Color,
 }
@@ -90,17 +77,23 @@ impl WebGl2 {
         // context.set_text_baseline("top");
         parent_element.append_child(&element)?;
 
+        console::time_with_label("create renderer");
         let renderer = webgl2::Renderer::create_with_canvas(canvas)
             .expect("Unable to create WebGL2 renderer");
+        console::time_end_with_label("create renderer");
 
+        console::time_with_label("create font-atlas");
         let font_atlas = webgl2::FontAtlas::load_default(renderer.gl()).expect("Unable to load font");
         let cell_size = font_atlas.cell_size();
+        console::time_end_with_label("create font-atlas");
 
+        console::time_with_label("create terminal grid");
         let terminal_grid = webgl2::TerminalGrid::new(
             renderer.gl(),
             font_atlas,
             renderer.canvas_size(),
         ).expect("Unable to create terminal grid");
+        console::time_end_with_label("create terminal grid");
 
         terminal_grid.upload_ubo_data(renderer.gl(), renderer.canvas_size(), cell_size);
 
@@ -114,6 +107,13 @@ impl WebGl2 {
     }
 }
 
+fn performance() -> Result<web_sys::Performance, Error> {
+    Ok(window()
+        .ok_or(Error::UnableToRetrieveWindow)?
+        .performance()
+        .unwrap())
+}
+
 /// WebGl2 backend.
 ///
 /// This backend renders the buffer onto a HTML canvas element.
@@ -123,10 +123,8 @@ pub struct WebGl2Backend {
     initialized: bool,
     /// Current buffer.
     buffer: Vec<Cell>,
-    /// Previous buffer.
-    // prev_buffer: Vec<Cell>,
-    /// Changed buffer cells
-    changed_cells: BitVec,
+    /// Indicates if the cells have changed, requiring a redraw.
+    cell_data_pending_upload: bool,
     /// WebGl2 context.
     context: WebGl2,
     /// Cursor position.
@@ -135,6 +133,8 @@ pub struct WebGl2Backend {
     cursor_shape: CursorShape,
     /// Draw cell boundaries with specified color.
     debug_mode: Option<String>,
+    /// Performance measurement.
+    performance: Option<web_sys::Performance>,
 }
 
 impl WebGl2Backend {
@@ -171,21 +171,17 @@ impl WebGl2Backend {
 
         let context = WebGl2::new(document, parent, width, height, Color::Black)?;
 
-        // setup font atlas
-        // let atlas_config = FontAtlasConfig::default();
-        // let font_atlas = FontAtlas::load_default()
-
         let buffer = get_sized_buffer_from_terminal_grid(&context.terminal_grid);
-        let changed_cells = bitvec![0; buffer.len()];
         Ok(Self {
             // prev_buffer: buffer.clone(),
             buffer,
             initialized: false,
-            changed_cells,
+            cell_data_pending_upload: false,
             context,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
+            performance: Some(performance()?), 
         })
     }
 
@@ -231,92 +227,37 @@ impl WebGl2Backend {
     // accordingly.
     //
     // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
-    fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
-        // if force_redraw {
-        //     self.canvas.context.clear_rect(
-        //         0.0,
-        //         0.0,
-        //         self.canvas.inner.client_width() as f64,
-        //         self.canvas.inner.client_height() as f64,
-        //     );
-        // }
-        // self.canvas.context.translate(5_f64, 5_f64)?;
-
-        // NOTE: The draw_* functions each traverses the buffer once, instead of
-        // traversing it once per cell; this is done to reduce the number of
-        // WASM calls per cell.
-
-        let gl = self.context.renderer.gl();
-        let terminal = &mut self.context.terminal_grid;
-        let cells = self.buffer.iter().map(cell_data);
-        terminal.update_cells(gl, cells).expect("Unable to update cells");
-
-        // self.resolve_changed_cells(force_redraw);
-        // self.draw_background()?;
-        // self.draw_symbols()?;
-        // self.draw_cursor()?;
-        // if self.debug_mode.is_some() {
-        //     self.draw_debug()?;
-        // }
+    fn update_grid(&mut self) -> Result<(), Error> {
+        self.measure_begin("update-grid");
+        if self.cell_data_pending_upload {
+            let gl = self.context.renderer.gl();
+            let terminal = &mut self.context.terminal_grid;
+            let cells = self.buffer.iter().map(cell_data);
+            
+            terminal.update_cells(gl, cells).expect("Unable to update cells");
+            
+            self.cell_data_pending_upload = false;
+        }
+        self.measure_end("update-grid");
 
         Ok(())
     }
 
-    // /// Updates the representation of the changed cells.
-    // ///
-    // /// This function updates the `changed_cells` vector to indicate which cells
-    // /// have changed.
-    // fn resolve_changed_cells(&mut self, force_redraw: bool) {
-    //     self.prev_buffer.iter()
-    //         .zip(self.buffer.iter())
-    //         .enumerate()
-    //         .filter(|(_, (prev, cell))| force_redraw || prev != cell)
-    //         .for_each(|(i, _)| self.changed_cells.set(i, true));
-    // }
+    fn measure_begin(&self, label: &str) {
+        if let Some(performance) = &self.performance {
+            performance.mark(label)
+                .unwrap();
+        }
+    }
 
-    // /// Draws the cursor on the canvas. todo: restore
-    // fn draw_cursor(&mut self) -> Result<(), Error> {
-    //     if let Some(pos) = self.cursor_position {
-    //         let cell = &self.buffer[pos.y as usize][pos.x as usize];
-    //
-    //         if cell.modifier.contains(Modifier::UNDERLINED) {
-    //             self.canvas.context.save();
-    //
-    //             self.canvas.context.fill_text(
-    //                 "_",
-    //                 pos.x as f64 * CELL_WIDTH,
-    //                 pos.y as f64 * CELL_HEIGHT,
-    //             )?;
-    //
-    //             self.canvas.context.restore();
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
-
-    // /// Draws cell boundaries for debugging. // todo: restore
-    // fn draw_debug(&mut self) -> Result<(), Error> {
-    //     self.canvas.context.save();
-    //
-    //     let color = self.debug_mode.as_ref().unwrap();
-    //     for (y, line) in self.buffer.iter().enumerate() {
-    //         for (x, _) in line.iter().enumerate() {
-    //             self.canvas.context.set_stroke_style_str(color);
-    //             self.canvas.context.stroke_rect(
-    //                 x as f64 * CELL_WIDTH,
-    //                 y as f64 * CELL_HEIGHT,
-    //                 CELL_WIDTH,
-    //                 CELL_HEIGHT,
-    //             );
-    //         }
-    //     }
-    //
-    //     self.canvas.context.restore();
-    //
-    //     Ok(())
-    // }
+    fn measure_end(&self, label: &str) {
+        if let Some(performance) = &self.performance {
+            performance.measure_with_start_mark(label, label)
+                .unwrap();
+        }
+    }
 }
+
 
 fn cell_data(cell: &Cell) -> webgl2::CellData {
     let mut fg = to_rgba(cell.fg);
@@ -336,15 +277,22 @@ impl Backend for WebGl2Backend {
     {
         let w = self.context.terminal_grid.terminal_size().0 as usize;
 
+        self.measure_begin("draw-grid");
         let terminal = &mut self.context.terminal_grid;
         self.context.renderer.render(terminal);
+        self.measure_end("draw-grid");
 
+        self.measure_begin("update-cell-content");
+        let mut mutated_cells = false;
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
 
+            mutated_cells |= &self.buffer[y * w + x] != cell;
             self.buffer[y * w + x] = cell.clone();
         }
+        self.cell_data_pending_upload = mutated_cells;
+        self.measure_end("update-cell-content");
         
         //     line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
         //     line[x] = cell.clone();
@@ -369,20 +317,7 @@ impl Backend for WebGl2Backend {
     /// This function is called after the [`CanvasBackend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
-        // Only runs once.
-        if !self.initialized {
-            self.update_grid(true)?;
-            // self.prev_buffer = self.buffer.clone();
-            self.initialized = true;
-            return Ok(());
-        }
-
-        // if self.buffer != self.prev_buffer {
-            self.update_grid(false)?;
-        // }
-
-        // self.prev_buffer = self.buffer.clone();
-
+        self.update_grid()?;
         Ok(())
     }
 
