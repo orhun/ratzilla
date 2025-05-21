@@ -1,6 +1,6 @@
 use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
-use std::io::Result as IoResult;
+use std::{cell::RefCell, io::Result as IoResult, rc::Rc};
 
 use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
@@ -12,8 +12,8 @@ use ratatui::{
 };
 use web_sys::{
     js_sys::{Boolean, Map},
-    wasm_bindgen::{JsCast, JsValue},
-    window,
+    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
+    window, Document, Element, Window,
 };
 
 /// Width of a single cell.
@@ -117,7 +117,7 @@ impl Canvas {
 #[derive(Debug)]
 pub struct CanvasBackend {
     /// Whether the canvas has been initialized.
-    initialized: bool,
+    initialized: Rc<RefCell<bool>>,
     /// Always clip foreground drawing to the cell rectangle. Helpful when
     /// dealing with out-of-bounds rendering from problematic fonts. Enabling
     /// this option may cause some performance issues when dealing with large
@@ -131,6 +131,12 @@ pub struct CanvasBackend {
     changed_cells: BitVec,
     /// Canvas.
     canvas: Canvas,
+    /// The parent of the grid element.
+    grid_parent: Element,
+    /// Window.
+    window: Window,
+    /// Document.
+    document: Document,
     /// Cursor position.
     cursor_position: Option<Position>,
     /// The cursor shape.
@@ -171,20 +177,64 @@ impl CanvasBackend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let canvas = Canvas::new(document, parent, width, height, Color::Black)?;
+        let canvas = Canvas::new(
+            document.clone(),
+            parent.clone(),
+            width,
+            height,
+            Color::Black,
+        )?;
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
-        Ok(Self {
+        let mut backend = Self {
             prev_buffer: buffer.clone(),
             always_clip_cells: options.always_clip_cells,
             buffer,
-            initialized: false,
+            initialized: Rc::new(RefCell::new(false)),
             changed_cells,
             canvas,
+            grid_parent: parent,
+            window,
+            document,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
-        })
+        };
+        backend.add_on_resize_listener();
+
+        Ok(backend)
+    }
+
+    /// Add a listener to the window resize event.
+    fn add_on_resize_listener(&mut self) {
+        let initialized = self.initialized.clone();
+        let closure = Closure::<dyn FnMut(_)>::new(move |_: web_sys::Event| {
+            initialized.replace(false);
+        });
+        self.window
+            .set_onresize(Some(closure.as_ref().unchecked_ref()));
+        closure.forget();
+    }
+
+    /// Reset the grid and clear the cells.
+    fn reset_grid(&mut self) -> Result<(), Error> {
+        let (width, height) = (
+            self.grid_parent.client_width() as u32,
+            self.grid_parent.client_height() as u32,
+        );
+        let canvas = Canvas::new(
+            self.document.clone(),
+            self.grid_parent.clone(),
+            width,
+            height,
+            Color::Black,
+        )?;
+        self.canvas = canvas;
+
+        self.buffer = get_sized_buffer_from_canvas(&self.canvas.inner);
+        self.prev_buffer = self.buffer.clone();
+
+        Ok(())
     }
 
     /// Sets the background color of the canvas.
@@ -439,6 +489,12 @@ impl Backend for CanvasBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
+        if !*self.initialized.borrow() {
+            // Only runs on resize event.
+            self.grid_parent.set_inner_html("");
+            self.reset_grid()?;
+        }
+
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
@@ -467,10 +523,10 @@ impl Backend for CanvasBackend {
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         // Only runs once.
-        if !self.initialized {
+        if !*self.initialized.borrow() {
             self.update_grid(true)?;
             self.prev_buffer = self.buffer.clone();
-            self.initialized = true;
+            self.initialized.replace(true);
             return Ok(());
         }
 
