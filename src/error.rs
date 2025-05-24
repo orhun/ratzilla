@@ -21,6 +21,12 @@ pub enum Error {
     #[error("Unable to retrieve body")]
     UnableToRetrieveBody,
 
+    /// Unable to retrieve child element.
+    ///
+    /// This error occurs when `Element.children().item(index)` returns `None`.
+    #[error("Unable to retrieve child element")]
+    UnableToRetrieveChildElement,
+
     /// Unable to retrieve canvas context.
     ///
     /// This error occurs when `canvas.get_context_with_context_options("2d")`
