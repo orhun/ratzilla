@@ -10,21 +10,18 @@
 mod fps;
 
 use crate::fps::{FpsRecorder, FpsStats};
-use ratzilla::{
-    ratatui::{
-        layout::Size,
-        style::{Color, Modifier, Style, Styled},
-        text::{Line, Span},
-        widgets::{Paragraph, Widget, Wrap},
-        Terminal,
-    },
-    CanvasBackend, WebRenderer,
-};
+use ratzilla::{ratatui::{
+    layout::Size,
+    style::{Color, Modifier, Style, Styled},
+    text::{Line, Span},
+    widgets::{Paragraph, Widget, Wrap},
+    Terminal,
+}, CanvasBackend, WebGl2Backend, WebRenderer};
 use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new()?;
+    let backend = WebGl2Backend::new()?;
     let terminal = Terminal::new(backend)?;
 
     let mut fps_recorder = FpsRecorder::new();

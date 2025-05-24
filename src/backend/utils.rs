@@ -4,7 +4,6 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
-use webgl2::TerminalGrid;
 use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},

@@ -1,4 +1,3 @@
-use bitvec::{bitvec, prelude::BitVec};
 use std::io::Result as IoResult;
 use std::mem::swap;
 use crate::{backend::utils::*, error::Error, CursorShape};
@@ -9,6 +8,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
+use term_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
 use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
 
 /// Options for the [`CanvasBackend`].
@@ -43,9 +43,9 @@ impl WebGl2BackendOptions {
 #[derive(Debug)]
 struct WebGl2 {
     /// The WebGL2 renderer.
-    renderer: webgl2::Renderer,
+    renderer: Renderer,
     /// Drawable representation of the terminal
-    terminal_grid: webgl2::TerminalGrid,
+    terminal_grid: TerminalGrid,
     /// Background color.
     background_color: Color,
 }
@@ -73,36 +73,32 @@ impl WebGl2 {
             &JsValue::from_str("desynchronized"),
             &Boolean::from(JsValue::TRUE),
         );
-        // context.set_font("16px monospace");
-        // context.set_text_baseline("top");
         parent_element.append_child(&element)?;
 
         console::time_with_label("create renderer");
-        let renderer = webgl2::Renderer::create_with_canvas(canvas)
+        let mut renderer = Renderer::create_with_canvas(canvas)
             .expect("Unable to create WebGL2 renderer");
+        
         console::time_end_with_label("create renderer");
 
         console::time_with_label("create font-atlas");
-        let font_atlas = webgl2::FontAtlas::load_default(renderer.gl()).expect("Unable to load font");
-        let cell_size = font_atlas.cell_size();
+        let font_atlas = FontAtlas::load_default(renderer.gl()).expect("Unable to load font");
         console::time_end_with_label("create font-atlas");
 
         console::time_with_label("create terminal grid");
-        let terminal_grid = webgl2::TerminalGrid::new(
+        let terminal_grid = TerminalGrid::new(
             renderer.gl(),
             font_atlas,
             renderer.canvas_size(),
         ).expect("Unable to create terminal grid");
         console::time_end_with_label("create terminal grid");
 
-        terminal_grid.upload_ubo_data(renderer.gl(), renderer.canvas_size(), cell_size);
+        terminal_grid.upload_ubo_data(renderer.gl(), renderer.canvas_size());
 
         Ok(Self {
-            // inner: canvas,
             terminal_grid,
             renderer,
             background_color,
-
         })
     }
 }
@@ -117,10 +113,8 @@ fn performance() -> Result<web_sys::Performance, Error> {
 /// WebGl2 backend.
 ///
 /// This backend renders the buffer onto a HTML canvas element.
-// #[derive(Debug)]
+#[derive(Debug)]
 pub struct WebGl2Backend {
-    /// Whether the canvas has been initialized.
-    initialized: bool,
     /// Current buffer.
     buffer: Vec<Cell>,
     /// Indicates if the cells have changed, requiring a redraw.
@@ -173,9 +167,7 @@ impl WebGl2Backend {
 
         let buffer = get_sized_buffer_from_terminal_grid(&context.terminal_grid);
         Ok(Self {
-            // prev_buffer: buffer.clone(),
             buffer,
-            initialized: false,
             cell_data_pending_upload: false,
             context,
             cursor_position: None,
@@ -225,8 +217,6 @@ impl WebGl2Backend {
 
     // Compare the current buffer to the previous buffer and updates the canvas
     // accordingly.
-    //
-    // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
     fn update_grid(&mut self) -> Result<(), Error> {
         self.measure_begin("update-grid");
         if self.cell_data_pending_upload {
@@ -258,15 +248,14 @@ impl WebGl2Backend {
     }
 }
 
-
-fn cell_data(cell: &Cell) -> webgl2::CellData {
+fn cell_data(cell: &Cell) -> CellData {
     let mut fg = to_rgba(cell.fg);
     let mut bg = to_rgba(cell.bg);
     if cell.modifier.contains(Modifier::REVERSED) {
         swap(&mut fg, &mut bg);
     }
 
-    webgl2::CellData::new(cell.symbol(), fg, bg,)
+    CellData::new(cell.symbol(), fg, bg,)
 }
 
 impl Backend for WebGl2Backend {
@@ -283,23 +272,20 @@ impl Backend for WebGl2Backend {
         self.measure_end("draw-grid");
 
         self.measure_begin("update-cell-content");
-        let mut mutated_cells = false;
+        let mut sync_required = false;
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
 
-            mutated_cells |= &self.buffer[y * w + x] != cell;
-            self.buffer[y * w + x] = cell.clone();
+            let c = &mut self.buffer[y * w + x];
+            sync_required |= c != cell;
+            *c = cell.clone();
         }
-        self.cell_data_pending_upload = mutated_cells;
+        self.cell_data_pending_upload = sync_required;
         self.measure_end("update-cell-content");
         
-        //     line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
-        //     line[x] = cell.clone();
-        // }
-        //
         // // Draw the cursor if set
-        // if let Some(pos) = self.cursor_position {
+        if let Some(pos) = self.cursor_position {
         //     let y = pos.y as usize;
         //     let x = pos.x as usize;
         //     let line = &mut self.buffer[y];
@@ -307,7 +293,7 @@ impl Backend for WebGl2Backend {
         //         let cursor_style = self.cursor_shape.show(line[x].style());
         //         line[x].set_style(cursor_style);
         //     }
-        // }
+        }
 
         Ok(())
     }
@@ -387,7 +373,7 @@ impl Backend for WebGl2Backend {
 
 
 /// Returns a buffer based on the `TerminalGrid`.
-fn get_sized_buffer_from_terminal_grid(grid: &webgl2::TerminalGrid) -> Vec<Cell> {
+fn get_sized_buffer_from_terminal_grid(grid: &TerminalGrid) -> Vec<Cell> {
     vec![Cell::default(); grid.cell_count()]
 }
 
