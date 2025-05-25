@@ -8,7 +8,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use term_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
+use term_renderer::{CellData, FontAtlas, FontStyle, Renderer, TerminalGrid};
 use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
 
 /// Options for the [`CanvasBackend`].
@@ -78,7 +78,7 @@ impl WebGl2 {
         console::time_with_label("create renderer");
         let mut renderer = Renderer::create_with_canvas(canvas)
             .expect("Unable to create WebGL2 renderer");
-        
+
         console::time_end_with_label("create renderer");
 
         console::time_with_label("create font-atlas");
@@ -255,7 +255,15 @@ fn cell_data(cell: &Cell) -> CellData {
         swap(&mut fg, &mut bg);
     }
 
-    CellData::new(cell.symbol(), fg, bg,)
+    CellData::new(cell.symbol(), font_style(cell), fg, bg,)
+}
+
+fn font_style(cell: &Cell) -> FontStyle {
+    let mut style = 0;
+    if cell.modifier.contains(Modifier::BOLD)   { style |= 1 << 0; }
+    if cell.modifier.contains(Modifier::ITALIC) { style |= 1 << 1; }
+
+    FontStyle::from_u8(style)
 }
 
 impl Backend for WebGl2Backend {
