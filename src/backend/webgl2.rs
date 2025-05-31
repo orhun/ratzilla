@@ -8,7 +8,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use term_renderer::{CellData, FontAtlas, FontStyle, Renderer, TerminalGrid};
+use term_renderer::{CellData, FontAtlas, FontAtlasData, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
 
 /// Options for the [`CanvasBackend`].
@@ -76,7 +76,7 @@ impl WebGl2 {
         parent_element.append_child(&element)?;
 
         console::time_with_label("create renderer");
-        let mut renderer = Renderer::create_with_canvas(canvas)
+        let renderer = Renderer::create_with_canvas(canvas)
             .expect("Unable to create WebGL2 renderer");
 
         console::time_end_with_label("create renderer");
@@ -92,8 +92,8 @@ impl WebGl2 {
             renderer.canvas_size(),
         ).expect("Unable to create terminal grid");
         console::time_end_with_label("create terminal grid");
-
-        terminal_grid.upload_ubo_data(renderer.gl(), renderer.canvas_size());
+        
+        terminal_grid.upload_ubo_data(renderer.gl());
 
         Ok(Self {
             terminal_grid,
@@ -255,7 +255,10 @@ fn cell_data(cell: &Cell) -> CellData {
         swap(&mut fg, &mut bg);
     }
 
-    CellData::new(cell.symbol(), font_style(cell), fg, bg,)
+    let style = font_style(cell);
+    let effect = glyph_effect(cell);
+    
+    CellData::new(cell.symbol(), style, effect, fg, bg)
 }
 
 fn font_style(cell: &Cell) -> FontStyle {
@@ -264,6 +267,16 @@ fn font_style(cell: &Cell) -> FontStyle {
     if cell.modifier.contains(Modifier::ITALIC) { style |= 1 << 1; }
 
     FontStyle::from_u8(style)
+}
+
+fn glyph_effect(cell: &Cell) -> GlyphEffect {
+    if cell.modifier.contains(Modifier::UNDERLINED) {
+        GlyphEffect::Underline
+    } else if cell.modifier.contains(Modifier::CROSSED_OUT) {
+        GlyphEffect::Strikethrough
+    } else {
+        GlyphEffect::None
+    }
 }
 
 impl Backend for WebGl2Backend {
