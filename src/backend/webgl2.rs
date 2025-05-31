@@ -1,5 +1,3 @@
-use std::io::Result as IoResult;
-use std::mem::swap;
 use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,
@@ -8,7 +6,9 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use term_renderer::{CellData, FontAtlas, FontAtlasData, FontStyle, GlyphEffect, Renderer, TerminalGrid};
+use std::io::Result as IoResult;
+use std::mem::swap;
+use term_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
 
 /// Options for the [`CanvasBackend`].
@@ -242,8 +242,8 @@ impl WebGl2Backend {
 }
 
 fn cell_data(cell: &Cell) -> CellData {
-    let mut fg = to_rgba(cell.fg);
-    let mut bg = to_rgba(cell.bg);
+    let mut fg = to_rgb(cell.fg);
+    let mut bg = to_rgb(cell.bg);
     if cell.modifier.contains(Modifier::REVERSED) {
         swap(&mut fg, &mut bg);
     }
@@ -251,8 +251,6 @@ fn cell_data(cell: &Cell) -> CellData {
     let style = font_style(cell);
     let effect = glyph_effect(cell);
 
-    // CellData::new(cell.symbol(), style, effect, fg, bg)
-    let fg = if fg == 0x0 { 0xFFFFFFFF } else { fg };
     CellData::new(cell.symbol(), style, effect, fg, bg)
 }
 
@@ -289,19 +287,20 @@ impl Backend for WebGl2Backend {
 
         self.measure_begin("update-cell-content");
         let mut sync_required = false;
-        for (x, y, cell) in content {
-            let y = y as usize;
-            let x = x as usize;
+        for (x, y, received_cell) in content {
+            let (x, y) = (x as usize, y as usize);
 
             let c = &mut self.buffer[y * w + x];
-            sync_required |= c != cell;
-            *c = cell_with_safe_colors(cell);
+            sync_required |= c != received_cell;
+            *c = cell_with_safe_colors(received_cell);
         }
         self.cell_data_pending_upload = sync_required;
         self.measure_end("update-cell-content");
         
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
+            self.cell_data_pending_upload = true;
+
             let y = pos.y as usize;
             let x = pos.x as usize;
 
@@ -335,7 +334,7 @@ impl Backend for WebGl2Backend {
                 cell.set_style(style);
             }
         }
-        
+
         self.cursor_position = None;
         Ok(())
     }
@@ -345,10 +344,15 @@ impl Backend for WebGl2Backend {
     }
 
     fn get_cursor(&mut self) -> IoResult<(u16, u16)> {
-        Ok((0, 0))
+        if let Some(pos) = self.cursor_position {
+            Ok((pos.x, pos.y))
+        } else {
+            Ok((0, 0)) // Default position if cursor is not set
+        }
     }
 
-    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {
+    fn set_cursor(&mut self, x: u16, y: u16) -> IoResult<()> {
+        self.cursor_position = Some(Position::new(x, y));
         Ok(())
     }
 
@@ -401,32 +405,30 @@ fn get_sized_buffer_from_terminal_grid(grid: &TerminalGrid) -> Vec<Cell> {
     vec![Cell::default(); grid.cell_count()]
 }
 
-fn to_rgba(color: Color) -> u32 {
+fn to_rgb(color: Color) -> u32 {
     let c = match color {
-        Color::Rgb(r, g, b) => ((r as u32) << 24) | ((g as u32) << 16) | (b as u32),
-        Color::Reset => 0x00000000,
-        Color::Black => 0x00000000,
-        Color::Red => 0x80000000,
-        Color::Green => 0x00800000,
-        Color::Yellow => 0x80800000,
-        Color::Blue => 0x00008000,
-        Color::Magenta => 0x80008000,
-        Color::Cyan => 0x00808000,
-        Color::Gray => 0xc0c0c000,
-        Color::DarkGray => 0x80808000,
-        Color::LightRed => 0xff000000,
-        Color::LightGreen => 0x00ff0000,
-        Color::LightYellow => 0xffff0000,
-        Color::LightBlue => 0x0000ff00,
-        Color::LightMagenta => 0xff00ff00,
-        Color::LightCyan => 0x00ffff00,
-        Color::White => 0xffffff00,
-        Color::Indexed(code) => {
-            panic!("Indexed colors are not supported atm");
-        }
+        Color::Rgb(r, g, b) => ((r as u32) << 16) | ((g as u32) << 8) | (b as u32) << 8,
+        Color::Reset => 0x000000,
+        Color::Black => 0x000000,
+        Color::Red => 0x800000,
+        Color::Green => 0x008000,
+        Color::Yellow => 0x808000,
+        Color::Blue => 0x000080,
+        Color::Magenta => 0x800080,
+        Color::Cyan => 0x008080,
+        Color::Gray => 0xc0c0c0,
+        Color::DarkGray => 0x808080,
+        Color::LightRed => 0xFF0000,
+        Color::LightGreen => 0x00FF00,
+        Color::LightYellow => 0xFFFF00,
+        Color::LightBlue => 0x0000FF,
+        Color::LightMagenta => 0xFF00FF,
+        Color::LightCyan => 0x00FFFF,
+        Color::White => 0xFFFFFF,
+        Color::Indexed(code) => indexed_to_rgb(code)
     };
 
-    c | 0xff // alpha to opaque
+    c
 }
 
 fn cell_with_safe_colors(cell: &Cell) -> Cell {
@@ -435,13 +437,13 @@ fn cell_with_safe_colors(cell: &Cell) -> Cell {
     } else {
         cell.fg
     };
-    
+
     let bg = if cell.bg == Color::Reset {
         Color::Black
     } else {
         cell.bg
     };
-    
+
     let mut c = cell.clone();
     c.set_fg(fg);
     c.set_bg(bg);
@@ -453,4 +455,55 @@ fn performance() -> Result<web_sys::Performance, Error> {
         .ok_or(Error::UnableToRetrieveWindow)?
         .performance()
         .unwrap())
+}
+
+fn indexed_to_rgb(index: u8) -> u32 {
+    match index {
+        // Basic 16 colors (0-15)
+        0..=15 => {
+            const BASIC_COLORS: [u32; 16] = [
+                0x000000, // 0: black
+                0xCD0000, // 1: red
+                0x00CD00, // 2: green
+                0xCDCD00, // 3: yellow
+                0x0000EE, // 4: blue
+                0xCD00CD, // 5: magenta
+                0x00CDCD, // 6: cyan
+                0xE5E5E5, // 7: white
+                0x7F7F7F, // 8: bright Black
+                0xFF0000, // 9: bright Red
+                0x00FF00, // 10: bright Green
+                0xFFFF00, // 11: bright Yellow
+                0x5C5CFF, // 12: bright Blue
+                0xFF00FF, // 13: bright Magenta
+                0x00FFFF, // 14: bright Cyan
+                0xFFFFFF, // 15: bright White
+            ];
+            BASIC_COLORS[index as usize]
+        }
+
+        // 216-color cube (16-231)
+        16..=231 => {
+            let cube_index = index - 16;
+            let r = cube_index / 36;
+            let g = (cube_index % 36) / 6;
+            let b = cube_index % 6;
+
+            // Convert 0-5 range to 0-255 RGB
+            // Values: 0 -> 0, 1 -> 95, 2 -> 135, 3 -> 175, 4 -> 215, 5 -> 255
+            let to_rgb = |n: u8| -> u32 {
+                if n == 0 { 0 } else { 55 + 40 * n as u32 }
+            };
+
+            to_rgb(r) << 16 | to_rgb(g) << 8 | to_rgb(b)
+        }
+
+        // 24 grayscale colors (232-255)
+        232..=255 => {
+            let gray_index = index - 232;
+            // linear interpolation from 8 to 238
+            let gray = (8 + gray_index * 10) as u32;
+            (gray << 16) | (gray << 8) | gray
+        }
+    }
 }
