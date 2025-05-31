@@ -407,7 +407,7 @@ fn get_sized_buffer_from_terminal_grid(grid: &TerminalGrid) -> Vec<Cell> {
 
 fn to_rgb(color: Color) -> u32 {
     let c = match color {
-        Color::Rgb(r, g, b) => ((r as u32) << 16) | ((g as u32) << 8) | (b as u32) << 8,
+        Color::Rgb(r, g, b) => ((r as u32) << 16) | ((g as u32) << 8) | b as u32,
         Color::Reset => 0x000000,
         Color::Black => 0x000000,
         Color::Red => 0x800000,
