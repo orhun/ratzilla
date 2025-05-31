@@ -92,7 +92,7 @@ impl WebGl2 {
             renderer.canvas_size(),
         ).expect("Unable to create terminal grid");
         console::time_end_with_label("create terminal grid");
-        
+
         terminal_grid.upload_ubo_data(renderer.gl());
 
         Ok(Self {
@@ -101,13 +101,6 @@ impl WebGl2 {
             background_color,
         })
     }
-}
-
-fn performance() -> Result<web_sys::Performance, Error> {
-    Ok(window()
-        .ok_or(Error::UnableToRetrieveWindow)?
-        .performance()
-        .unwrap())
 }
 
 /// WebGl2 backend.
@@ -257,7 +250,9 @@ fn cell_data(cell: &Cell) -> CellData {
 
     let style = font_style(cell);
     let effect = glyph_effect(cell);
-    
+
+    // CellData::new(cell.symbol(), style, effect, fg, bg)
+    let fg = if fg == 0x0 { 0xFFFFFFFF } else { fg };
     CellData::new(cell.symbol(), style, effect, fg, bg)
 }
 
@@ -300,20 +295,21 @@ impl Backend for WebGl2Backend {
 
             let c = &mut self.buffer[y * w + x];
             sync_required |= c != cell;
-            *c = cell.clone();
+            *c = cell_with_safe_colors(cell);
         }
         self.cell_data_pending_upload = sync_required;
         self.measure_end("update-cell-content");
         
-        // // Draw the cursor if set
+        // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
-        //     let y = pos.y as usize;
-        //     let x = pos.x as usize;
-        //     let line = &mut self.buffer[y];
-        //     if x < line.len() {
-        //         let cursor_style = self.cursor_shape.show(line[x].style());
-        //         line[x].set_style(cursor_style);
-        //     }
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+
+            let idx = y * w + x;
+            if idx < self.buffer.len() {
+                let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
+                self.buffer[idx].set_style(cursor_style);
+            }
         }
 
         Ok(())
@@ -329,16 +325,18 @@ impl Backend for WebGl2Backend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        // if let Some(pos) = self.cursor_position {
-        //     let y = pos.y as usize;
-        //     let x = pos.x as usize;
-        //     let line = &mut self.buffer[y];
-        //     if x < line.len() {
-        //         let style = self.cursor_shape.hide(line[x].style());
-        //         line[x].set_style(style);
-        //     }
-        // }
-        // self.cursor_position = None;
+        if let Some(pos) = self.cursor_position {
+            let y = pos.y as usize;
+            let x = pos.x as usize;
+            let w = self.context.terminal_grid.terminal_size().0 as usize;
+
+            if let Some(cell) = self.buffer.get_mut(y * w + x) {
+                let style = self.cursor_shape.hide(cell.style());
+                cell.set_style(style);
+            }
+        }
+        
+        self.cursor_position = None;
         Ok(())
     }
 
@@ -376,22 +374,27 @@ impl Backend for WebGl2Backend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        // let new_pos = position.into();
-        // if let Some(old_pos) = self.cursor_position {
-        //     let y = old_pos.y as usize;
-        //     let x = old_pos.x as usize;
-        //     let line = &mut self.buffer[y];
-        //     if x < line.len() && old_pos != new_pos {
-        //         let style = self.cursor_shape.hide(line[x].style());
-        //         line[x].set_style(style);
-        //     }
-        // }
-        // self.cursor_position = Some(new_pos);
+        let w = self.context.terminal_grid.terminal_size().0 as usize;
+
+        let new_pos = position.into();
+        if let Some(old_pos) = self.cursor_position {
+            if old_pos == new_pos {
+                return Ok(()); // No change in cursor position
+            }
+
+            let y = old_pos.y as usize;
+            let x = old_pos.x as usize;
+
+            let old_idx = y * w + x;
+            if let Some(old_cell) = self.buffer.get_mut(old_idx) {
+                let style = self.cursor_shape.hide(old_cell.style());
+                old_cell.set_style(style);
+            }
+        }
+        self.cursor_position = Some(new_pos);
         Ok(())
     }
 }
-
-
 
 /// Returns a buffer based on the `TerminalGrid`.
 fn get_sized_buffer_from_terminal_grid(grid: &TerminalGrid) -> Vec<Cell> {
@@ -424,4 +427,30 @@ fn to_rgba(color: Color) -> u32 {
     };
 
     c | 0xff // alpha to opaque
+}
+
+fn cell_with_safe_colors(cell: &Cell) -> Cell {
+    let fg = if cell.fg == Color::Reset {
+        Color::White
+    } else {
+        cell.fg
+    };
+    
+    let bg = if cell.bg == Color::Reset {
+        Color::Black
+    } else {
+        cell.bg
+    };
+    
+    let mut c = cell.clone();
+    c.set_fg(fg);
+    c.set_bg(bg);
+    c
+}
+
+fn performance() -> Result<web_sys::Performance, Error> {
+    Ok(window()
+        .ok_or(Error::UnableToRetrieveWindow)?
+        .performance()
+        .unwrap())
 }

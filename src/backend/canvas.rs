@@ -238,7 +238,7 @@ impl CanvasBackend {
         }
         self.canvas.context.translate(5_f64, 5_f64)?;
 
-        // NOTE: The draw_* functions each traverses the buffer once, instead of
+        // NOTE: The draw_* functions each traverse the buffer once, instead of
         // traversing it once per cell; this is done to reduce the number of
         // WASM calls per cell.
         self.resolve_changed_cells(force_redraw);
