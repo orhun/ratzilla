@@ -101,6 +101,10 @@ impl WebGl2 {
             background_color,
         })
     }
+    
+    fn terminal_size(&self) -> (u16, u16) {
+        self.terminal_grid.terminal_size()
+    }
 }
 
 /// WebGl2 backend.
@@ -226,6 +230,18 @@ impl WebGl2Backend {
         Ok(())
     }
 
+    fn draw_cursor(&mut self, pos: Position) -> IoResult<()> {
+        let w = self.context.terminal_size().0 as usize;
+        let idx = pos.y as usize * w + pos.x as usize;
+        
+        if idx < self.buffer.len() {
+            let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
+            self.buffer[idx].set_style(cursor_style);
+        }
+        
+        Ok(())
+    }
+
     fn measure_begin(&self, label: &str) {
         if let Some(performance) = &self.performance {
             performance.mark(label)
@@ -290,30 +306,23 @@ impl Backend for WebGl2Backend {
         for (x, y, received_cell) in content {
             let (x, y) = (x as usize, y as usize);
 
-            let c = &mut self.buffer[y * w + x];
-            sync_required |= c != received_cell;
-            *c = cell_with_safe_colors(received_cell);
+            let current_cell = &mut self.buffer[y * w + x];
+            let new_cell = cell_with_safe_colors(received_cell);
+            sync_required |= current_cell != &new_cell;
+            *current_cell = new_cell;
         }
         self.cell_data_pending_upload = sync_required;
         self.measure_end("update-cell-content");
         
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
-            self.cell_data_pending_upload = true;
-
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-
-            let idx = y * w + x;
-            if idx < self.buffer.len() {
-                let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
-                self.buffer[idx].set_style(cursor_style);
-            }
+            self.draw_cursor(pos)?;
         }
 
         Ok(())
     }
 
+    
     /// Flush the content to the screen.
     ///
     /// This function is called after the [`CanvasBackend::draw`] function to
