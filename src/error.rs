@@ -31,6 +31,14 @@ pub enum Error {
     /// JS value error.
     #[error("JS value error: {0:?}")]
     JsValue(wasm_bindgen::JsValue),
+    
+    /// WebGL2Backend error.
+    #[error("WebGL2Backend error: {0}")]
+    WebGl2Error(String), // todo: probably rethink this
+    
+    /// Failed to retrieve a HTML/js component, such as `Performance`.
+    #[error("Failed to retrieve component: {0}")]
+    UnableToRetrieveComponent(&'static str),
 }
 
 /// Convert [`wasm_bindgen::JsValue`] to [`Error`].

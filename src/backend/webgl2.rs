@@ -9,7 +9,7 @@ use ratatui::{
 use std::io::Result as IoResult;
 use std::mem::swap;
 use term_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
-use web_sys::{console, js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
+use web_sys::{js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -39,7 +39,7 @@ impl WebGl2BackendOptions {
     }
 }
 
-/// WebGl2 renderer.
+/// WebGl2 renderer and context.
 #[derive(Debug)]
 struct WebGl2 {
     /// The WebGL2 renderer.
@@ -75,25 +75,12 @@ impl WebGl2 {
         );
         parent_element.append_child(&element)?;
 
-        console::time_with_label("create renderer");
-        let renderer = Renderer::create_with_canvas(canvas)
-            .expect("Unable to create WebGL2 renderer");
-
-        console::time_end_with_label("create renderer");
-
-        console::time_with_label("create font-atlas");
-        let font_atlas = FontAtlas::load_default(renderer.gl()).expect("Unable to load font");
-        console::time_end_with_label("create font-atlas");
-
-        console::time_with_label("create terminal grid");
+        let renderer = Renderer::create_with_canvas(canvas)?;
         let terminal_grid = TerminalGrid::new(
             renderer.gl(),
-            font_atlas,
+            FontAtlas::load_default(renderer.gl())?,
             renderer.canvas_size(),
-        ).expect("Unable to create terminal grid");
-        console::time_end_with_label("create terminal grid");
-
-        terminal_grid.upload_ubo_data(renderer.gl());
+        )?;
 
         Ok(Self {
             terminal_grid,
@@ -221,7 +208,7 @@ impl WebGl2Backend {
             let terminal = &mut self.context.terminal_grid;
             let cells = self.buffer.iter().map(cell_data);
             
-            terminal.update_cells(gl, cells).expect("Unable to update cells");
+            terminal.update_cells(gl, cells)?;
             
             self.cell_data_pending_upload = false;
         }
@@ -245,14 +232,27 @@ impl WebGl2Backend {
     fn measure_begin(&self, label: &str) {
         if let Some(performance) = &self.performance {
             performance.mark(label)
-                .unwrap();
+                .unwrap_or_default();
         }
     }
 
     fn measure_end(&self, label: &str) {
         if let Some(performance) = &self.performance {
             performance.measure_with_start_mark(label, label)
-                .unwrap();
+                .unwrap_or_default();
+        }
+    }
+}
+
+/// Converts a [`term_renderer::Error`] into a [`Error`].
+impl From<term_renderer::Error> for Error {
+    fn from(value: term_renderer::Error) -> Self {
+        use term_renderer::Error::*;
+        match value {
+            Initialization(s) 
+            | Shader(s) 
+            | Resource(s) 
+            | Data(s) => Error::WebGl2Error(s),
         }
     }
 }
@@ -463,7 +463,7 @@ fn performance() -> Result<web_sys::Performance, Error> {
     Ok(window()
         .ok_or(Error::UnableToRetrieveWindow)?
         .performance()
-        .unwrap())
+        .ok_or(Error::UnableToRetrieveComponent("Performance"))?)
 }
 
 fn indexed_to_rgb(index: u8) -> u32 {
