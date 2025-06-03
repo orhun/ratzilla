@@ -1,3 +1,4 @@
+use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,
@@ -9,8 +10,6 @@ use ratatui::{
 use std::io::Result as IoResult;
 use std::mem::swap;
 use term_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
-use web_sys::{js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
-use crate::backend::elements::{get_document, get_element_by_id_or_body};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -19,6 +18,8 @@ pub struct WebGl2BackendOptions {
     grid_id: Option<String>,
     /// Override the automatically detected size.
     size: Option<(u32, u32)>,
+    /// Measure performance using the `performance` API.
+    measure_performance: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -54,27 +55,12 @@ struct WebGl2 {
 impl WebGl2 {
     /// Constructs a new [`Canvas`].
     fn new(
-        document: web_sys::Document,
         parent_element: web_sys::Element,
         width: u32,
         height: u32,
         background_color: Color,
     ) -> Result<Self, Error> {
-        let element = document.create_element("canvas")?;
-        let canvas = element
-            .clone()
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .map_err(|_| ())
-            .expect("Unable to cast canvas element");
-        canvas.set_width(width);
-        canvas.set_height(height);
-        let context_options = Map::new();
-        context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
-        context_options.set(
-            &JsValue::from_str("desynchronized"),
-            &Boolean::from(JsValue::TRUE),
-        );
-        parent_element.append_child(&element)?;
+        let canvas = create_canvas_in_element(&parent_element, width, height)?;
 
         let renderer = Renderer::create_with_canvas(canvas)?;
         let terminal_grid = TerminalGrid::new(
@@ -133,7 +119,11 @@ impl WebGl2Backend {
 
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(options: WebGl2BackendOptions) -> Result<Self, Error> {
-        let document = get_document()?;
+        let performance = if options.measure_performance {
+            Some(performance()?)
+        } else {
+            None
+        };
 
         // Parent element of canvas (uses <body> unless specified)
         let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
@@ -142,8 +132,7 @@ impl WebGl2Backend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let context = WebGl2::new(document, parent, width, height, Color::Black)?;
-
+        let context = WebGl2::new(parent, width, height, Color::Black)?;
         let buffer = get_sized_buffer_from_terminal_grid(&context.terminal_grid);
         Ok(Self {
             buffer,
@@ -152,7 +141,7 @@ impl WebGl2Backend {
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
-            performance: Some(performance()?), 
+            performance,
         })
     }
 
@@ -173,27 +162,6 @@ impl WebGl2Backend {
         self
     }
 
-    /// Enable or disable debug mode to draw cells with a specified color.
-    ///
-    /// The format of the color is the same as the CSS color format, e.g.:
-    /// - `#666`
-    /// - `#ff0000`
-    /// - `red`
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ratzilla::WebGl2Backend;
-    /// let mut backend = WebGl2Backend::new().unwrap();
-    ///
-    /// backend.set_debug_mode(Some("#666"));
-    /// backend.set_debug_mode(Some("red"));
-    /// ```
-    pub fn set_debug_mode<T: Into<String>>(&mut self, color: Option<T>) {
-        // todo: alternate grid shader
-        self.debug_mode = color.map(Into::into);
-    }
-
     // Compare the current buffer to the previous buffer and updates the canvas
     // accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
@@ -212,6 +180,7 @@ impl WebGl2Backend {
         Ok(())
     }
 
+    /// Draws the cursor at the specified position. 
     fn draw_cursor(&mut self, pos: Position) -> IoResult<()> {
         let w = self.context.terminal_size().0 as usize;
         let idx = pos.y as usize * w + pos.x as usize;
@@ -224,6 +193,7 @@ impl WebGl2Backend {
         Ok(())
     }
 
+    /// Measures the beginning of a performance mark.
     fn measure_begin(&self, label: &str) {
         if let Some(performance) = &self.performance {
             performance.mark(label)
@@ -231,6 +201,7 @@ impl WebGl2Backend {
         }
     }
 
+    /// Measures the end of a performance mark.
     fn measure_end(&self, label: &str) {
         if let Some(performance) = &self.performance {
             performance.measure_with_start_mark(label, label)
@@ -421,13 +392,6 @@ fn cell_with_safe_colors(cell: &Cell) -> Cell {
     c.set_fg(fg);
     c.set_bg(bg);
     c
-}
-
-fn performance() -> Result<web_sys::Performance, Error> {
-    Ok(window()
-        .ok_or(Error::UnableToRetrieveWindow)?
-        .performance()
-        .ok_or(Error::UnableToRetrieveComponent("Performance"))?)
 }
 
 fn indexed_to_rgb(index: u8) -> u32 {

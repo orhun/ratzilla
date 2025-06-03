@@ -4,10 +4,13 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
+use web_sys::js_sys::{Boolean, Map};
+use web_sys::wasm_bindgen::JsCast;
 use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
+use crate::backend::elements::{get_document, get_window};
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -169,4 +172,31 @@ pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Ve
     let width = canvas.client_width() as u16 / 10_u16;
     let height = canvas.client_height() as u16 / 19_u16;
     vec![vec![Cell::default(); width as usize]; height as usize]
+}
+
+/// Returns the performance object from the window.
+pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
+    Ok(get_window()?
+        .performance()
+        .ok_or(Error::UnableToRetrieveComponent("Performance"))?)
+}
+
+pub(crate) fn create_canvas_in_element(
+    parent: &web_sys::Element,
+    width: u32,
+    height: u32,
+) -> Result<HtmlCanvasElement, Error> {
+    let element = get_document()?.create_element("canvas")?;
+    
+    let canvas = element
+        .clone()
+        .dyn_into::<HtmlCanvasElement>()
+        .map_err(|_| ())
+        .expect("Unable to cast canvas element");
+    canvas.set_width(width);
+    canvas.set_height(height);
+    
+    parent.append_child(&element)?;
+    
+    Ok(canvas)
 }
