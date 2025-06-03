@@ -9,7 +9,7 @@ use ratatui::{
 };
 use std::io::Result as IoResult;
 use std::mem::swap;
-use term_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
+use beamterm_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -211,9 +211,9 @@ impl WebGl2Backend {
 }
 
 /// Converts a [`term_renderer::Error`] into a [`Error`].
-impl From<term_renderer::Error> for Error {
-    fn from(value: term_renderer::Error) -> Self {
-        use term_renderer::Error::*;
+impl From<beamterm_renderer::Error> for Error {
+    fn from(value: beamterm_renderer::Error) -> Self {
+        use beamterm_renderer::Error::*;
         match value {
             Initialization(s) 
             | Shader(s) 
