@@ -10,6 +10,7 @@ use std::io::Result as IoResult;
 use std::mem::swap;
 use term_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 use web_sys::{js_sys::{Boolean, Map}, wasm_bindgen::{JsCast, JsValue}, window};
+use crate::backend::elements::{get_document, get_element_by_id_or_body};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -132,16 +133,10 @@ impl WebGl2Backend {
 
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(options: WebGl2BackendOptions) -> Result<Self, Error> {
-        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
-        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+        let document = get_document()?;
 
         // Parent element of canvas (uses <body> unless specified)
-        let parent = match options.grid_id.as_ref() {
-            Some(id) => document
-                .get_element_by_id(id)
-                .ok_or(Error::UnableToRetrieveBody)?,
-            None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
-        };
+        let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
         let (width, height) = options
             .size
@@ -505,29 +500,29 @@ fn cell_data(cell: &Cell) -> CellData {
 ///
 /// # Performance Optimization
 /// This function uses bitwise operations instead of individual `contains()` checks.
-/// Combined with the optimizations in [`glyph_effect()`], this provides a ~30% 
-/// performance improvement for the entire [`cell_data()`] function. 
+/// Combined with the optimizations in [`glyph_effect()`], this provides a ~30%
+/// performance improvement for the entire [`cell_data()`] function.
 ///
 /// # Bit Layout Reference
-/// 
+///
 /// ```plain
 /// Modifier bits:     0000_0000_0000_0001  (BOLD at bit 0)
 ///                    0000_0000_0000_0100  (ITALIC at bit 2)
 ///
 /// FontStyle result:  0000_0010_0000_0000  (Bold as bit 9)
 ///                    0000_0100_0000_0000  (Italic as bit 10)
-/// 
-/// Shift operations:  bit 0 << 9 = bit 9 
+///
+/// Shift operations:  bit 0 << 9 = bit 9
 ///                    bit 2 << 8 = bit 10
 /// ```
 fn font_style(cell: &Cell) -> FontStyle {
     let mut style = 0;
-    
+
     const _: () = {
         // confirming all bit positions at compile-time
         assert!(Modifier::BOLD.bits() == 1u16 << 0);
         assert!(Modifier::ITALIC.bits() == 1u16 << 2);
-        
+
         assert!(FontStyle::Bold as u16 == 0x0200);
         assert!(FontStyle::Italic as u16 == 0x0400);
     };
@@ -564,7 +559,7 @@ fn glyph_effect(cell: &Cell) -> GlyphEffect {
         // confirming all bit positions at compile-time
         assert!(Modifier::UNDERLINED.bits() == 1u16 << 3);
         assert!(Modifier::CROSSED_OUT.bits() == 1u16 << 8);
-        
+
         assert!(GlyphEffect::Underline as u16 == 1u16 << 12);
         assert!(GlyphEffect::Strikethrough as u16 == 1u16 << 13);
     };

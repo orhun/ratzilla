@@ -12,6 +12,7 @@ use web_sys::{
 };
 
 use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::backend::elements::get_element_by_id_or_body;
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -109,12 +110,7 @@ impl DomBackend {
             prev_buffer: vec![],
             cells: vec![],
             grid: document.create_element("div")?,
-            grid_parent: match options.grid_id.as_ref() {
-                Some(id) => document
-                    .get_element_by_id(id)
-                    .ok_or(Error::UnableToRetrieveBody)?,
-                None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
-            },
+            grid_parent: get_element_by_id_or_body(options.grid_id.as_ref())?,
             options,
             window,
             document,

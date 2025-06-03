@@ -20,6 +20,10 @@ pub enum Error {
     /// This error occurs when `document.body()` returns `None`.
     #[error("Unable to retrieve body")]
     UnableToRetrieveBody,
+    
+    /// Unable to retrieve HTML element by ID.
+    #[error("Unable to retrieve element: {0}")]
+    UnableToRetrieveElementById(String),
 
     /// Unable to retrieve canvas context.
     ///

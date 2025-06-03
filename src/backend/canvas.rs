@@ -13,8 +13,8 @@ use ratatui::{
 use web_sys::{
     js_sys::{Boolean, Map},
     wasm_bindgen::{JsCast, JsValue},
-    window,
 };
+use crate::backend::elements::{get_document, get_element_by_id_or_body};
 
 /// Width of a single cell.
 ///
@@ -156,16 +156,10 @@ impl CanvasBackend {
 
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(options: CanvasBackendOptions) -> Result<Self, Error> {
-        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
-        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+        let document = get_document()?;
 
         // Parent element of canvas (uses <body> unless specified)
-        let parent = match options.grid_id.as_ref() {
-            Some(id) => document
-                .get_element_by_id(id)
-                .ok_or(Error::UnableToRetrieveBody)?,
-            None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
-        };
+        let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
         let (width, height) = options
             .size
