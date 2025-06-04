@@ -10,6 +10,7 @@ use ratatui::{
 };
 use std::io::Result as IoResult;
 use std::mem::swap;
+use ratatui::style::Style;
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -299,7 +300,11 @@ impl Backend for WebGl2Backend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        // todo: clear canvas
+        let clear_cell: Cell = Cell::default()
+            .set_style(Style::default().fg(Color::White).bg(Color::Black))
+            .clone();
+        
+        self.buffer.fill(clear_cell);
         Ok(())
     }
 
@@ -309,7 +314,14 @@ impl Backend for WebGl2Backend {
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        unimplemented!()
+        let (cols, rows) = self.context.terminal_grid.terminal_size();
+        let (w, h) = self.context.renderer.canvas_size();
+        
+        Ok(WindowSize {
+            columns_rows: Size::new(cols, rows),
+            pixels: Size::new(w as _, h as _),
+            
+        })
     }
 
     fn get_cursor_position(&mut self) -> IoResult<Position> {
@@ -460,7 +472,7 @@ fn cell_data(cell: &Cell) -> CellData {
 /// Extracts glyph styling bits from cell modifiers.
 ///
 /// # Performance Optimization
-/// Bitwise operations are instead of individual `contains()` checks,
+/// Bitwise operations are used instead of individual `contains()` checks.
 /// This provides a ~50% performance improvement over the naive approach.
 ///
 /// # Bit Layout Reference
