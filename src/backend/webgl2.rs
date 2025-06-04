@@ -178,6 +178,8 @@ impl WebGl2Backend {
         // resize the buffer if needed
         let new_size = self.context.terminal_size();
         if new_size != old_size {
+            self.cell_data_pending_upload = true;
+            
             let cells = &self.buffer;
             self.buffer = resize_cell_grid(cells, old_size, new_size);
         }
