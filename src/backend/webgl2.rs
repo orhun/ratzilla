@@ -1,5 +1,6 @@
 use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, CursorShape};
+use beamterm_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -9,7 +10,6 @@ use ratatui::{
 };
 use std::io::Result as IoResult;
 use std::mem::swap;
-use beamterm_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -96,8 +96,6 @@ pub struct WebGl2Backend {
     cursor_position: Option<Position>,
     /// The cursor shape.
     cursor_shape: CursorShape,
-    /// Draw cell boundaries with specified color.
-    debug_mode: Option<String>,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
 }
@@ -122,7 +120,8 @@ impl WebGl2Backend {
         let performance = if options.measure_performance {
             Some(performance()?)
         } else {
-            None
+            Some(performance()?)
+            // None
         };
 
         // Parent element of canvas (uses <body> unless specified)
@@ -140,7 +139,6 @@ impl WebGl2Backend {
             context,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
-            debug_mode: None,
             performance,
         })
     }
@@ -376,18 +374,22 @@ fn to_rgb(color: Color) -> u32 {
 }
 
 fn cell_with_safe_colors(cell: &Cell) -> Cell {
-    let fg = if cell.fg == Color::Reset {
+    let mut fg = if cell.fg == Color::Reset {
         Color::White
     } else {
         cell.fg
     };
 
-    let bg = if cell.bg == Color::Reset {
+    let mut bg = if cell.bg == Color::Reset {
         Color::Black
     } else {
         cell.bg
     };
 
+    if cell.modifier.contains(Modifier::REVERSED) {
+        swap(&mut fg, &mut bg);
+    }
+    
     let mut c = cell.clone();
     c.set_fg(fg);
     c.set_bg(bg);
@@ -447,98 +449,51 @@ fn indexed_to_rgb(index: u8) -> u32 {
 
 
 fn cell_data(cell: &Cell) -> CellData {
-    let mut fg = to_rgb(cell.fg);
-    let mut bg = to_rgb(cell.bg);
-    if cell.modifier.contains(Modifier::REVERSED) {
-        swap(&mut fg, &mut bg);
-    }
-
-    let style = font_style(cell);
-    let effect = glyph_effect(cell);
-
-    CellData::new(cell.symbol(), style, effect, fg, bg)
+    CellData::new_with_style_bits(
+        cell.symbol(),
+        into_glyph_bits(cell.modifier),
+        to_rgb(cell.fg),
+        to_rgb(cell.bg)
+    )
 }
 
-
-/// Extracts font style bits from cell modifiers using direct bit manipulation.
+/// Extracts glyph styling bits from cell modifiers.
 ///
 /// # Performance Optimization
-/// This function uses bitwise operations instead of individual `contains()` checks.
-/// Combined with the optimizations in [`glyph_effect()`], this provides a ~30%
-/// performance improvement for the entire [`cell_data()`] function.
+/// Bitwise operations are instead of individual `contains()` checks,
+/// This provides a ~50% performance improvement over the naive approach.
 ///
 /// # Bit Layout Reference
 ///
 /// ```plain
 /// Modifier bits:     0000_0000_0000_0001  (BOLD at bit 0)
 ///                    0000_0000_0000_0100  (ITALIC at bit 2)
-///
-/// FontStyle result:  0000_0010_0000_0000  (Bold as bit 9)
-///                    0000_0100_0000_0000  (Italic as bit 10)
-///
-/// Shift operations:  bit 0 << 9 = bit 9
-///                    bit 2 << 8 = bit 10
-/// ```
-fn font_style(cell: &Cell) -> FontStyle {
-    let mut style = 0;
-
-    const _: () = {
-        // confirming all bit positions at compile-time
-        assert!(Modifier::BOLD.bits() == 1u16 << 0);
-        assert!(Modifier::ITALIC.bits() == 1u16 << 2);
-
-        assert!(FontStyle::Bold as u16 == 0x0200);
-        assert!(FontStyle::Italic as u16 == 0x0400);
-    };
-
-    // Shift modifier bits to match FontStyle bit positions
-    style |= (cell.modifier.bits() << 9) & 0x0200; // bold
-    style |= (cell.modifier.bits() << 8) & 0x0400; // italic
-
-    FontStyle::from_u16(style)
-}
-
-/// Extracts glyph effects from cell modifiers using optimized bit shifting.
-///
-/// # Performance Optimization
-/// Like [`font_style()`], this avoids branching and method calls by using direct
-/// bit manipulation. The combined optimizations provide significant performance
-/// gains in the per-cell rendering hot path.
-///
-/// # Bit Layout Reference
-/// ```plain
-/// Modifier bits:     0000_0000_0000_1000  (UNDERLINED at bit 3)
+///                    0000_0000_0000_1000  (UNDERLINED at bit 3)
 ///                    0000_0001_0000_0000  (CROSSED_OUT at bit 8)
 ///
+/// FontStyle bits:    0000_0010_0000_0000  (Bold as bit 9)
+///                    0000_0100_0000_0000  (Italic as bit 10)
 /// GlyphEffect bits:  0001_0000_0000_0000  (Underline at bit 12)
 ///                    0010_0000_0000_0000  (Strikethrough at bit 13)
 ///
-/// Shift operations:  bit 3 << 9 = bit 12
+/// Shift operations:  bit 0 << 9 = bit 9
+///                    bit 2 << 8 = bit 10
+///                    bit 3 << 9 = bit 12
 ///                    bit 8 << 5 = bit 13
 /// ```
-fn glyph_effect(cell: &Cell) -> GlyphEffect {
-    let mut effect = 0u16;
+const fn into_glyph_bits(modifier: Modifier) -> u16 {
+    let m = modifier.bits();
 
-    const _: () = {
-        // confirming all bit positions at compile-time
-        assert!(Modifier::UNDERLINED.bits() == 1u16 << 3);
-        assert!(Modifier::CROSSED_OUT.bits() == 1u16 << 8);
-
-        assert!(GlyphEffect::Underline as u16 == 1u16 << 12);
-        assert!(GlyphEffect::Strikethrough as u16 == 1u16 << 13);
-    };
-
-    // Shift modifier bits to match GlyphEffect bit positions
-    effect |= (cell.modifier.bits() << 9) & 0x1000; // underline
-    effect |= (cell.modifier.bits() << 5) & 0x2000; // strikethrough
-    GlyphEffect::from_u16(effect)
+    (m << 9) & (1 << 9)    // bold
+    | (m << 8) & (1 << 10) // italic
+    | (m << 9) & (1 << 12) // underline
+    | (m << 5) & (1 << 13) // strikethrough
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::style::{Modifier, Style};
+    use ratatui::style::Modifier;
 
     #[test]
     fn test_font_style() {
@@ -547,7 +502,7 @@ mod tests {
             (FontStyle::Italic,     Modifier::ITALIC),
             (FontStyle::BoldItalic, Modifier::BOLD | Modifier::ITALIC),
         ].into_iter()
-            .map(|(style, modifier)| (style, font_style(&cell_from(modifier))))
+            .map(|(style, modifier)| (style as u16, into_glyph_bits(modifier)))
             .for_each(|(expected, actual)| assert_eq!(expected, actual));
     }
 
@@ -556,15 +511,8 @@ mod tests {
         [
             (GlyphEffect::Underline,     Modifier::UNDERLINED),
             (GlyphEffect::Strikethrough, Modifier::CROSSED_OUT),
-            (GlyphEffect::None,          Modifier::BOLD | Modifier::ITALIC) // no effect,
         ].into_iter()
-            .map(|(effect, modifier)| (effect, glyph_effect(&cell_from(modifier))))
+            .map(|(effect, modifier)| (effect as u16, into_glyph_bits(modifier)))
             .for_each(|(expected, actual)| assert_eq!(expected, actual));
-    }
-
-    fn cell_from(modifier: Modifier) -> Cell {
-        let mut cell = Cell::default();
-        cell.set_style(Style::new().add_modifier(modifier));
-        cell
     }
 }

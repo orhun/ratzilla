@@ -1,16 +1,15 @@
+use crate::backend::elements::{get_document, get_window};
+use crate::{
+    error::Error,
+    utils::{get_screen_size, get_window_size, is_mobile},
+};
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
-use web_sys::js_sys::{Boolean, Map};
 use web_sys::wasm_bindgen::JsCast;
-use crate::{
-    error::Error,
-    utils::{get_screen_size, get_window_size, is_mobile},
-};
-use crate::backend::elements::{get_document, get_window};
+use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
