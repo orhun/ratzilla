@@ -1,3 +1,4 @@
+use std::cmp::min;
 use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, CursorShape};
 use beamterm_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
@@ -99,6 +100,7 @@ pub struct WebGl2Backend {
     cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
+
 }
 
 impl WebGl2Backend {
@@ -161,6 +163,28 @@ impl WebGl2Backend {
         self
     }
 
+    /// Sets the canvas viewport and projection, reconfigures the terminal grid.
+    pub fn on_canvas_resize(
+        &mut self,
+    ) -> Result<(), Error> {
+        let size_px = self.context.renderer.canvas_size();
+        let old_size = self.context.terminal_size();
+
+        // resize the terminal grid and viewport
+        let gl = self.context.renderer.gl();
+        self.context.terminal_grid.resize(gl, size_px)?;
+        self.context.renderer.resize(size_px.0, size_px.1);
+
+        // resize the buffer if needed
+        let new_size = self.context.terminal_size();
+        if new_size != old_size {
+            let cells = &self.buffer;
+            self.buffer = resize_cell_grid(cells, old_size, new_size);
+        }
+
+        Ok(())
+    }
+
     // Compare the current buffer to the previous buffer and updates the canvas
     // accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
@@ -175,6 +199,25 @@ impl WebGl2Backend {
             self.cell_data_pending_upload = false;
         }
         self.measure_end("update-grid");
+
+        Ok(())
+    }
+
+    /// Checks if the canvas size matches the display size and resizes it if necessary.
+    fn canvas_resize_check(&mut self) -> Result<(), Error> {
+        let canvas = self.context.renderer.canvas();
+        let display_width = canvas.client_width() as u32;
+        let display_height = canvas.client_height() as u32;
+
+        let buffer_width = canvas.width();
+        let buffer_height = canvas.height();
+
+        if display_width != buffer_width || display_height != buffer_height {
+            canvas.set_width(display_width);
+            canvas.set_height(display_height);
+
+            self.on_canvas_resize()?;
+        }
 
         Ok(())
     }
@@ -207,6 +250,32 @@ impl WebGl2Backend {
                 .unwrap_or_default();
         }
     }
+}
+
+fn resize_cell_grid(
+    cells: &[Cell],
+    old_size: (u16, u16),
+    new_size: (u16, u16),
+) -> Vec<Cell> {
+    let old_size = (old_size.0 as usize, old_size.1 as usize);
+    let new_size = (new_size.0 as usize, new_size.1 as usize);
+
+    let new_len = new_size.0 * new_size.1;
+
+    let mut new_cells = Vec::with_capacity(new_len);
+    for _ in 0..new_len {
+        new_cells.push(default_cell());
+    }
+
+    for y in 0..min(old_size.1, new_size.1) {
+        for x in 0..min(old_size.0, new_size.0) {
+            let new_idx = y * new_size.0 + x;
+            let old_idx = y * old_size.0 + x;
+            new_cells[new_idx] = cells[old_idx].clone();
+        }
+    }
+
+    new_cells
 }
 
 /// Converts a [`term_renderer::Error`] into a [`Error`].
@@ -262,6 +331,7 @@ impl Backend for WebGl2Backend {
     /// This function is called after the [`CanvasBackend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
+        self.canvas_resize_check()?;
         self.update_grid()?;
         Ok(())
     }
@@ -286,25 +356,8 @@ impl Backend for WebGl2Backend {
         Ok(())
     }
 
-    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {
-        if let Some(pos) = self.cursor_position {
-            Ok((pos.x, pos.y))
-        } else {
-            Ok((0, 0)) // Default position if cursor is not set
-        }
-    }
-
-    fn set_cursor(&mut self, x: u16, y: u16) -> IoResult<()> {
-        self.cursor_position = Some(Position::new(x, y));
-        Ok(())
-    }
-
     fn clear(&mut self) -> IoResult<()> {
-        let clear_cell: Cell = Cell::default()
-            .set_style(Style::default().fg(Color::White).bg(Color::Black))
-            .clone();
-        
-        self.buffer.fill(clear_cell);
+        self.buffer.fill(default_cell());
         Ok(())
     }
 
@@ -316,11 +369,11 @@ impl Backend for WebGl2Backend {
     fn window_size(&mut self) -> IoResult<WindowSize> {
         let (cols, rows) = self.context.terminal_grid.terminal_size();
         let (w, h) = self.context.renderer.canvas_size();
-        
+
         Ok(WindowSize {
             columns_rows: Size::new(cols, rows),
             pixels: Size::new(w as _, h as _),
-            
+
         })
     }
 
@@ -401,7 +454,7 @@ fn cell_with_safe_colors(cell: &Cell) -> Cell {
     if cell.modifier.contains(Modifier::REVERSED) {
         swap(&mut fg, &mut bg);
     }
-    
+
     let mut c = cell.clone();
     c.set_fg(fg);
     c.set_bg(bg);
@@ -457,6 +510,12 @@ fn indexed_to_rgb(index: u8) -> u32 {
             (gray << 16) | (gray << 8) | gray
         }
     }
+}
+
+fn default_cell() -> Cell {
+    Cell::default()
+        .set_style(Style::default().fg(Color::White).bg(Color::Black))
+        .clone()
 }
 
 
