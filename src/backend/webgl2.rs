@@ -249,28 +249,6 @@ impl WebGl2Backend {
     }
 }
 
-fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
-    let old_size = (old_size.0 as usize, old_size.1 as usize);
-    let new_size = (new_size.0 as usize, new_size.1 as usize);
-
-    let new_len = new_size.0 * new_size.1;
-
-    let mut new_cells = Vec::with_capacity(new_len);
-    for _ in 0..new_len {
-        new_cells.push(default_cell());
-    }
-
-    for y in 0..min(old_size.1, new_size.1) {
-        for x in 0..min(old_size.0, new_size.0) {
-            let new_idx = y * new_size.0 + x;
-            let old_idx = y * old_size.0 + x;
-            new_cells[new_idx] = cells[old_idx].clone();
-        }
-    }
-
-    new_cells
-}
-
 /// Converts a [`term_renderer::Error`] into a [`Error`].
 impl From<beamterm_renderer::Error> for Error {
     fn from(value: beamterm_renderer::Error) -> Self {
@@ -393,6 +371,28 @@ impl Backend for WebGl2Backend {
         self.cursor_position = Some(new_pos);
         Ok(())
     }
+}
+
+fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
+    let old_size = (old_size.0 as usize, old_size.1 as usize);
+    let new_size = (new_size.0 as usize, new_size.1 as usize);
+
+    let new_len = new_size.0 * new_size.1;
+
+    let mut new_cells = Vec::with_capacity(new_len);
+    for _ in 0..new_len {
+        new_cells.push(default_cell());
+    }
+
+    for y in 0..min(old_size.1, new_size.1) {
+        for x in 0..min(old_size.0, new_size.0) {
+            let new_idx = y * new_size.0 + x;
+            let old_idx = y * old_size.0 + x;
+            new_cells[new_idx] = cells[old_idx].clone();
+        }
+    }
+
+    new_cells
 }
 
 /// Returns a buffer based on the `TerminalGrid`.
