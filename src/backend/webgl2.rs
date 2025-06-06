@@ -1,17 +1,17 @@
-use std::cmp::min;
-use crate::backend::elements::get_element_by_id_or_body;
-use crate::{backend::utils::*, error::Error, CursorShape};
+use crate::{
+    backend::{elements::get_element_by_id_or_body, utils::*},
+    error::Error,
+    CursorShape,
+};
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Color, Modifier},
+    style::{Color, Modifier, Style},
 };
-use std::io::Result as IoResult;
-use std::mem::swap;
-use ratatui::style::Style;
+use std::{cmp::min, io::Result as IoResult, mem::swap};
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -77,7 +77,7 @@ impl WebGl2 {
             background_color,
         })
     }
-    
+
     fn terminal_size(&self) -> (u16, u16) {
         self.terminal_grid.terminal_size()
     }
@@ -100,7 +100,6 @@ pub struct WebGl2Backend {
     cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
-
 }
 
 impl WebGl2Backend {
@@ -163,9 +162,7 @@ impl WebGl2Backend {
     }
 
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
-    pub fn on_canvas_resize(
-        &mut self,
-    ) -> Result<(), Error> {
+    pub fn on_canvas_resize(&mut self) -> Result<(), Error> {
         let size_px = self.context.renderer.canvas_size();
         let old_size = self.context.terminal_size();
 
@@ -178,7 +175,7 @@ impl WebGl2Backend {
         let new_size = self.context.terminal_size();
         if new_size != old_size {
             self.cell_data_pending_upload = true;
-            
+
             let cells = &self.buffer;
             self.buffer = resize_cell_grid(cells, old_size, new_size);
         }
@@ -194,9 +191,9 @@ impl WebGl2Backend {
             let gl = self.context.renderer.gl();
             let terminal = &mut self.context.terminal_grid;
             let cells = self.buffer.iter().map(cell_data);
-            
+
             terminal.update_cells(gl, cells)?;
-            
+
             self.cell_data_pending_upload = false;
         }
         self.measure_end("update-grid");
@@ -223,41 +220,37 @@ impl WebGl2Backend {
         Ok(())
     }
 
-    /// Draws the cursor at the specified position. 
+    /// Draws the cursor at the specified position.
     fn draw_cursor(&mut self, pos: Position) -> IoResult<()> {
         let w = self.context.terminal_size().0 as usize;
         let idx = pos.y as usize * w + pos.x as usize;
-        
+
         if idx < self.buffer.len() {
             let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
             self.buffer[idx].set_style(cursor_style);
         }
-        
+
         Ok(())
     }
 
     /// Measures the beginning of a performance mark.
     fn measure_begin(&self, label: &str) {
         if let Some(performance) = &self.performance {
-            performance.mark(label)
-                .unwrap_or_default();
+            performance.mark(label).unwrap_or_default();
         }
     }
 
     /// Measures the end of a performance mark.
     fn measure_end(&self, label: &str) {
         if let Some(performance) = &self.performance {
-            performance.measure_with_start_mark(label, label)
+            performance
+                .measure_with_start_mark(label, label)
                 .unwrap_or_default();
         }
     }
 }
 
-fn resize_cell_grid(
-    cells: &[Cell],
-    old_size: (u16, u16),
-    new_size: (u16, u16),
-) -> Vec<Cell> {
+fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
     let old_size = (old_size.0 as usize, old_size.1 as usize);
     let new_size = (new_size.0 as usize, new_size.1 as usize);
 
@@ -284,10 +277,7 @@ impl From<beamterm_renderer::Error> for Error {
     fn from(value: beamterm_renderer::Error) -> Self {
         use beamterm_renderer::Error::*;
         match value {
-            Initialization(s) 
-            | Shader(s) 
-            | Resource(s) 
-            | Data(s) => Error::WebGl2Error(s),
+            Initialization(s) | Shader(s) | Resource(s) | Data(s) => Error::WebGl2Error(s),
         }
     }
 }
@@ -317,7 +307,7 @@ impl Backend for WebGl2Backend {
         }
         self.cell_data_pending_upload = sync_required;
         self.measure_end("update-cell-content");
-        
+
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
             self.draw_cursor(pos)?;
@@ -326,7 +316,6 @@ impl Backend for WebGl2Backend {
         Ok(())
     }
 
-    
     /// Flush the content to the screen.
     ///
     /// This function is called after the [`CanvasBackend::draw`] function to
@@ -374,7 +363,6 @@ impl Backend for WebGl2Backend {
         Ok(WindowSize {
             columns_rows: Size::new(cols, rows),
             pixels: Size::new(w as _, h as _),
-
         })
     }
 
@@ -433,7 +421,7 @@ fn to_rgb(color: Color) -> u32 {
         Color::LightMagenta => 0xFF00FF,
         Color::LightCyan => 0x00FFFF,
         Color::White => 0xFFFFFF,
-        Color::Indexed(code) => indexed_to_rgb(code)
+        Color::Indexed(code) => indexed_to_rgb(code),
     };
 
     c
@@ -497,7 +485,11 @@ fn indexed_to_rgb(index: u8) -> u32 {
             // Convert 0-5 range to 0-255 RGB
             // Values: 0 -> 0, 1 -> 95, 2 -> 135, 3 -> 175, 4 -> 215, 5 -> 255
             let to_rgb = |n: u8| -> u32 {
-                if n == 0 { 0 } else { 55 + 40 * n as u32 }
+                if n == 0 {
+                    0
+                } else {
+                    55 + 40 * n as u32
+                }
             };
 
             to_rgb(r) << 16 | to_rgb(g) << 8 | to_rgb(b)
@@ -519,13 +511,12 @@ fn default_cell() -> Cell {
         .clone()
 }
 
-
 fn cell_data(cell: &Cell) -> CellData {
     CellData::new_with_style_bits(
         cell.symbol(),
         into_glyph_bits(cell.modifier),
         to_rgb(cell.fg),
-        to_rgb(cell.bg)
+        to_rgb(cell.bg),
     )
 }
 
@@ -564,28 +555,30 @@ const fn into_glyph_bits(modifier: Modifier) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use beamterm_renderer::{FontStyle, GlyphEffect};
     use super::*;
+    use beamterm_renderer::{FontStyle, GlyphEffect};
     use ratatui::style::Modifier;
 
     #[test]
     fn test_font_style() {
         [
-            (FontStyle::Bold,       Modifier::BOLD),
-            (FontStyle::Italic,     Modifier::ITALIC),
+            (FontStyle::Bold, Modifier::BOLD),
+            (FontStyle::Italic, Modifier::ITALIC),
             (FontStyle::BoldItalic, Modifier::BOLD | Modifier::ITALIC),
-        ].into_iter()
-            .map(|(style, modifier)| (style as u16, into_glyph_bits(modifier)))
-            .for_each(|(expected, actual)| assert_eq!(expected, actual));
+        ]
+        .into_iter()
+        .map(|(style, modifier)| (style as u16, into_glyph_bits(modifier)))
+        .for_each(|(expected, actual)| assert_eq!(expected, actual));
     }
 
     #[test]
     fn test_glyph_effect() {
         [
-            (GlyphEffect::Underline,     Modifier::UNDERLINED),
+            (GlyphEffect::Underline, Modifier::UNDERLINED),
             (GlyphEffect::Strikethrough, Modifier::CROSSED_OUT),
-        ].into_iter()
-            .map(|(effect, modifier)| (effect as u16, into_glyph_bits(modifier)))
-            .for_each(|(expected, actual)| assert_eq!(expected, actual));
+        ]
+        .into_iter()
+        .map(|(effect, modifier)| (effect as u16, into_glyph_bits(modifier)))
+        .for_each(|(expected, actual)| assert_eq!(expected, actual));
     }
 }
