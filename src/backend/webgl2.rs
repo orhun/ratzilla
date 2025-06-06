@@ -41,6 +41,12 @@ impl WebGl2BackendOptions {
         self.size = Some(size);
         self
     }
+    
+    /// Enables frame-based measurements using the `performance` API.
+    pub fn measure_performance(mut self, measure: bool) -> Self {
+        self.measure_performance = measure;
+        self
+    }
 }
 
 /// WebGl2 renderer and context.
