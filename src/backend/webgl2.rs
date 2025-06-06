@@ -1,7 +1,7 @@
 use std::cmp::min;
 use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, CursorShape};
-use beamterm_renderer::{CellData, FontAtlas, FontStyle, GlyphEffect, Renderer, TerminalGrid};
+use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -123,8 +123,7 @@ impl WebGl2Backend {
         let performance = if options.measure_performance {
             Some(performance()?)
         } else {
-            Some(performance()?)
-            // None
+            None
         };
 
         // Parent element of canvas (uses <body> unless specified)
@@ -565,6 +564,7 @@ const fn into_glyph_bits(modifier: Modifier) -> u16 {
 
 #[cfg(test)]
 mod tests {
+    use beamterm_renderer::{FontStyle, GlyphEffect};
     use super::*;
     use ratatui::style::Modifier;
 
