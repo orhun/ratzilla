@@ -183,8 +183,7 @@ impl WebGl2Backend {
         Ok(())
     }
 
-    // Compare the current buffer to the previous buffer and updates the canvas
-    // accordingly.
+    // Synchronizes the terminal buffer with beamterm's terminal grid.
     fn update_grid(&mut self) -> Result<(), Error> {
         self.measure_begin("update-grid");
         if self.cell_data_pending_upload {
