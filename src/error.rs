@@ -20,7 +20,7 @@ pub enum Error {
     /// This error occurs when `document.body()` returns `None`.
     #[error("Unable to retrieve body")]
     UnableToRetrieveBody,
-    
+
     /// Unable to retrieve HTML element by ID.
     #[error("Unable to retrieve element: {0}")]
     UnableToRetrieveElementById(String),
@@ -35,11 +35,11 @@ pub enum Error {
     /// JS value error.
     #[error("JS value error: {0:?}")]
     JsValue(wasm_bindgen::JsValue),
-    
+
     /// WebGL2Backend error.
     #[error("WebGL2Backend error: {0}")]
     WebGl2Error(String), // todo: probably rethink this
-    
+
     /// Failed to retrieve a HTML/js component, such as `Performance`.
     #[error("Failed to retrieve component: {0}")]
     UnableToRetrieveComponent(&'static str),

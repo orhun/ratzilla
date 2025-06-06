@@ -1,5 +1,5 @@
-use web_sys::{window, Document, Window};
 use crate::error::Error;
+use web_sys::{window, Document, Window};
 
 pub(crate) fn get_document() -> Result<Document, Error> {
     get_window()?
@@ -21,5 +21,4 @@ pub(crate) fn get_element_by_id_or_body(id: Option<&String>) -> Result<web_sys::
             .ok_or(Error::UnableToRetrieveBody)
             .map(|body| body.into()),
     }
-    
 }

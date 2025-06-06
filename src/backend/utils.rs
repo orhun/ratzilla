@@ -180,13 +180,15 @@ pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
         .ok_or(Error::UnableToRetrieveComponent("Performance"))?)
 }
 
+/// Creates a new canvas element in the specified parent element with the
+/// given width and height.
 pub(crate) fn create_canvas_in_element(
     parent: &web_sys::Element,
     width: u32,
     height: u32,
 ) -> Result<HtmlCanvasElement, Error> {
     let element = get_document()?.create_element("canvas")?;
-    
+
     let canvas = element
         .clone()
         .dyn_into::<HtmlCanvasElement>()
@@ -194,8 +196,8 @@ pub(crate) fn create_canvas_in_element(
         .expect("Unable to cast canvas element");
     canvas.set_width(width);
     canvas.set_height(height);
-    
+
     parent.append_child(&element)?;
-    
+
     Ok(canvas)
 }
