@@ -41,4 +41,4 @@ ratatui = { version = "0.29", default-features = false, features = ["all-widgets
 console_error_panic_hook = "0.1.7"
 thiserror = "2.0.12"
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc", "std"] }
-beamterm-renderer = { path = "../webgl2/beamterm-renderer" }
+beamterm-renderer = { version = "0.1.1" }
