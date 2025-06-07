@@ -231,6 +231,7 @@ There is a Vercel deployment template available for Ratzilla [here](https://verc
 - <https://jetpham.com> - Conway's Game of Life
 - <https://map.apt-swarm.orca.toys> - Map of apt-swarm p2p locations
 - [TachyonFX FTL](https://junkdog.github.io/tachyonfx-ftl/) - DSL editor and previewer for TachyonFX effects
+- <https://emrecansuster.com> - Personal website of Emrecan Şuşter
 
 ## Acknowledgements
 
