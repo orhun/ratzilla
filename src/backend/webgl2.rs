@@ -15,7 +15,9 @@ use web_sys::console;
 pub struct WebGl2BackendOptions {
     /// The element ID.
     grid_id: Option<String>,
-    /// Override the automatically detected size.
+    /// Size of the render area.
+    ///
+    /// Overrides the automatically detected size if set.
     size: Option<(u32, u32)>,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
