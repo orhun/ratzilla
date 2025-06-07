@@ -308,7 +308,7 @@ impl From<beamterm_renderer::Error> for Error {
 }
 
 impl Backend for WebGl2Backend {
-    // Populates the buffer with the given content.
+    // Populates the buffer with the *updated* cell content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
@@ -321,16 +321,11 @@ impl Backend for WebGl2Backend {
         self.measure_end("webgl-render");
 
         self.measure_begin("sync-terminal-buffer");
-        let mut sync_required = false;
-        for (x, y, received_cell) in content {
+        for (x, y, updated_cell) in content {
             let (x, y) = (x as usize, y as usize);
-
-            let current_cell = &mut self.buffer[y * w + x];
-            let new_cell = cell_with_safe_colors(received_cell);
-            sync_required |= current_cell != &new_cell;
-            *current_cell = new_cell;
+            self.buffer[y * w + x] = cell_with_safe_colors(updated_cell);
         }
-        self.cell_data_pending_upload = sync_required;
+        self.cell_data_pending_upload = true;
         self.measure_end("sync-terminal-buffer");
 
         // Draw the cursor if set
