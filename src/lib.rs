@@ -25,5 +25,7 @@ pub use ratatui;
 // Re-export web_sys crate.
 pub use web_sys;
 
-pub use backend::{canvas::CanvasBackend, cursor::CursorShape, dom::DomBackend};
+pub use backend::{
+    canvas::CanvasBackend, cursor::CursorShape, dom::DomBackend, webgl2::WebGl2Backend,
+};
 pub use render::WebRenderer;

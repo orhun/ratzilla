@@ -13,7 +13,6 @@ use ratatui::{
 use web_sys::{
     js_sys::{Boolean, Map},
     wasm_bindgen::{JsCast, JsValue},
-    window,
 };
 
 /// Width of a single cell.
@@ -75,20 +74,13 @@ struct Canvas {
 impl Canvas {
     /// Constructs a new [`Canvas`].
     fn new(
-        document: web_sys::Document,
         parent_element: web_sys::Element,
         width: u32,
         height: u32,
         background_color: Color,
     ) -> Result<Self, Error> {
-        let element = document.create_element("canvas")?;
-        let canvas = element
-            .clone()
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .map_err(|_| ())
-            .expect("Unable to cast canvas element");
-        canvas.set_width(width);
-        canvas.set_height(height);
+        let canvas = create_canvas_in_element(&parent_element, width, height)?;
+
         let context_options = Map::new();
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
         context_options.set(
@@ -102,7 +94,7 @@ impl Canvas {
             .expect("Unable to cast canvas context");
         context.set_font("16px monospace");
         context.set_text_baseline("top");
-        parent_element.append_child(&element)?;
+
         Ok(Self {
             inner: canvas,
             context,
@@ -156,22 +148,14 @@ impl CanvasBackend {
 
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(options: CanvasBackendOptions) -> Result<Self, Error> {
-        let window = window().ok_or(Error::UnableToRetrieveWindow)?;
-        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-
         // Parent element of canvas (uses <body> unless specified)
-        let parent = match options.grid_id.as_ref() {
-            Some(id) => document
-                .get_element_by_id(id)
-                .ok_or(Error::UnableToRetrieveBody)?,
-            None => document.body().ok_or(Error::UnableToRetrieveBody)?.into(),
-        };
+        let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
         let (width, height) = options
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let canvas = Canvas::new(document, parent, width, height, Color::Black)?;
+        let canvas = Canvas::new(parent, width, height, Color::Black)?;
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
         Ok(Self {
@@ -238,7 +222,7 @@ impl CanvasBackend {
         }
         self.canvas.context.translate(5_f64, 5_f64)?;
 
-        // NOTE: The draw_* functions each traverses the buffer once, instead of
+        // NOTE: The draw_* functions each traverse the buffer once, instead of
         // traversing it once per cell; this is done to reduce the number of
         // WASM calls per cell.
         self.resolve_changed_cells(force_redraw);
