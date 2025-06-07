@@ -1,8 +1,4 @@
-use crate::{
-    backend::utils::*,
-    error::Error,
-    CursorShape,
-};
+use crate::{backend::utils::*, error::Error, CursorShape};
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
 use ratatui::{
     backend::WindowSize,
@@ -12,6 +8,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
+use web_sys::console;
 
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
@@ -89,9 +86,52 @@ impl WebGl2 {
     }
 }
 
-/// WebGl2 backend.
+/// WebGl2 backend for high-performance terminal rendering.
 ///
-/// This backend renders the buffer onto a HTML canvas element.
+/// This backend renders the terminal buffer onto an HTML canvas element using WebGL2
+/// and the beamterm renderer.
+///
+/// # Performance Measurement
+///
+/// The backend supports built-in performance profiling using the browser's Performance API.
+/// When enabled via [`WebGl2BackendOptions::measure_performance`], it tracks the duration
+/// of each operation:
+///
+/// | Label                  | Operation                                                   |
+/// |------------------------|-------------------------------------------------------------|
+/// | `sync-terminal-buffer` | Updating the internal buffer with cell changes from ratatui |
+/// | `upload-cells-to-gpu`  | Uploading changed cell data to GPU buffers                  |
+/// | `webgl-render`         | Executing the WebGL draw call to render the terminal        |
+///
+/// ## Viewing Performance Measurements
+///
+/// To view the performance measurements in your browser:
+///
+/// 1. Enable performance measurement when creating the backend
+/// 2. Open your browser's Developer Tools (F12 or Ctrl+Shift+I/J)
+/// 3. Navigate to the **Performance** tab
+/// 4. Collect measurements with the "Record" button, then stop recording
+/// 4. Zoom in on a frame and look for the **User Timing** section which will show:
+///    - Individual timing marks for each operation
+///    - Duration measurements between start and end of each operation
+///
+/// Alternatively, in the browser console, you can query measurements:
+/// ```javascript
+/// // View all measurements
+/// performance.getEntriesByType('measure')
+///
+/// // View specific operation
+/// performance.getEntriesByName('webgl-render')
+///
+/// // Calculate average time for last 100 measurements
+/// const avg = (name) => {
+///   const entries = performance.getEntriesByName(name).slice(-100);
+///   return entries.reduce((sum, e) => sum + e.duration, 0) / entries.length;
+/// };
+/// avg('webgl-render')
+/// avg('upload-cells-to-gpu')
+/// avg('sync-terminal-buffer')
+/// ```
 #[derive(Debug)]
 pub struct WebGl2Backend {
     /// Current buffer.
@@ -180,6 +220,8 @@ impl WebGl2Backend {
         // resize the buffer if needed
         let new_size = self.context.terminal_size();
         if new_size != old_size {
+            console::log_1(&format!("Resizing terminal to {}x{}", new_size.0, new_size.1).into());
+
             self.cell_data_pending_upload = true;
 
             let cells = &self.buffer;
@@ -191,7 +233,7 @@ impl WebGl2Backend {
 
     // Synchronizes the terminal buffer with beamterm's terminal grid.
     fn update_grid(&mut self) -> Result<(), Error> {
-        self.measure_begin("update-grid");
+        self.measure_begin("upload-cells-to-gpu");
         if self.cell_data_pending_upload {
             let gl = self.context.renderer.gl();
             let terminal = &mut self.context.terminal_grid;
@@ -201,7 +243,7 @@ impl WebGl2Backend {
 
             self.cell_data_pending_upload = false;
         }
-        self.measure_end("update-grid");
+        self.measure_end("upload-cells-to-gpu");
 
         Ok(())
     }
@@ -273,12 +315,12 @@ impl Backend for WebGl2Backend {
     {
         let w = self.context.terminal_grid.terminal_size().0 as usize;
 
-        self.measure_begin("draw-grid");
+        self.measure_begin("webgl-render");
         let terminal = &mut self.context.terminal_grid;
         self.context.renderer.render(terminal);
-        self.measure_end("draw-grid");
+        self.measure_end("webgl-render");
 
-        self.measure_begin("update-cell-content");
+        self.measure_begin("sync-terminal-buffer");
         let mut sync_required = false;
         for (x, y, received_cell) in content {
             let (x, y) = (x as usize, y as usize);
@@ -289,7 +331,7 @@ impl Backend for WebGl2Backend {
             *current_cell = new_cell;
         }
         self.cell_data_pending_upload = sync_required;
-        self.measure_end("update-cell-content");
+        self.measure_end("sync-terminal-buffer");
 
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {

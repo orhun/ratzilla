@@ -7,8 +7,10 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use web_sys::wasm_bindgen::JsCast;
-use web_sys::{wasm_bindgen::JsValue, window, Document, Element, HtmlCanvasElement, Window};
+use web_sys::{
+    wasm_bindgen::{JsCast, JsValue},
+    window, Document, Element, HtmlCanvasElement, Window,
+};
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -196,7 +198,6 @@ pub(crate) fn get_element_by_id_or_body(id: Option<&String>) -> Result<web_sys::
             .map(|body| body.into()),
     }
 }
-
 
 /// Returns the performance object from the window.
 pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
