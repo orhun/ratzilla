@@ -16,7 +16,7 @@ use ratzilla::{ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Widget, Wrap},
     Terminal,
-}, CanvasBackend, WebGl2Backend, WebRenderer};
+}, WebGl2Backend, WebRenderer};
 use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
