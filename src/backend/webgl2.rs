@@ -101,7 +101,7 @@ impl WebGl2 {
 ///
 /// | Label                  | Operation                                                   |
 /// |------------------------|-------------------------------------------------------------|
-/// | `sync-terminal-buffer` | Updating the internal buffer with cell changes from ratatui |
+/// | `sync-terminal-buffer` | Updating the internal buffer with cell changes from Ratatui |
 /// | `upload-cells-to-gpu`  | Uploading changed cell data to GPU buffers                  |
 /// | `webgl-render`         | Executing the WebGL draw call to render the terminal        |
 ///
