@@ -118,6 +118,7 @@ impl WebGl2 {
 ///    - Duration measurements between start and end of each operation
 ///
 /// Alternatively, in the browser console, you can query measurements:
+///
 /// ```javascript
 /// // View all measurements
 /// performance.getEntriesByType('measure')
