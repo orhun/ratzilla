@@ -211,7 +211,7 @@ impl WebGl2Backend {
     }
 
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
-    pub fn on_canvas_resize(&mut self) -> Result<(), Error> {
+    pub fn resize_canvas(&mut self) -> Result<(), Error> {
         let size_px = self.context.renderer.canvas_size();
         let old_size = self.context.terminal_size();
 
