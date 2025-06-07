@@ -11,7 +11,6 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
 
 /// Options for the [`DomBackend`].

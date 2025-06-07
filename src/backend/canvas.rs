@@ -2,7 +2,6 @@ use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
 use std::io::Result as IoResult;
 
-use crate::backend::elements::get_element_by_id_or_body;
 use crate::{backend::utils::*, error::Error, CursorShape};
 use ratatui::{
     backend::WindowSize,

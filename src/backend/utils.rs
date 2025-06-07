@@ -1,4 +1,3 @@
-use crate::backend::elements::{get_document, get_window};
 use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
@@ -9,7 +8,7 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::wasm_bindgen::JsCast;
-use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
+use web_sys::{wasm_bindgen::JsValue, window, Document, Element, HtmlCanvasElement, Window};
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -173,6 +172,32 @@ pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Ve
     vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
+/// Returns the document object from the window.
+pub(crate) fn get_document() -> Result<Document, Error> {
+    get_window()?
+        .document()
+        .ok_or(Error::UnableToRetrieveDocument)
+}
+
+/// Returns the window object.
+pub(crate) fn get_window() -> Result<Window, Error> {
+    window().ok_or(Error::UnableToRetrieveWindow)
+}
+
+/// Returns an element by its ID or the body element if no ID is provided.
+pub(crate) fn get_element_by_id_or_body(id: Option<&String>) -> Result<web_sys::Element, Error> {
+    match id {
+        Some(id) => get_document()?
+            .get_element_by_id(id)
+            .ok_or_else(|| Error::UnableToRetrieveElementById(id.to_string())),
+        None => get_document()?
+            .body()
+            .ok_or(Error::UnableToRetrieveBody)
+            .map(|body| body.into()),
+    }
+}
+
+
 /// Returns the performance object from the window.
 pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
     Ok(get_window()?
@@ -183,7 +208,7 @@ pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
 /// Creates a new canvas element in the specified parent element with the
 /// given width and height.
 pub(crate) fn create_canvas_in_element(
-    parent: &web_sys::Element,
+    parent: &Element,
     width: u32,
     height: u32,
 ) -> Result<HtmlCanvasElement, Error> {

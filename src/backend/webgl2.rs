@@ -1,5 +1,5 @@
 use crate::{
-    backend::{elements::get_element_by_id_or_body, utils::*},
+    backend::utils::*,
     error::Error,
     CursorShape,
 };
