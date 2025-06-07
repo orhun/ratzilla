@@ -338,7 +338,7 @@ impl Backend for WebGl2Backend {
 
     /// Flush the content to the screen.
     ///
-    /// This function is called after the [`CanvasBackend::draw`] function to
+    /// This function is called after the [`WebGl2Backend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         self.canvas_resize_check()?;
