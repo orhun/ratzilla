@@ -252,7 +252,7 @@ impl WebGl2Backend {
     }
 
     /// Checks if the canvas size matches the display size and resizes it if necessary.
-    fn canvas_resize_check(&mut self) -> Result<(), Error> {
+    fn check_canvas_resize(&mut self) -> Result<(), Error> {
         let canvas = self.context.renderer.canvas();
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
