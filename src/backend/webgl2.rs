@@ -58,7 +58,7 @@ struct WebGl2 {
 }
 
 impl WebGl2 {
-    /// Constructs a new [`Canvas`].
+    /// Constructs a new [`WebGl2`].
     fn new(
         parent_element: web_sys::Element,
         width: u32,
