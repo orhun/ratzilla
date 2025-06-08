@@ -298,16 +298,6 @@ impl WebGl2Backend {
     }
 }
 
-/// Converts a [`term_renderer::Error`] into a [`Error`].
-impl From<beamterm_renderer::Error> for Error {
-    fn from(value: beamterm_renderer::Error) -> Self {
-        use beamterm_renderer::Error::*;
-        match value {
-            Initialization(s) | Shader(s) | Resource(s) | Data(s) => Error::WebGl2Error(s),
-        }
-    }
-}
-
 impl Backend for WebGl2Backend {
     // Populates the buffer with the *updated* cell content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>

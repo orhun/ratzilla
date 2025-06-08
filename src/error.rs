@@ -38,7 +38,7 @@ pub enum Error {
 
     /// WebGL2Backend error.
     #[error("WebGL2Backend error: {0}")]
-    WebGl2Error(String), // todo: probably rethink this
+    WebGl2Error(beamterm_renderer::Error),
 
     /// Failed to retrieve a HTML/js component, such as `Performance`.
     #[error("Failed to retrieve component: {0}")]
@@ -56,5 +56,12 @@ impl From<wasm_bindgen::JsValue> for Error {
 impl From<Error> for std::io::Error {
     fn from(error: Error) -> Self {
         std::io::Error::new(std::io::ErrorKind::Other, error.to_string())
+    }
+}
+
+/// Converts a [`term_renderer::Error`] into a [`Error`].
+impl From<beamterm_renderer::Error> for Error {
+    fn from(value: beamterm_renderer::Error) -> Self {
+        Self::WebGl2Error(value)
     }
 }
