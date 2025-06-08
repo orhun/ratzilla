@@ -45,7 +45,8 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Enables frame-based measurements using the `performance` API.
+    /// Enables frame-based measurements using the
+    /// [Performance](https://developer.mozilla.org/en-US/docs/Web/API/Performance) API.
     pub fn measure_performance(mut self, measure: bool) -> Self {
         self.measure_performance = measure;
         self
