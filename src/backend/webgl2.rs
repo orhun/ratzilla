@@ -12,7 +12,6 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
-use web_sys::console;
 
 // labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -224,8 +223,6 @@ impl WebGl2Backend {
         // resize the buffer if needed
         let new_size = self.context.terminal_size();
         if new_size != old_size {
-            console::log_1(&format!("Resizing terminal to {}x{}", new_size.0, new_size.1).into());
-
             self.dirty_cell_data = true;
 
             let cells = &self.buffer;
