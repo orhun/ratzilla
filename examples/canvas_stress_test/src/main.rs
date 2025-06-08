@@ -1,7 +1,7 @@
 //! # Ratzilla Canvas Rendering Stress Test
 //!
 //! This example demonstrates a stress test for the foreground text rendering
-//! capabilities of the `CanvasBackend` in Ratzilla. It displays large amounts
+//! capabilities of the `WebGl2Backend` in Ratzilla. It displays large amounts
 //! of lorem ipsum text with different coloring strategies while monitoring
 //! the frames per second (FPS).
 //!
