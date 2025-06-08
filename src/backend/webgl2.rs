@@ -178,7 +178,7 @@ impl WebGl2Backend {
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
         let context = WebGl2::new(parent, width, height)?;
-        let buffer = get_sized_buffer_from_terminal_grid(&context.terminal_grid);
+        let buffer = vec![Cell::default(); context.terminal_grid.cell_count()];
         Ok(Self {
             buffer,
             cell_data_pending_upload: false,
@@ -414,6 +414,19 @@ impl Backend for WebGl2Backend {
     }
 }
 
+/// Resizes the cell grid to the new size, copying existing cells where possible.
+///
+/// When the terminal dimensions change, this function creates a new cell buffer and
+/// preserves existing content in the overlapping region. Any cells outside the overlap
+/// are populated with default values.
+///
+/// # Arguments
+/// * `cells` - Current cell buffer to resize
+/// * `old_size` - Previous terminal dimensions (cols, rows)
+/// * `new_size` - New terminal dimensions (cols, rows)
+///
+/// # Returns
+/// A new cell buffer sized to `new_size`.
 fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
     let old_size = (old_size.0 as usize, old_size.1 as usize);
     let new_size = (new_size.0 as usize, new_size.1 as usize);
@@ -425,8 +438,10 @@ fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) 
         new_cells.push(default_cell());
     }
 
+    // restrict dimensions to the overlapping area
     for y in 0..min(old_size.1, new_size.1) {
         for x in 0..min(old_size.0, new_size.0) {
+            // translate x,y to index for old and new buffer
             let new_idx = y * new_size.0 + x;
             let old_idx = y * old_size.0 + x;
             new_cells[new_idx] = cells[old_idx].clone();
@@ -434,11 +449,6 @@ fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) 
     }
 
     new_cells
-}
-
-/// Returns a buffer based on the `TerminalGrid`.
-fn get_sized_buffer_from_terminal_grid(grid: &TerminalGrid) -> Vec<Cell> {
-    vec![Cell::default(); grid.cell_count()]
 }
 
 fn cell_with_safe_colors(cell: &Cell) -> Cell {
