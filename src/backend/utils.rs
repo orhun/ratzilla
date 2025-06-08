@@ -1,4 +1,5 @@
 use crate::{
+    backend::color::ansi_to_rgb,
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
@@ -86,53 +87,11 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
-/// Returns the actual foreground color of a cell, considering the `REVERSED` modifier.
-pub(crate) fn actual_fg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.bg
-    } else {
-        cell.fg
-    }
-}
-
-/// Returns the actual background color of a cell, considering the `REVERSED` modifier.
-pub(crate) fn actual_bg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.fg
-    } else {
-        cell.bg
-    }
-}
-
 /// Converts a Color to a CSS style.
 pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
     let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
 
     format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
-}
-
-/// Converts an ANSI color to an RGB tuple.
-fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
-    match color {
-        Color::Black => Some((0, 0, 0)),
-        Color::Red => Some((128, 0, 0)),
-        Color::Green => Some((0, 128, 0)),
-        Color::Yellow => Some((128, 128, 0)),
-        Color::Blue => Some((0, 0, 128)),
-        Color::Magenta => Some((128, 0, 128)),
-        Color::Cyan => Some((0, 128, 128)),
-        Color::Gray => Some((192, 192, 192)),
-        Color::DarkGray => Some((128, 128, 128)),
-        Color::LightRed => Some((255, 0, 0)),
-        Color::LightGreen => Some((0, 255, 0)),
-        Color::LightYellow => Some((255, 255, 0)),
-        Color::LightBlue => Some((0, 0, 255)),
-        Color::LightMagenta => Some((255, 0, 255)),
-        Color::LightCyan => Some((0, 255, 255)),
-        Color::White => Some((255, 255, 255)),
-        Color::Rgb(r, g, b) => Some((r, g, b)),
-        _ => None,
-    }
 }
 
 /// Calculates the number of pixels that can fit in the window.

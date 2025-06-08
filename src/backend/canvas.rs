@@ -2,7 +2,14 @@ use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
 use std::io::Result as IoResult;
 
-use crate::{backend::utils::*, error::Error, CursorShape};
+use crate::{
+    backend::{
+        color::{actual_bg_color, actual_fg_color},
+        utils::*,
+    },
+    error::Error,
+    CursorShape,
+};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,

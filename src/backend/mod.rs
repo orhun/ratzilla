@@ -21,5 +21,6 @@ pub mod webgl2;
 /// Backend utilities.
 pub(crate) mod utils;
 
+mod color;
 /// Cursor shapes.
 pub mod cursor;
