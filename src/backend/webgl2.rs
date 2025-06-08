@@ -14,6 +14,11 @@ use ratatui::{
 use std::{cmp::min, io::Result as IoResult, mem::swap};
 use web_sys::console;
 
+// labels used by the Performance API
+const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
+const UPLOAD_CELLS_TO_GPU_MARK: &str = "upload-cells-to-gpu";
+const WEBGL_RENDER_MARK: &str = "webgl-render";
+
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
 pub struct WebGl2BackendOptions {
@@ -136,8 +141,8 @@ impl WebGl2 {
 pub struct WebGl2Backend {
     /// Current buffer.
     buffer: Vec<Cell>,
-    /// Indicates if the cells have changed, requiring a redraw.
-    cell_data_pending_upload: bool,
+    /// Indicates if the cells have changed, requiring a
+    dirty_cell_data: bool,
     /// WebGl2 context.
     context: WebGl2,
     /// Cursor position.
@@ -182,7 +187,7 @@ impl WebGl2Backend {
         let buffer = vec![Cell::default(); context.terminal_grid.cell_count()];
         Ok(Self {
             buffer,
-            cell_data_pending_upload: false,
+            dirty_cell_data: false,
             context,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
@@ -221,7 +226,7 @@ impl WebGl2Backend {
         if new_size != old_size {
             console::log_1(&format!("Resizing terminal to {}x{}", new_size.0, new_size.1).into());
 
-            self.cell_data_pending_upload = true;
+            self.dirty_cell_data = true;
 
             let cells = &self.buffer;
             self.buffer = resize_cell_grid(cells, old_size, new_size);
@@ -232,17 +237,17 @@ impl WebGl2Backend {
 
     // Synchronizes the terminal buffer with beamterm's terminal grid.
     fn update_grid(&mut self) -> Result<(), Error> {
-        self.measure_begin("upload-cells-to-gpu");
-        if self.cell_data_pending_upload {
+        if self.dirty_cell_data {
+            self.measure_begin(UPLOAD_CELLS_TO_GPU_MARK);
             let gl = self.context.renderer.gl();
             let terminal = &mut self.context.terminal_grid;
             let cells = self.buffer.iter().map(cell_data);
 
             terminal.update_cells(gl, cells)?;
 
-            self.cell_data_pending_upload = false;
+            self.dirty_cell_data = false;
+            self.measure_end(UPLOAD_CELLS_TO_GPU_MARK);
         }
-        self.measure_end("upload-cells-to-gpu");
 
         Ok(())
     }
@@ -312,20 +317,28 @@ impl Backend for WebGl2Backend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        let w = self.context.terminal_grid.terminal_size().0 as usize;
+        if content.size_hint().1 == Some(0) {
+            // No content to draw, nothing to do
+            return Ok(());
+        } else {
+            // Mark the cell data as dirty; triggers update_grid()
+            self.dirty_cell_data = true;
+        }
 
-        self.measure_begin("webgl-render");
+        // Render existing content to the canvas.
+        self.measure_begin(WEBGL_RENDER_MARK);
         let terminal = &mut self.context.terminal_grid;
         self.context.renderer.render(terminal);
-        self.measure_end("webgl-render");
+        self.measure_end(WEBGL_RENDER_MARK);
 
-        self.measure_begin("sync-terminal-buffer");
+        // Update internal cell buffer with the new content
+        self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
+        let w = self.context.terminal_grid.terminal_size().0 as usize;
         for (x, y, updated_cell) in content {
             let (x, y) = (x as usize, y as usize);
             self.buffer[y * w + x] = cell_with_safe_colors(updated_cell);
         }
-        self.cell_data_pending_upload = true;
-        self.measure_end("sync-terminal-buffer");
+        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
@@ -455,6 +468,7 @@ fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) 
 fn cell_with_safe_colors(cell: &Cell) -> Cell {
     let mut fg = cell.fg;
     let mut bg = cell.bg;
+
     if cell.modifier.contains(Modifier::REVERSED) {
         swap(&mut fg, &mut bg);
     }
