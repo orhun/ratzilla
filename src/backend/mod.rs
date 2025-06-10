@@ -4,7 +4,7 @@
 //! each with different performance characteristics and trade-offs:
 //!
 //! - [`WebGl2Backend`]: GPU-accelerated rendering powered by [beamterm][beamterm]. Uses prebuilt
-//!   font atlases. Best performance, capable of 60fps on large terminals (300x100+). 
+//!   font atlases. Best performance, capable of 60fps on large terminals (300x100+).
 //!
 //! - [`CanvasBackend`]: Canvas 2D API with full Unicode support via browser font rendering.
 //!   Good fallback when WebGL2 isn't available or when dynamic character support is required.
