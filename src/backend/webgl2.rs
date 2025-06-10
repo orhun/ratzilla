@@ -195,8 +195,10 @@ impl WebGl2Backend {
     }
 
     /// Sets the background color of the canvas.
+    ///
+    /// TODO: Pass onto the beamterm renderer once it supports it
     pub fn set_background_color(&mut self, _color: Color) {
-        // todo: pass onto the renderer once it supports it
+       unimplemented!()
     }
 
     /// Returns the [`CursorShape`].
