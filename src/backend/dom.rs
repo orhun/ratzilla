@@ -196,18 +196,76 @@ impl DomBackend {
     /// Compare the current buffer to the previous buffer and updates the grid
     /// accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    continue;
+        for y in 0..self.buffer.len() {
+            // Complete line re-rendering required when any hyperlink status changes (added or removed)
+            // This is necessary because hyperlinks require special DOM structure with anchor elements
+            let needs_rerender = (0..self.buffer[y].len()).any(|x| {
+                let old_cell = &self.prev_buffer[y][x];
+                let new_cell = &self.buffer[y][x];
+                new_cell != old_cell && (
+                    new_cell.modifier.contains(HYPERLINK_MODIFIER) ||
+                        old_cell.modifier.contains(HYPERLINK_MODIFIER)
+                )
+            });
+
+            self.rerender_line(y, needs_rerender)?;
+        }
+
+        Ok(())
+    }
+
+    /// Updates a grid line by comparing buffers. It fully re-renders the line if hyperlinks change;
+    /// otherwise, it updates only the modified cells.
+    fn rerender_line(&mut self, y: usize, needs_rerender: bool) -> Result<(), Error> {
+        let line = &self.buffer[y];
+        let pre = self.grid.children().item(y as u32).ok_or(Error::UnableToRetrieveChildElement)?;
+
+        // Full re-render — rebuilds the entire line if hyperlink presence changes.
+        if needs_rerender {
+            // Required when hyperlinks are added or removed, as they need special DOM structure
+            pre.set_inner_html("");  // Clear existing content
+
+            let mut x = 0;
+            while x < line.len() {
+                if line[x].modifier.contains(HYPERLINK_MODIFIER) {
+                    // Process contiguous hyperlink cells as a group
+                    let start_x = x;
+                    // Find the end of the hyperlink sequence
+                    while x + 1 < line.len() && line[x + 1].modifier.contains(HYPERLINK_MODIFIER) {
+                        x += 1;
+                    }
+
+                    // Create anchor element wrapping the hyperlink cells
+                    let hyperlink_cells = &line[start_x..=x];
+                    let anchor = create_anchor(&self.document, hyperlink_cells)?;
+
+                    // Create spans for each cell in the hyperlink and add to the anchor
+                    for i in start_x..=x {
+                        let span = create_span(&self.document, &line[i])?;
+                        self.cells[y * line.len() + i] = span.clone();
+                        anchor.append_child(&span)?;
+                    }
+                    pre.append_child(&anchor)?;
+                } else {
+                    // Handle regular non-hyperlink cell
+                    let span = create_span(&self.document, &line[x])?;
+                    self.cells[y * line.len() + x] = span.clone();
+                    pre.append_child(&span)?;
                 }
-                if cell != &self.prev_buffer[y][x] {
-                    let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_style_as_css(cell))?;
+                x += 1;
+            }
+        } else { // Partial update — updates only changed cells when hyperlinks are unchanged.
+            // No hyperlink structure changes are needed
+            for x in 0..line.len() {
+                if self.buffer[y][x] != self.prev_buffer[y][x] {
+                    // Only update cells that have changed
+                    let span = &self.cells[y * line.len() + x];
+                    span.set_inner_html(self.buffer[y][x].symbol());
+                    span.set_attribute("style", &get_cell_style_as_css(&self.buffer[y][x]))?;
                 }
             }
         }
+
         Ok(())
     }
 }
