@@ -13,7 +13,7 @@ use ratatui::{
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
 
-// labels used by the Performance API
+// Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
 const UPLOAD_CELLS_TO_GPU_MARK: &str = "upload-cells-to-gpu";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
