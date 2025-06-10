@@ -48,10 +48,10 @@ pub mod dom;
 /// WebGL2 backend.
 pub mod webgl2;
 
-/// Backend utilities.
-pub(crate) mod utils;
 /// Color handling.
 mod color;
+/// Backend utilities.
+pub(crate) mod utils;
 
 /// Cursor shapes.
 pub mod cursor;

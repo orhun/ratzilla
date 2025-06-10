@@ -198,7 +198,7 @@ impl WebGl2Backend {
     ///
     /// TODO: Pass onto the beamterm renderer once it supports it
     pub fn set_background_color(&mut self, _color: Color) {
-       unimplemented!()
+        unimplemented!()
     }
 
     /// Returns the [`CursorShape`].
