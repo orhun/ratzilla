@@ -20,7 +20,8 @@ pub mod webgl2;
 
 /// Backend utilities.
 pub(crate) mod utils;
-
+/// Color handling.
 mod color;
+
 /// Cursor shapes.
 pub mod cursor;
