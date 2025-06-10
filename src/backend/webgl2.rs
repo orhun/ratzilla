@@ -18,7 +18,7 @@ const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
 const UPLOAD_CELLS_TO_GPU_MARK: &str = "upload-cells-to-gpu";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
 
-/// Options for the [`CanvasBackend`].
+/// Options for the [`WebGl2Backend`].
 #[derive(Debug, Default)]
 pub struct WebGl2BackendOptions {
     /// The element ID.
@@ -32,7 +32,7 @@ pub struct WebGl2BackendOptions {
 }
 
 impl WebGl2BackendOptions {
-    /// Constructs a new [`CanvasBackendOptions`].
+    /// Constructs a new [`WebGl2BackendOptions`].
     pub fn new() -> Self {
         Default::default()
     }
@@ -153,13 +153,13 @@ pub struct WebGl2Backend {
 }
 
 impl WebGl2Backend {
-    /// Constructs a new [`CanvasBackend`].
+    /// Constructs a new [`WebGl2Backend`].
     pub fn new() -> Result<Self, Error> {
         let (width, height) = get_raw_window_size();
         Self::new_with_size(width.into(), height.into())
     }
 
-    /// Constructs a new [`CanvasBackend`] with the given size.
+    /// Constructs a new [`WebGl2Backend`] with the given size.
     pub fn new_with_size(width: u32, height: u32) -> Result<Self, Error> {
         Self::new_with_options(WebGl2BackendOptions {
             size: Some((width, height)),
@@ -167,7 +167,7 @@ impl WebGl2Backend {
         })
     }
 
-    /// Constructs a new [`CanvasBackend`] with the given options.
+    /// Constructs a new [`WebGl2Backend`] with the given options.
     pub fn new_with_options(options: WebGl2BackendOptions) -> Result<Self, Error> {
         let performance = if options.measure_performance {
             Some(performance()?)
