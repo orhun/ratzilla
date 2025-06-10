@@ -14,7 +14,7 @@
 //!   supports hyperlinks, but slowest for large terminals.
 //!
 //! [beamterm]: https://github.com/junkdog/beamterm
-//! 
+//!
 //! ## Backend Comparison
 //!
 //! | Feature                      | DomBackend | CanvasBackend | WebGl2Backend    |
