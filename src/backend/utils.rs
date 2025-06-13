@@ -1,13 +1,16 @@
+use crate::{
+    backend::color::ansi_to_rgb,
+    error::Error,
+    utils::{get_screen_size, get_window_size, is_mobile},
+};
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use web_sys::{wasm_bindgen::JsValue, Document, Element, HtmlCanvasElement};
-
-use crate::{
-    error::Error,
-    utils::{get_screen_size, get_window_size, is_mobile},
+use web_sys::{
+    wasm_bindgen::{JsCast, JsValue},
+    window, Document, Element, HtmlCanvasElement, Window,
 };
 
 /// Creates a new `<span>` element with the given cell.
@@ -84,53 +87,11 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
-/// Returns the actual foreground color of a cell, considering the `REVERSED` modifier.
-pub(crate) fn actual_fg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.bg
-    } else {
-        cell.fg
-    }
-}
-
-/// Returns the actual background color of a cell, considering the `REVERSED` modifier.
-pub(crate) fn actual_bg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.fg
-    } else {
-        cell.bg
-    }
-}
-
 /// Converts a Color to a CSS style.
 pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
     let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
 
     format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
-}
-
-/// Converts an ANSI color to an RGB tuple.
-fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
-    match color {
-        Color::Black => Some((0, 0, 0)),
-        Color::Red => Some((128, 0, 0)),
-        Color::Green => Some((0, 128, 0)),
-        Color::Yellow => Some((128, 128, 0)),
-        Color::Blue => Some((0, 0, 128)),
-        Color::Magenta => Some((128, 0, 128)),
-        Color::Cyan => Some((0, 128, 128)),
-        Color::Gray => Some((192, 192, 192)),
-        Color::DarkGray => Some((128, 128, 128)),
-        Color::LightRed => Some((255, 0, 0)),
-        Color::LightGreen => Some((0, 255, 0)),
-        Color::LightYellow => Some((255, 255, 0)),
-        Color::LightBlue => Some((0, 0, 255)),
-        Color::LightMagenta => Some((255, 0, 255)),
-        Color::LightCyan => Some((0, 255, 255)),
-        Color::White => Some((255, 255, 255)),
-        Color::Rgb(r, g, b) => Some((r, g, b)),
-        _ => None,
-    }
 }
 
 /// Calculates the number of pixels that can fit in the window.
@@ -170,4 +131,58 @@ pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Ve
     let width = canvas.client_width() as u16 / 10_u16;
     let height = canvas.client_height() as u16 / 19_u16;
     vec![vec![Cell::default(); width as usize]; height as usize]
+}
+
+/// Returns the document object from the window.
+pub(crate) fn get_document() -> Result<Document, Error> {
+    get_window()?
+        .document()
+        .ok_or(Error::UnableToRetrieveDocument)
+}
+
+/// Returns the window object.
+pub(crate) fn get_window() -> Result<Window, Error> {
+    window().ok_or(Error::UnableToRetrieveWindow)
+}
+
+/// Returns an element by its ID or the body element if no ID is provided.
+pub(crate) fn get_element_by_id_or_body(id: Option<&String>) -> Result<web_sys::Element, Error> {
+    match id {
+        Some(id) => get_document()?
+            .get_element_by_id(id)
+            .ok_or_else(|| Error::UnableToRetrieveElementById(id.to_string())),
+        None => get_document()?
+            .body()
+            .ok_or(Error::UnableToRetrieveBody)
+            .map(|body| body.into()),
+    }
+}
+
+/// Returns the performance object from the window.
+pub(crate) fn performance() -> Result<web_sys::Performance, Error> {
+    Ok(get_window()?
+        .performance()
+        .ok_or(Error::UnableToRetrieveComponent("Performance"))?)
+}
+
+/// Creates a new canvas element in the specified parent element with the
+/// given width and height.
+pub(crate) fn create_canvas_in_element(
+    parent: &Element,
+    width: u32,
+    height: u32,
+) -> Result<HtmlCanvasElement, Error> {
+    let element = get_document()?.create_element("canvas")?;
+
+    let canvas = element
+        .clone()
+        .dyn_into::<HtmlCanvasElement>()
+        .map_err(|_| ())
+        .expect("Unable to cast canvas element");
+    canvas.set_width(width);
+    canvas.set_height(height);
+
+    parent.append_child(&element)?;
+
+    Ok(canvas)
 }

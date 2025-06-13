@@ -2,16 +2,15 @@
 
 mod wave_effect;
 
-use ratzilla::{
-    backend::canvas::CanvasBackendOptions, ratatui::Terminal, CanvasBackend, WebRenderer,
-};
+use ratzilla::{ratatui::Terminal, WebGl2Backend, WebRenderer};
 use tachyonfx::{EffectRenderer, IntoEffect};
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use wave_effect::WaveInterference;
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend =
-        CanvasBackend::new_with_options(CanvasBackendOptions::new().grid_id("container"))?;
+        WebGl2Backend::new_with_options(WebGl2BackendOptions::new().grid_id("container"))?;
     let terminal = Terminal::new(backend)?;
 
     let mut effect = WaveInterference::new().into_effect();

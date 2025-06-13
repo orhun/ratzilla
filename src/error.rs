@@ -21,6 +21,10 @@ pub enum Error {
     #[error("Unable to retrieve body")]
     UnableToRetrieveBody,
 
+    /// Unable to retrieve HTML element by ID.
+    #[error("Unable to retrieve element: {0}")]
+    UnableToRetrieveElementById(String),
+
     /// Unable to retrieve canvas context.
     ///
     /// This error occurs when `canvas.get_context_with_context_options("2d")`
@@ -31,6 +35,14 @@ pub enum Error {
     /// JS value error.
     #[error("JS value error: {0:?}")]
     JsValue(wasm_bindgen::JsValue),
+
+    /// WebGL2Backend error.
+    #[error("WebGL2Backend error: {0}")]
+    WebGl2Error(beamterm_renderer::Error),
+
+    /// Failed to retrieve a HTML/js component, such as `Performance`.
+    #[error("Failed to retrieve component: {0}")]
+    UnableToRetrieveComponent(&'static str),
 }
 
 /// Convert [`wasm_bindgen::JsValue`] to [`Error`].
@@ -44,5 +56,12 @@ impl From<wasm_bindgen::JsValue> for Error {
 impl From<Error> for std::io::Error {
     fn from(error: Error) -> Self {
         std::io::Error::new(std::io::ErrorKind::Other, error.to_string())
+    }
+}
+
+/// Converts a [`beamterm_renderer::Error`] into a [`Error`].
+impl From<beamterm_renderer::Error> for Error {
+    fn from(value: beamterm_renderer::Error) -> Self {
+        Self::WebGl2Error(value)
     }
 }

@@ -1,7 +1,7 @@
 //! # Ratzilla Canvas Rendering Stress Test
 //!
 //! This example demonstrates a stress test for the foreground text rendering
-//! capabilities of the `CanvasBackend` in Ratzilla. It displays large amounts
+//! capabilities of the `WebGl2Backend` in Ratzilla. It displays large amounts
 //! of lorem ipsum text with different coloring strategies while monitoring
 //! the frames per second (FPS).
 //!
@@ -10,21 +10,18 @@
 mod fps;
 
 use crate::fps::{FpsRecorder, FpsStats};
-use ratzilla::{
-    ratatui::{
-        layout::Size,
-        style::{Color, Modifier, Style, Styled},
-        text::{Line, Span},
-        widgets::{Paragraph, Widget, Wrap},
-        Terminal,
-    },
-    CanvasBackend, WebRenderer,
-};
+use ratzilla::{ratatui::{
+    layout::Size,
+    style::{Color, Modifier, Style, Styled},
+    text::{Line, Span},
+    widgets::{Paragraph, Widget, Wrap},
+    Terminal,
+}, WebGl2Backend, WebRenderer};
 use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new()?;
+    let backend = WebGl2Backend::new()?;
     let terminal = Terminal::new(backend)?;
 
     let mut fps_recorder = FpsRecorder::new();
