@@ -32,13 +32,6 @@
 //! - **WebGl2Backend**: Preferred for most applications - consumes the least amount of resources
 //! - **CanvasBackend**: When you need dynamic Unicode/emoji or must support non-WebGL2 browsers
 //! - **DomBackend**: When you need hyperlinks, accessibility, or CSS styling
-//!
-//! ## Font Atlas Limitation
-//!
-//! WebGl2Backend uses prebuilt font atlases for performance. Characters not in the atlas
-//! will display as ' '. Use [`CanvasBackend`] if you need dynamic Unicode/emoji support.
-//!
-//! Note: WebGL2 is supported in all modern browsers (Chrome 56+, Firefox 51+, Safari 15+).
 
 /// Canvas backend.
 pub mod canvas;

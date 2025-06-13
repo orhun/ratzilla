@@ -91,8 +91,20 @@ impl WebGl2 {
 
 /// WebGl2 backend for high-performance terminal rendering.
 ///
-/// This backend renders the terminal buffer onto an HTML canvas element using WebGL2
-/// and the beamterm renderer.
+/// This backend renders the terminal buffer onto an HTML canvas element using [WebGL2]
+/// and the [beamterm renderer].
+///
+/// [WebGL2]: https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API
+/// [beamterm renderer]: https://crates.io/crates/beamterm-renderer
+///
+/// WebGL2 is supported in all modern browsers (Chrome 56+, Firefox 51+, Safari 15+).
+///
+/// ## Font Atlas Limitation
+///
+/// [`WebGl2Backend`] uses prebuilt font atlases for performance. Characters not in the atlas
+/// will display as ` `. Use [`CanvasBackend`] if you need dynamic Unicode/emoji support.
+///
+/// [`CanvasBackend`]: crate::backend::canvas::CanvasBackend
 ///
 /// # Performance Measurement
 ///
