@@ -59,7 +59,7 @@ impl From<Error> for std::io::Error {
     }
 }
 
-/// Converts a [`term_renderer::Error`] into a [`Error`].
+/// Converts a [`beamterm_renderer::Error`] into a [`Error`].
 impl From<beamterm_renderer::Error> for Error {
     fn from(value: beamterm_renderer::Error) -> Self {
         Self::WebGl2Error(value)
