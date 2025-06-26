@@ -3,7 +3,7 @@ use crate::{
     error::Error,
     CursorShape,
 };
-use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
+use beamterm_renderer::{CellData, FontAtlasData, SelectionMode, Terminal as Beamterm};
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
@@ -12,6 +12,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
+use std::cell::RefCell;
+use std::rc::Rc;
+use web_sys::console;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -54,38 +57,6 @@ impl WebGl2BackendOptions {
     pub fn measure_performance(mut self, measure: bool) -> Self {
         self.measure_performance = measure;
         self
-    }
-}
-
-/// WebGl2 renderer and context.
-#[derive(Debug)]
-struct WebGl2 {
-    /// The WebGL2 renderer.
-    renderer: Renderer,
-    /// Drawable representation of the terminal
-    terminal_grid: TerminalGrid,
-}
-
-impl WebGl2 {
-    /// Constructs a new [`WebGl2`].
-    fn new(parent_element: web_sys::Element, width: u32, height: u32) -> Result<Self, Error> {
-        let canvas = create_canvas_in_element(&parent_element, width, height)?;
-
-        let renderer = Renderer::create_with_canvas(canvas)?;
-        let terminal_grid = TerminalGrid::new(
-            renderer.gl(),
-            FontAtlas::load_default(renderer.gl())?,
-            renderer.canvas_size(),
-        )?;
-
-        Ok(Self {
-            terminal_grid,
-            renderer,
-        })
-    }
-
-    fn terminal_size(&self) -> (u16, u16) {
-        self.terminal_grid.terminal_size()
     }
 }
 
@@ -155,7 +126,7 @@ pub struct WebGl2Backend {
     /// Indicates if the cells have changed, requiring a
     dirty_cell_data: bool,
     /// WebGl2 context.
-    context: WebGl2,
+    context: Beamterm,
     /// Cursor position.
     cursor_position: Option<Position>,
     /// The cursor shape.
@@ -194,8 +165,34 @@ impl WebGl2Backend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let context = WebGl2::new(parent, width, height)?;
-        let buffer = vec![Cell::default(); context.terminal_grid.cell_count()];
+        // let selection = Rc::new(RefCell::new(select(Block)));
+        // let input_selection = selection.clone();
+
+        let canvas = create_canvas_in_element(&parent, width, height)?;
+        let context = Beamterm::builder(canvas)
+            .fallback_glyph(" ")
+            .font_atlas(FontAtlasData::default())
+            .canvas_padding_color(0xff0000)
+            .default_mouse_input_handler(SelectionMode::Block, true)
+            // .mouse_input_handler(move |e, grid| {
+            //     let mut selection = input_selection.borrow_mut();
+            //     let new_selection = match e.event_type {
+            //         MouseEventType::MouseDown => selection.clone().start((e.col, e.row)),
+            //         MouseEventType::MouseMove => selection.clone(),
+            //         MouseEventType::MouseUp => selection.clone().end((e.col, e.row)),
+            //     };
+            // 
+            //     if e.event_type == MouseEventType::MouseUp {
+            //         let text = grid.get_text(new_selection.clone().trim_trailing_whitespace());
+            //         console::log_2(&"Selected text: ".into(), &text.as_str().into());
+            //     }
+            // 
+            //     *selection = new_selection;
+            // 
+            // })
+            .build()?;
+
+        let buffer = vec![Cell::default(); context.cell_count()];
         Ok(Self {
             buffer,
             dirty_cell_data: false,
@@ -210,7 +207,7 @@ impl WebGl2Backend {
     ///
     /// TODO: Pass onto the beamterm renderer once it supports it
     pub fn set_background_color(&mut self, _color: Color) {
-        unimplemented!()
+        // unimplemented!()
     }
 
     /// Returns the [`CursorShape`].
@@ -226,13 +223,11 @@ impl WebGl2Backend {
 
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
     pub fn resize_canvas(&mut self) -> Result<(), Error> {
-        let size_px = self.context.renderer.canvas_size();
+        let size_px = self.context.canvas_size();
         let old_size = self.context.terminal_size();
 
         // resize the terminal grid and viewport
-        let gl = self.context.renderer.gl();
-        self.context.terminal_grid.resize(gl, size_px)?;
-        self.context.renderer.resize(size_px.0, size_px.1);
+        self.context.resize(size_px.0, size_px.1)?;
 
         // resize the buffer if needed
         let new_size = self.context.terminal_size();
@@ -250,13 +245,11 @@ impl WebGl2Backend {
     fn update_grid(&mut self) -> Result<(), Error> {
         if self.dirty_cell_data {
             self.measure_begin(UPLOAD_CELLS_TO_GPU_MARK);
-            let gl = self.context.renderer.gl();
-            let terminal = &mut self.context.terminal_grid;
+
             let cells = self.buffer.iter().map(cell_data);
-
-            terminal.update_cells(gl, cells)?;
-
+            self.context.update_cells(cells)?;
             self.dirty_cell_data = false;
+
             self.measure_end(UPLOAD_CELLS_TO_GPU_MARK);
         }
 
@@ -265,7 +258,7 @@ impl WebGl2Backend {
 
     /// Checks if the canvas size matches the display size and resizes it if necessary.
     fn check_canvas_resize(&mut self) -> Result<(), Error> {
-        let canvas = self.context.renderer.canvas();
+        let canvas = self.context.canvas();
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
@@ -328,13 +321,12 @@ impl Backend for WebGl2Backend {
 
         // Render existing content to the canvas.
         self.measure_begin(WEBGL_RENDER_MARK);
-        let terminal = &mut self.context.terminal_grid;
-        self.context.renderer.render(terminal);
+        let _ = self.context.render_frame();
         self.measure_end(WEBGL_RENDER_MARK);
 
         // Update internal cell buffer with the new content
         self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
-        let w = self.context.terminal_grid.terminal_size().0 as usize;
+        let w = self.context.terminal_size().0 as usize;
         for (x, y, updated_cell) in content {
             let (x, y) = (x as usize, y as usize);
             self.buffer[y * w + x] = cell_with_safe_colors(updated_cell);
@@ -363,7 +355,7 @@ impl Backend for WebGl2Backend {
         if let Some(pos) = self.cursor_position {
             let y = pos.y as usize;
             let x = pos.x as usize;
-            let w = self.context.terminal_grid.terminal_size().0 as usize;
+            let w = self.context.terminal_size().0 as usize;
 
             if let Some(cell) = self.buffer.get_mut(y * w + x) {
                 let style = self.cursor_shape.hide(cell.style());
@@ -385,13 +377,13 @@ impl Backend for WebGl2Backend {
     }
 
     fn size(&self) -> IoResult<Size> {
-        let (w, h) = self.context.terminal_grid.terminal_size();
+        let (w, h) = self.context.terminal_size();
         Ok(Size::new(w as _, h as _))
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        let (cols, rows) = self.context.terminal_grid.terminal_size();
-        let (w, h) = self.context.renderer.canvas_size();
+        let (cols, rows) = self.context.terminal_size();
+        let (w, h) = self.context.canvas_size();
 
         Ok(WindowSize {
             columns_rows: Size::new(cols, rows),
@@ -407,7 +399,7 @@ impl Backend for WebGl2Backend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        let w = self.context.terminal_grid.terminal_size().0 as usize;
+        let w = self.context.terminal_size().0 as usize;
 
         let new_pos = position.into();
         if let Some(old_pos) = self.cursor_position {
