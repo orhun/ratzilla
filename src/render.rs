@@ -2,7 +2,7 @@ use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, rc::Rc};
 use web_sys::{wasm_bindgen::prelude::*, window};
 
-use crate::event::KeyEvent;
+use crate::event::{KeyEvent, MouseEvent};
 
 /// Trait for rendering on the web.
 ///
@@ -36,6 +36,31 @@ pub trait WebRenderer {
         let document = window.document().unwrap();
         document
             .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+            .unwrap();
+        closure.forget();
+    }
+
+    /// Handles mouse events.
+    ///
+    /// This method takes a closure that will be called on every `mousemove`, 'mousedown', and `mouseup`
+    /// event.
+    fn on_mouse_event<F>(&self, mut callback: F)
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
+            callback(event.into());
+        });
+        let window = window().unwrap();
+        let document = window.document().unwrap();
+        document
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
+            .unwrap();
+        document
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
+            .unwrap();
+        document
+            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
             .unwrap();
         closure.forget();
     }
