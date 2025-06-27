@@ -2,7 +2,7 @@ use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, rc::Rc};
 use web_sys::{wasm_bindgen::prelude::*, window};
 
-use crate::event::{MouseEvent, KeyEvent};
+use crate::event::{KeyEvent, MouseEvent};
 
 /// Trait for rendering on the web.
 ///
@@ -41,7 +41,7 @@ pub trait WebRenderer {
     }
 
     /// Handles mouse events.
-    /// 
+    ///
     /// This method takes a closure that will be called on every `mousemove`, 'mousedown', and `mouseup`
     /// event.
     fn on_mouse_event<F>(&self, mut callback: F)
