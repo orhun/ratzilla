@@ -9,13 +9,14 @@ use ratzilla::{
         widgets::Widget,
         Terminal,
     },
-    CanvasBackend, WebRenderer,
+    WebRenderer,
 };
+use examples_shared::{backend_from_query_param, BackendType};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let (_backend_type, terminal) = backend_from_query_param(BackendType::Canvas)
+        .build_terminal()?;
     let mut app = ColorsWidget::default();
     terminal.draw_web(move |frame| {
         frame.render_widget(&mut app, frame.area());

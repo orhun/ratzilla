@@ -8,3 +8,4 @@ publish = false
 console_error_panic_hook = "0.1.7"
 ratzilla = { path = "../../" }
 tui-textarea = { version = "0.7.0", default-features = false, features = ["ratatui"] }
+examples-shared = { path = "../shared" }

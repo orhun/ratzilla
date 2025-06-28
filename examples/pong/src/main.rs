@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use ratzilla::{
-    event::KeyCode, utils::set_document_title, widgets::Hyperlink, DomBackend, WebRenderer,
+    event::KeyCode, utils::set_document_title, widgets::Hyperlink, WebRenderer,
 };
 
 use ratzilla::ratatui::{
@@ -14,6 +14,7 @@ use ratzilla::ratatui::{
     },
     Terminal,
 };
+use examples_shared::{backend_from_query_param, BackendType};
 
 struct App {
     count: u64,
@@ -63,8 +64,8 @@ impl App {
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
-    let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let (_backend_type, terminal) = backend_from_query_param(BackendType::Dom)
+        .build_terminal()?;
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {

@@ -8,11 +8,12 @@ use ratzilla::ratatui::{
     Terminal,
 };
 
-use ratzilla::{DomBackend, WebRenderer};
+use ratzilla::{WebRenderer};
+use examples_shared::{backend_from_query_param, BackendType};
 
 fn main() -> io::Result<()> {
-    let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let (_backend_type, terminal) = backend_from_query_param(BackendType::Dom)
+        .build_terminal()?;
 
     terminal.draw_web(move |f| {
         let canvas = canvas::Canvas::default()
