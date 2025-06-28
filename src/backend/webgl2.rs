@@ -3,22 +3,21 @@ use crate::{
     error::Error,
     CursorShape,
 };
-use beamterm_renderer::{CellData, FontAtlasData, SelectionMode, Terminal as Beamterm};
+use beamterm_renderer::{
+    CellData, FontAtlasData, FontStyle, GlyphEffect, SelectionMode, Terminal as Beamterm,
+};
+use compact_str::CompactString;
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier},
 };
-use std::{cmp::min, io::Result as IoResult, mem::swap};
-use std::cell::RefCell;
-use std::rc::Rc;
-use web_sys::console;
+use std::{io::Result as IoResult, mem::swap};
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
-const UPLOAD_CELLS_TO_GPU_MARK: &str = "upload-cells-to-gpu";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
 
 /// Options for the [`WebGl2Backend`].
@@ -30,8 +29,14 @@ pub struct WebGl2BackendOptions {
     ///
     /// Overrides the automatically detected size if set.
     size: Option<(u32, u32)>,
+    /// Fallback glyph to use for characters not in the font atlas.
+    fallback_glyph: Option<CompactString>,
+    /// Override the default font atlas.
+    font_atlas: Option<FontAtlasData>,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
+    /// The canvas padding color.
+    canvas_padding_color: Option<Color>,
 }
 
 impl WebGl2BackendOptions {
@@ -42,7 +47,7 @@ impl WebGl2BackendOptions {
 
     /// Sets the element id of the canvas' parent element.
     pub fn grid_id(mut self, id: &str) -> Self {
-        self.grid_id = Some(id.to_string());
+        self.grid_id = Some(id.into());
         self
     }
 
@@ -57,6 +62,26 @@ impl WebGl2BackendOptions {
     pub fn measure_performance(mut self, measure: bool) -> Self {
         self.measure_performance = measure;
         self
+    }
+
+    /// Sets the fallback glyph to use for characters not in the font atlas.
+    /// If not set, defaults to a space character (` `).
+    pub fn fallback_glyph(mut self, glyph: &str) -> Self {
+        self.fallback_glyph = Some(glyph.into());
+        self
+    }
+
+    /// Sets a custom font atlas to use for rendering.
+    pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
+        self.font_atlas = Some(atlas);
+        self
+    }
+
+    /// Gets the canvas padding color, defaulting to black if not set.
+    fn get_canvas_padding_color(&self) -> u32 {
+        self.canvas_padding_color
+            .map(|c| to_rgb(c, 0x000000))
+            .unwrap_or(0x000000)
     }
 }
 
@@ -85,9 +110,8 @@ impl WebGl2BackendOptions {
 ///
 /// | Label                  | Operation                                                   |
 /// |------------------------|-------------------------------------------------------------|
-/// | `sync-terminal-buffer` | Updating the internal buffer with cell changes from Ratatui |
-/// | `upload-cells-to-gpu`  | Uploading changed cell data to GPU buffers                  |
-/// | `webgl-render`         | Executing the WebGL draw call to render the terminal        |
+/// | `sync-terminal-buffer` | Synchronizes Ratatui's cell data with beamterm's            |
+/// | `webgl-render`         | Flushes the GPU buffers and executes the WebGL draw call    |
 ///
 /// ## Viewing Performance Measurements
 ///
@@ -121,10 +145,6 @@ impl WebGl2BackendOptions {
 /// ```
 #[derive(Debug)]
 pub struct WebGl2Backend {
-    /// Current buffer.
-    buffer: Vec<Cell>,
-    /// Indicates if the cells have changed, requiring a
-    dirty_cell_data: bool,
     /// WebGl2 context.
     context: Beamterm,
     /// Cursor position.
@@ -151,7 +171,7 @@ impl WebGl2Backend {
     }
 
     /// Constructs a new [`WebGl2Backend`] with the given options.
-    pub fn new_with_options(options: WebGl2BackendOptions) -> Result<Self, Error> {
+    pub fn new_with_options(mut options: WebGl2BackendOptions) -> Result<Self, Error> {
         let performance = if options.measure_performance {
             Some(performance()?)
         } else {
@@ -165,49 +185,21 @@ impl WebGl2Backend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        // let selection = Rc::new(RefCell::new(select(Block)));
-        // let input_selection = selection.clone();
-
         let canvas = create_canvas_in_element(&parent, width, height)?;
+
         let context = Beamterm::builder(canvas)
-            .fallback_glyph(" ")
-            .font_atlas(FontAtlasData::default())
-            .canvas_padding_color(0xff0000)
+            .canvas_padding_color(options.get_canvas_padding_color())
+            .fallback_glyph(&options.fallback_glyph.unwrap_or(" ".into()))
+            .font_atlas(options.font_atlas.take().unwrap_or_default())
             .default_mouse_input_handler(SelectionMode::Block, true)
-            // .mouse_input_handler(move |e, grid| {
-            //     let mut selection = input_selection.borrow_mut();
-            //     let new_selection = match e.event_type {
-            //         MouseEventType::MouseDown => selection.clone().start((e.col, e.row)),
-            //         MouseEventType::MouseMove => selection.clone(),
-            //         MouseEventType::MouseUp => selection.clone().end((e.col, e.row)),
-            //     };
-            // 
-            //     if e.event_type == MouseEventType::MouseUp {
-            //         let text = grid.get_text(new_selection.clone().trim_trailing_whitespace());
-            //         console::log_2(&"Selected text: ".into(), &text.as_str().into());
-            //     }
-            // 
-            //     *selection = new_selection;
-            // 
-            // })
             .build()?;
 
-        let buffer = vec![Cell::default(); context.cell_count()];
         Ok(Self {
-            buffer,
-            dirty_cell_data: false,
             context,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             performance,
         })
-    }
-
-    /// Sets the background color of the canvas.
-    ///
-    /// TODO: Pass onto the beamterm renderer once it supports it
-    pub fn set_background_color(&mut self, _color: Color) {
-        // unimplemented!()
     }
 
     /// Returns the [`CursorShape`].
@@ -224,34 +216,9 @@ impl WebGl2Backend {
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
     pub fn resize_canvas(&mut self) -> Result<(), Error> {
         let size_px = self.context.canvas_size();
-        let old_size = self.context.terminal_size();
 
         // resize the terminal grid and viewport
         self.context.resize(size_px.0, size_px.1)?;
-
-        // resize the buffer if needed
-        let new_size = self.context.terminal_size();
-        if new_size != old_size {
-            self.dirty_cell_data = true;
-
-            let cells = &self.buffer;
-            self.buffer = resize_cell_grid(cells, old_size, new_size);
-        }
-
-        Ok(())
-    }
-
-    // Synchronizes the terminal buffer with beamterm's terminal grid.
-    fn update_grid(&mut self) -> Result<(), Error> {
-        if self.dirty_cell_data {
-            self.measure_begin(UPLOAD_CELLS_TO_GPU_MARK);
-
-            let cells = self.buffer.iter().map(cell_data);
-            self.context.update_cells(cells)?;
-            self.dirty_cell_data = false;
-
-            self.measure_end(UPLOAD_CELLS_TO_GPU_MARK);
-        }
 
         Ok(())
     }
@@ -275,17 +242,27 @@ impl WebGl2Backend {
         Ok(())
     }
 
-    /// Draws the cursor at the specified position.
-    fn draw_cursor(&mut self, pos: Position) -> IoResult<()> {
-        let w = self.context.terminal_size().0 as usize;
-        let idx = pos.y as usize * w + pos.x as usize;
-
-        if idx < self.buffer.len() {
-            let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
-            self.buffer[idx].set_style(cursor_style);
+    /// Toggles the cursor visibility based on its current position.
+    /// If there is no cursor position, it does nothing.
+    fn toggle_cursor(&mut self) {
+        if let Some(pos) = self.cursor_position {
+            self.draw_cursor(pos);
         }
+    }
 
-        Ok(())
+    /// Draws the cursor at the specified position.
+    fn draw_cursor(&mut self, pos: Position) {
+        if let Some(c) = self.context.grid().borrow_mut().cell_data_mut(pos.x, pos.y) {
+            match self.cursor_shape {
+                CursorShape::SteadyBlock => {
+                    c.flip_colors();
+                }
+                CursorShape::SteadyUnderScore => {
+                    // if the overall style is underlined, remove it, otherwise add it
+                    c.style(c.get_style() ^ (GlyphEffect::Underline as u16));
+                }
+            }
+        }
     }
 
     /// Measures the beginning of a performance mark.
@@ -314,29 +291,24 @@ impl Backend for WebGl2Backend {
         if content.size_hint().1 == Some(0) {
             // No content to draw, nothing to do
             return Ok(());
-        } else {
-            // Mark the cell data as dirty; triggers update_grid()
-            self.dirty_cell_data = true;
         }
 
-        // Render existing content to the canvas.
+        // Flushes GPU buffers and render existing content to the canvas
         self.measure_begin(WEBGL_RENDER_MARK);
+        self.toggle_cursor(); // show cursor before rendering
         let _ = self.context.render_frame();
+        self.toggle_cursor(); // restore cell to previous state
         self.measure_end(WEBGL_RENDER_MARK);
 
         // Update internal cell buffer with the new content
         self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
-        let w = self.context.terminal_size().0 as usize;
-        for (x, y, updated_cell) in content {
-            let (x, y) = (x as usize, y as usize);
-            self.buffer[y * w + x] = cell_with_safe_colors(updated_cell);
-        }
-        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
-        // Draw the cursor if set
-        if let Some(pos) = self.cursor_position {
-            self.draw_cursor(pos)?;
-        }
+        let cells = content.map(|(x, y, cell)| (x, y, cell_data(cell)));
+        self.context
+            .update_cells_by_position(cells)
+            .map_err(Error::from)?;
+
+        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
         Ok(())
     }
@@ -347,22 +319,10 @@ impl Backend for WebGl2Backend {
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         self.check_canvas_resize()?;
-        self.update_grid()?;
         Ok(())
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-            let w = self.context.terminal_size().0 as usize;
-
-            if let Some(cell) = self.buffer.get_mut(y * w + x) {
-                let style = self.cursor_shape.hide(cell.style());
-                cell.set_style(style);
-            }
-        }
-
         self.cursor_position = None;
         Ok(())
     }
@@ -372,7 +332,13 @@ impl Backend for WebGl2Backend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        self.buffer.fill(default_cell());
+        let cells = [CellData::new_with_style_bits(" ", 0, 0xffffff, 0x000000)]
+            .into_iter()
+            .cycle()
+            .take(self.context.cell_count());
+
+        self.context.update_cells(cells).map_err(Error::from)?;
+
         Ok(())
     }
 
@@ -399,66 +365,13 @@ impl Backend for WebGl2Backend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        let w = self.context.terminal_size().0 as usize;
-
-        let new_pos = position.into();
-        if let Some(old_pos) = self.cursor_position {
-            if old_pos == new_pos {
-                return Ok(()); // No change in cursor position
-            }
-
-            let y = old_pos.y as usize;
-            let x = old_pos.x as usize;
-
-            let old_idx = y * w + x;
-            if let Some(old_cell) = self.buffer.get_mut(old_idx) {
-                let style = self.cursor_shape.hide(old_cell.style());
-                old_cell.set_style(style);
-            }
-        }
-        self.cursor_position = Some(new_pos);
+        self.cursor_position = Some(position.into());
         Ok(())
     }
 }
 
-/// Resizes the cell grid to the new size, copying existing cells where possible.
-///
-/// When the terminal dimensions change, this function creates a new cell buffer and
-/// preserves existing content in the overlapping region. Any cells outside the overlap
-/// are populated with default values.
-///
-/// # Arguments
-/// * `cells` - Current cell buffer to resize
-/// * `old_size` - Previous terminal dimensions (cols, rows)
-/// * `new_size` - New terminal dimensions (cols, rows)
-///
-/// # Returns
-/// A new cell buffer sized to `new_size`.
-fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
-    let old_size = (old_size.0 as usize, old_size.1 as usize);
-    let new_size = (new_size.0 as usize, new_size.1 as usize);
-
-    let new_len = new_size.0 * new_size.1;
-
-    let mut new_cells = Vec::with_capacity(new_len);
-    for _ in 0..new_len {
-        new_cells.push(default_cell());
-    }
-
-    // restrict dimensions to the overlapping area
-    for y in 0..min(old_size.1, new_size.1) {
-        for x in 0..min(old_size.0, new_size.0) {
-            // translate x,y to index for old and new buffer
-            let new_idx = y * new_size.0 + x;
-            let old_idx = y * old_size.0 + x;
-            new_cells[new_idx] = cells[old_idx].clone();
-        }
-    }
-
-    new_cells
-}
-
-fn cell_with_safe_colors(cell: &Cell) -> Cell {
+/// Resolves foreground and background colors for a [`Cell`].
+fn resolve_fg_bg_colors(cell: &Cell) -> (u32, u32) {
     let mut fg = cell.fg;
     let mut bg = cell.bg;
 
@@ -469,22 +382,14 @@ fn cell_with_safe_colors(cell: &Cell) -> Cell {
     let mut c = cell.clone();
     c.set_fg(fg);
     c.set_bg(bg);
-    c
+
+    (to_rgb(c.fg, 0xffffff), to_rgb(c.bg, 0x000000))
 }
 
-fn default_cell() -> Cell {
-    Cell::default()
-        .set_style(Style::default().fg(Color::White).bg(Color::Black))
-        .clone()
-}
-
+/// Converts a [`Cell`] into a [`CellData`] for the beamterm renderer.
 fn cell_data(cell: &Cell) -> CellData {
-    CellData::new_with_style_bits(
-        cell.symbol(),
-        into_glyph_bits(cell.modifier),
-        to_rgb(cell.fg, 0xffffff),
-        to_rgb(cell.bg, 0x000000),
-    )
+    let (fg, bg) = resolve_fg_bg_colors(cell);
+    CellData::new_with_style_bits(cell.symbol(), into_glyph_bits(cell.modifier), fg, bg)
 }
 
 /// Extracts glyph styling bits from cell modifiers.
