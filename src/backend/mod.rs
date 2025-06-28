@@ -21,7 +21,7 @@
 //! | **60fps on large terminals** | ✗          | ✗             | ✓                |
 //! | **Memory Usage**             | Highest    | Medium        | Lowest           |
 //! | **Hyperlinks**               | ✓          | ✗             | ✗                |
-//! | **Text Selection**           | ✓          | ✗             | ✗                |
+//! | **Text Selection**           | ✓          | ✗             | ✓                |
 //! | **Accessibility**            | ✓          | Limited       | Limited          |
 //! | **Unicode/Emoji Support**    | Full       | Full          | Limited to atlas |
 //! | **Dynamic Characters**       | ✓          | ✓             | ✗                |
