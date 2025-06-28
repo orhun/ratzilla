@@ -37,6 +37,8 @@ pub struct WebGl2BackendOptions {
     measure_performance: bool,
     /// The canvas padding color.
     canvas_padding_color: Option<Color>,
+    /// Whether to use beamterm's internal mouse handler for selection.
+    default_mouse_handler: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -70,7 +72,7 @@ impl WebGl2BackendOptions {
         self.fallback_glyph = Some(glyph.into());
         self
     }
-    
+
     /// Sets the canvas padding color. The padding area is the space not covered by the
     /// terminal grid.
     pub fn canvas_padding_color(mut self, color: Color) -> Self {
@@ -81,6 +83,13 @@ impl WebGl2BackendOptions {
     /// Sets a custom font atlas to use for rendering.
     pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
         self.font_atlas = Some(atlas);
+        self
+    }
+
+    /// Enables block-based mouse selection with automatic copy to
+    /// clipboard on selection.
+    pub fn enable_mouse_selection(mut self) -> Self {
+        self.default_mouse_handler = true;
         self
     }
 
@@ -197,9 +206,13 @@ impl WebGl2Backend {
         let context = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
             .fallback_glyph(&options.fallback_glyph.unwrap_or(" ".into()))
-            .font_atlas(options.font_atlas.take().unwrap_or_default())
-            .default_mouse_input_handler(SelectionMode::Block, true)
-            .build()?;
+            .font_atlas(options.font_atlas.take().unwrap_or_default());
+
+        let context = if options.default_mouse_handler {
+            context.default_mouse_input_handler(SelectionMode::Block, true)
+        } else {
+            context
+        }.build()?;
 
         Ok(Self {
             context,
