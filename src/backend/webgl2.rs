@@ -161,8 +161,8 @@ impl WebGl2BackendOptions {
 /// ```
 #[derive(Debug)]
 pub struct WebGl2Backend {
-    /// WebGl2 context.
-    context: Beamterm,
+    /// WebGl2 terminal renderer.
+    beamterm: Beamterm,
     /// Cursor position.
     cursor_position: Option<Position>,
     /// The cursor shape.
@@ -215,7 +215,7 @@ impl WebGl2Backend {
         }.build()?;
 
         Ok(Self {
-            context,
+            beamterm: context,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             performance,
@@ -235,17 +235,17 @@ impl WebGl2Backend {
 
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
     pub fn resize_canvas(&mut self) -> Result<(), Error> {
-        let size_px = self.context.canvas_size();
+        let size_px = self.beamterm.canvas_size();
 
         // resize the terminal grid and viewport
-        self.context.resize(size_px.0, size_px.1)?;
+        self.beamterm.resize(size_px.0, size_px.1)?;
 
         Ok(())
     }
 
     /// Checks if the canvas size matches the display size and resizes it if necessary.
     fn check_canvas_resize(&mut self) -> Result<(), Error> {
-        let canvas = self.context.canvas();
+        let canvas = self.beamterm.canvas();
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
@@ -272,7 +272,7 @@ impl WebGl2Backend {
 
     /// Draws the cursor at the specified position.
     fn draw_cursor(&mut self, pos: Position) {
-        if let Some(c) = self.context.grid().borrow_mut().cell_data_mut(pos.x, pos.y) {
+        if let Some(c) = self.beamterm.grid().borrow_mut().cell_data_mut(pos.x, pos.y) {
             match self.cursor_shape {
                 CursorShape::SteadyBlock => {
                     c.flip_colors();
@@ -316,7 +316,7 @@ impl Backend for WebGl2Backend {
         // Flushes GPU buffers and render existing content to the canvas
         self.measure_begin(WEBGL_RENDER_MARK);
         self.toggle_cursor(); // show cursor before rendering
-        let _ = self.context.render_frame();
+        let _ = self.beamterm.render_frame();
         self.toggle_cursor(); // restore cell to previous state
         self.measure_end(WEBGL_RENDER_MARK);
 
@@ -324,7 +324,7 @@ impl Backend for WebGl2Backend {
         self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
 
         let cells = content.map(|(x, y, cell)| (x, y, cell_data(cell)));
-        self.context
+        self.beamterm
             .update_cells_by_position(cells)
             .map_err(Error::from)?;
 
@@ -355,21 +355,21 @@ impl Backend for WebGl2Backend {
         let cells = [CellData::new_with_style_bits(" ", 0, 0xffffff, 0x000000)]
             .into_iter()
             .cycle()
-            .take(self.context.cell_count());
+            .take(self.beamterm.cell_count());
 
-        self.context.update_cells(cells).map_err(Error::from)?;
+        self.beamterm.update_cells(cells).map_err(Error::from)?;
 
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
-        let (w, h) = self.context.terminal_size();
+        let (w, h) = self.beamterm.terminal_size();
         Ok(Size::new(w as _, h as _))
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        let (cols, rows) = self.context.terminal_size();
-        let (w, h) = self.context.canvas_size();
+        let (cols, rows) = self.beamterm.terminal_size();
+        let (w, h) = self.beamterm.canvas_size();
 
         Ok(WindowSize {
             columns_rows: Size::new(cols, rows),
