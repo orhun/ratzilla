@@ -4,7 +4,7 @@ use crate::{
     CursorShape,
 };
 use beamterm_renderer::{
-    CellData, FontAtlasData, FontStyle, GlyphEffect, SelectionMode, Terminal as Beamterm,
+    CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
 };
 use compact_str::CompactString;
 use ratatui::{
@@ -313,13 +313,6 @@ impl Backend for WebGl2Backend {
             return Ok(());
         }
 
-        // Flushes GPU buffers and render existing content to the canvas
-        self.measure_begin(WEBGL_RENDER_MARK);
-        self.toggle_cursor(); // show cursor before rendering
-        let _ = self.beamterm.render_frame();
-        self.toggle_cursor(); // restore cell to previous state
-        self.measure_end(WEBGL_RENDER_MARK);
-
         // Update internal cell buffer with the new content
         self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
 
@@ -339,6 +332,16 @@ impl Backend for WebGl2Backend {
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         self.check_canvas_resize()?;
+
+        // Flushes GPU buffers and render existing content to the canvas
+        self.measure_begin(WEBGL_RENDER_MARK);
+        
+        self.toggle_cursor(); // show cursor before rendering
+        let _ = self.beamterm.render_frame();
+        self.toggle_cursor(); // restore cell to previous state
+        
+        self.measure_end(WEBGL_RENDER_MARK);
+        
         Ok(())
     }
 
