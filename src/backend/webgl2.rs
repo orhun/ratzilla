@@ -337,7 +337,7 @@ impl Backend for WebGl2Backend {
         self.measure_begin(WEBGL_RENDER_MARK);
         
         self.toggle_cursor(); // show cursor before rendering
-        let _ = self.beamterm.render_frame();
+        self.beamterm.render_frame().map_err(Error::from)?;
         self.toggle_cursor(); // restore cell to previous state
         
         self.measure_end(WEBGL_RENDER_MARK);
@@ -367,7 +367,7 @@ impl Backend for WebGl2Backend {
 
     fn size(&self) -> IoResult<Size> {
         let (w, h) = self.beamterm.terminal_size();
-        Ok(Size::new(w as _, h as _))
+        Ok(Size::new(w, h))
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
