@@ -6,14 +6,15 @@ use ratzilla::{
         prelude::*,
         widgets::{Block, Borders, Paragraph},
     },
-    DomBackend, WebRenderer,
+    WebRenderer,
 };
+use examples_shared::{backend_from_query_param, BackendType};
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let (_backend_type, terminal) = backend_from_query_param(BackendType::Dom)
+        .build_terminal()?;
 
     let app = Rc::new(RefCell::new(App::new()));
 

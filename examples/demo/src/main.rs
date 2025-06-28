@@ -11,9 +11,12 @@ use std::{cell::RefCell, io::Result, rc::Rc};
 use app::App;
 use clap::Parser;
 use ratzilla::event::KeyCode;
-use ratzilla::ratatui::style::Color;
-use ratzilla::ratatui::Terminal;
-use ratzilla::{CanvasBackend, WebRenderer};
+use ratzilla::WebRenderer;
+use examples_shared::{backend_from_query_param, BackendType};
+use ratzilla::{
+    backend::webgl2::WebGl2BackendOptions,
+    backend::canvas::CanvasBackendOptions,
+};
 
 mod app;
 
@@ -34,9 +37,20 @@ struct Cli {
 
 fn main() -> Result<()> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    let mut backend = CanvasBackend::new_with_size(1600, 900)?;
-    backend.set_background_color(Color::Rgb(18, 18, 18));
-    let terminal = Terminal::new(backend)?;
+    
+    // Create backend with explicit size like main branch (1600x900)
+    let canvas_options = CanvasBackendOptions::new()
+        .size((1600, 900));
+    
+    let webgl2_options = WebGl2BackendOptions::new()
+        .measure_performance(true)
+        .size((1600, 900));
+    
+    let (_backend_type, terminal) = backend_from_query_param(BackendType::WebGl2)
+        .canvas_options(canvas_options)
+        .webgl2_options(webgl2_options)
+        .build_terminal()?;
+    
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {

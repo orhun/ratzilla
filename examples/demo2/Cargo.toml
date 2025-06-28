@@ -14,3 +14,4 @@ ratzilla = { path = "../../" }
 strum = "0.26.3"
 time = "0.3.37"
 unicode-width = "0.2.0"
+examples-shared = { path = "../shared" }
