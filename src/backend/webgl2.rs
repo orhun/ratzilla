@@ -70,6 +70,13 @@ impl WebGl2BackendOptions {
         self.fallback_glyph = Some(glyph.into());
         self
     }
+    
+    /// Sets the canvas padding color. The padding area is the space not covered by the
+    /// terminal grid.
+    pub fn canvas_padding_color(mut self, color: Color) -> Self {
+        self.canvas_padding_color = Some(color);
+        self
+    }
 
     /// Sets a custom font atlas to use for rendering.
     pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
