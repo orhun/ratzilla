@@ -1,11 +1,10 @@
-use std::io;
-use std::cell::RefCell;
-use ratzilla::{CanvasBackend, DomBackend, WebGl2Backend};
-use ratzilla::ratatui::{prelude::Backend, Terminal, TerminalOptions};
+use ratzilla::{
+    backend::{canvas::CanvasBackendOptions, dom::DomBackendOptions, webgl2::WebGl2BackendOptions},
+    ratatui::{prelude::Backend, Terminal, TerminalOptions},
+    CanvasBackend, DomBackend, WebGl2Backend,
+};
+use std::{cell::RefCell, io};
 use web_sys::{wasm_bindgen::JsValue, Url};
-use ratzilla::backend::canvas::CanvasBackendOptions;
-use ratzilla::backend::dom::DomBackendOptions;
-use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use web_time::Instant;
 
 /// Records and calculates frames per second.
@@ -50,7 +49,7 @@ impl FpsRecorder {
         } else {
             self.tail - 1
         };
-        
+
         let elapsed = self.recorded_frame[newest_idx]
             .duration_since(self.recorded_frame[self.tail])
             .as_secs_f32()
@@ -103,11 +102,11 @@ fn update_fps_display(fps: f32) {
     let _ = (|| -> Result<(), JsValue> {
         let window = web_sys::window().ok_or("No window")?;
         let document = window.document().ok_or("No document")?;
-        
+
         if let Some(fps_element) = document.get_element_by_id("ratzilla-fps") {
             fps_element.set_text_content(Some(&format!("{:.1}", fps)));
         }
-        
+
         Ok(())
     })();
 }
@@ -123,14 +122,17 @@ pub struct MultiBackendBuilder {
 
 impl MultiBackendBuilder {
     fn new(default_backend: BackendType) -> Self {
-        Self { default_backend, ..Self::default() }
+        Self {
+            default_backend,
+            ..Self::default()
+        }
     }
-    
+
     pub fn terminal_options(mut self, options: TerminalOptions) -> Self {
         self.terminal_options = options;
         self
     }
-    
+
     /// Set options for the Canvas backend
     pub fn canvas_options(mut self, options: CanvasBackendOptions) -> Self {
         self.canvas_options = options;
@@ -148,7 +150,7 @@ impl MultiBackendBuilder {
         self.webgl2_options = options;
         self
     }
-    
+
     pub fn build_terminal(self) -> io::Result<(BackendType, Terminal<FpsTrackingBackend>)> {
         let backend_type = get_backend_from_query(self.default_backend);
         let backend = create_backend_with_options(
@@ -157,17 +159,17 @@ impl MultiBackendBuilder {
             Some(self.canvas_options),
             Some(self.webgl2_options),
         )?;
-        
+
         // Initialize FPS recorder
         init_fps_recorder();
-        
+
         // Wrap backend with FPS tracking
         let fps_backend = FpsTrackingBackend::new(backend);
         let terminal = Terminal::with_options(fps_backend, self.terminal_options)?;
-        
+
         // Inject footer (ignore errors)
         let _ = inject_backend_footer(backend_type);
-        
+
         Ok((backend_type, terminal))
     }
 }
@@ -201,7 +203,7 @@ impl BackendType {
     pub fn as_str(&self) -> &'static str {
         match self {
             BackendType::Dom => "dom",
-            BackendType::Canvas => "canvas", 
+            BackendType::Canvas => "canvas",
             BackendType::WebGl2 => "webgl2",
         }
     }
@@ -286,7 +288,10 @@ impl Backend for RatzillaBackend {
         }
     }
 
-    fn set_cursor_position<P: Into<ratzilla::ratatui::layout::Position>>(&mut self, position: P) -> io::Result<()> {
+    fn set_cursor_position<P: Into<ratzilla::ratatui::layout::Position>>(
+        &mut self,
+        position: P,
+    ) -> io::Result<()> {
         match self {
             RatzillaBackend::Dom(backend) => backend.set_cursor_position(position),
             RatzillaBackend::Canvas(backend) => backend.set_cursor_position(position),
@@ -352,7 +357,10 @@ impl Backend for FpsTrackingBackend {
         self.inner.get_cursor_position()
     }
 
-    fn set_cursor_position<P: Into<ratzilla::ratatui::layout::Position>>(&mut self, position: P) -> io::Result<()> {
+    fn set_cursor_position<P: Into<ratzilla::ratatui::layout::Position>>(
+        &mut self,
+        position: P,
+    ) -> io::Result<()> {
         self.inner.set_cursor_position(position)
     }
 
@@ -399,7 +407,7 @@ fn get_backend_from_query(default: BackendType) -> BackendType {
 fn inject_backend_footer(current_backend: BackendType) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or("No window")?;
     let document = window.document().ok_or("No document")?;
-    
+
     // Remove existing footer if present
     if let Some(existing) = document.get_element_by_id("ratzilla-backend-footer") {
         existing.remove();
@@ -408,14 +416,15 @@ fn inject_backend_footer(current_backend: BackendType) -> Result<(), JsValue> {
     // Create footer element
     let footer = document.create_element("div")?;
     footer.set_id("ratzilla-backend-footer");
-    
+
     // Set footer styles
-    footer.set_attribute("style", 
+    footer.set_attribute(
+        "style",
         "position: fixed; bottom: 0; left: 0; right: 0; \
          background: rgba(0,0,0,0.8); color: white; \
          padding: 8px 16px; font-family: monospace; font-size: 12px; \
          display: flex; justify-content: center; gap: 16px; \
-         border-top: 1px solid #333; z-index: 1000;"
+         border-top: 1px solid #333; z-index: 1000;",
     )?;
 
     // Get current URL without backend param - use relative URL to avoid protocol issues
@@ -434,12 +443,21 @@ fn inject_backend_footer(current_backend: BackendType) -> Result<(), JsValue> {
         };
 
         let link = if is_current {
-            format!("<span style=\"{}\">● {}</span>", style, backend.display_name())
+            format!(
+                "<span style=\"{}\">● {}</span>",
+                style,
+                backend.display_name()
+            )
         } else {
-            format!("<a href=\"{}?backend={}\" style=\"{}\">{}</a>", 
-                base_url, backend.as_str(), style, backend.display_name())
+            format!(
+                "<a href=\"{}?backend={}\" style=\"{}\">{}</a>",
+                base_url,
+                backend.as_str(),
+                style,
+                backend.display_name()
+            )
         };
-        
+
         links.push(link);
     }
 
@@ -449,7 +467,7 @@ fn inject_backend_footer(current_backend: BackendType) -> Result<(), JsValue> {
          <span id=\"ratzilla-fps\" style=\"color: #4ade80; font-weight: bold;\">--</span>",
         links.join(" | ")
     );
-    
+
     footer.set_inner_html(&footer_html);
 
     // Append to body
@@ -467,8 +485,14 @@ fn create_backend_with_options(
 ) -> io::Result<RatzillaBackend> {
     use RatzillaBackend::*;
     match backend_type {
-        BackendType::Dom => Ok(Dom(DomBackend::new_with_options(dom_options.unwrap_or_default())?)),
-        BackendType::Canvas => Ok(Canvas(CanvasBackend::new_with_options(canvas_options.unwrap_or_default())?)),
-        BackendType::WebGl2 => Ok(WebGl2(WebGl2Backend::new_with_options(webgl2_options.unwrap_or_default())?)),
+        BackendType::Dom => Ok(Dom(DomBackend::new_with_options(
+            dom_options.unwrap_or_default(),
+        )?)),
+        BackendType::Canvas => Ok(Canvas(CanvasBackend::new_with_options(
+            canvas_options.unwrap_or_default(),
+        )?)),
+        BackendType::WebGl2 => Ok(WebGl2(WebGl2Backend::new_with_options(
+            webgl2_options.unwrap_or_default(),
+        )?)),
     }
 }
