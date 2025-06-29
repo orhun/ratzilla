@@ -5,6 +5,7 @@ use crate::{
 };
 use beamterm_renderer::{
     CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
+    TerminalMouseHandler, TerminalMouseEvent, MouseEventType, select,
 };
 use compact_str::CompactString;
 use ratatui::{
@@ -14,7 +15,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use std::{io::Result as IoResult, mem::swap};
+use std::{io::Result as IoResult, mem::swap, rc::Rc, cell::RefCell};
 use bitvec::prelude::BitVec;
 use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
 
@@ -23,7 +24,7 @@ const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
 
 /// Options for the [`WebGl2Backend`].
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct WebGl2BackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -45,6 +46,8 @@ pub struct WebGl2BackendOptions {
     enable_hyperlinks: bool,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
+    /// Hyperlink click callback.
+    hyperlink_callback: Option<Rc<RefCell<dyn FnMut(&str)>>>,
 }
 
 impl WebGl2BackendOptions {
@@ -111,11 +114,36 @@ impl WebGl2BackendOptions {
         self
     }
 
+    /// Sets a callback for when hyperlinks are clicked
+    pub fn on_hyperlink_click<F>(mut self, callback: F) -> Self 
+    where F: FnMut(&str) + 'static
+    {
+        self.enable_hyperlinks = true;
+        self.hyperlink_callback = Some(Rc::new(RefCell::new(callback)));
+        self
+    }
+
     /// Gets the canvas padding color, defaulting to black if not set.
     fn get_canvas_padding_color(&self) -> u32 {
         self.canvas_padding_color
             .map(|c| to_rgb(c, 0x000000))
             .unwrap_or(0x000000)
+    }
+}
+
+impl std::fmt::Debug for WebGl2BackendOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebGl2BackendOptions")
+            .field("grid_id", &self.grid_id)
+            .field("size", &self.size)
+            .field("fallback_glyph", &self.fallback_glyph)
+            .field("canvas_padding_color", &self.canvas_padding_color)
+            .field("cursor_shape", &self.cursor_shape)
+            .field("default_mouse_handler", &self.default_mouse_handler)
+            .field("enable_hyperlinks", &self.enable_hyperlinks)
+            .field("measure_performance", &self.measure_performance)
+            .field("hyperlink_callback", &"<callback>")
+            .finish()
     }
 }
 
@@ -177,7 +205,6 @@ impl WebGl2BackendOptions {
 /// avg('upload-cells-to-gpu')
 /// avg('sync-terminal-buffer')
 /// ```
-#[derive(Debug)]
 pub struct WebGl2Backend {
     /// WebGl2 terminal renderer.
     beamterm: Beamterm,
@@ -188,7 +215,11 @@ pub struct WebGl2Backend {
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
     /// Hyperlink tracking.
-    hyperlink_cells: Option<BitVec>
+    hyperlink_cells: Option<BitVec>,
+    /// Mouse handler for hyperlink clicks.
+    hyperlink_mouse_handler: Option<TerminalMouseHandler>,
+    /// Hyperlink click callback.
+    hyperlink_callback: Option<Rc<RefCell<dyn FnMut(&str)>>>,
 }
 
 impl WebGl2Backend {
@@ -240,11 +271,23 @@ impl WebGl2Backend {
             None
         };
 
+        // Extract hyperlink callback from options
+        let hyperlink_callback = options.hyperlink_callback.take();
+
+        // Set up hyperlink mouse handler if callback is provided
+        let hyperlink_mouse_handler = if let Some(ref callback) = hyperlink_callback {
+            Some(Self::create_hyperlink_mouse_handler(&context, hyperlink_cells.as_ref(), callback.clone())?)
+        } else {
+            None
+        };
+
         Ok(Self {
             beamterm: context,
             cursor_position: None,
             options,
             hyperlink_cells,
+            hyperlink_mouse_handler,
+            hyperlink_callback,
             performance,
         })
     }
@@ -271,6 +314,12 @@ impl WebGl2Backend {
 
         // resize the terminal grid and viewport
         self.beamterm.resize(size_px.0, size_px.1)?;
+
+        // Update mouse handler dimensions if it exists
+        if let Some(mouse_handler) = &self.hyperlink_mouse_handler {
+            let (cols, rows) = self.beamterm.terminal_size();
+            mouse_handler.update_dimensions(cols, rows);
+        }
 
         // clear any hyperlink cells; we'll get them in the next draw call
         if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
@@ -367,6 +416,120 @@ impl WebGl2Backend {
             performance
                 .measure_with_start_mark(label, label)
                 .unwrap_or_default();
+        }
+    }
+
+    /// Creates a mouse handler specifically for hyperlink clicks.
+    fn create_hyperlink_mouse_handler(
+        beamterm: &Beamterm,
+        hyperlink_cells: Option<&BitVec>,
+        callback: Rc<RefCell<dyn FnMut(&str)>>,
+    ) -> Result<TerminalMouseHandler, Error> {
+        let grid = beamterm.grid();
+        let canvas = beamterm.canvas();
+        let hyperlink_cells_clone = hyperlink_cells.map(|cells| cells.clone());
+        
+        let mouse_handler = TerminalMouseHandler::new(
+            &canvas,
+            grid,
+            move |event: TerminalMouseEvent, grid: &beamterm_renderer::TerminalGrid| {
+                // Only handle left mouse button clicks
+                if event.event_type == MouseEventType::MouseUp && event.button == 0 {
+                    if let Some(url) = Self::extract_hyperlink_url_static(
+                        &hyperlink_cells_clone,
+                        grid,
+                        event.col,
+                        event.row,
+                    ) {
+                        // Call the user's hyperlink callback
+                        if let Ok(mut cb) = callback.try_borrow_mut() {
+                            cb(&url);
+                        }
+                    }
+                }
+            },
+        )?;
+
+        Ok(mouse_handler)
+    }
+
+    /// Extracts hyperlink URL from grid coordinates (static version for use in closures).
+    fn extract_hyperlink_url_static(
+        hyperlink_cells: &Option<BitVec>,
+        grid: &beamterm_renderer::TerminalGrid,
+        start_col: u16,
+        row: u16,
+    ) -> Option<String> {
+        let hyperlink_cells = hyperlink_cells.as_ref()?;
+        let (cols, _) = grid.terminal_size();
+        
+        // Check if clicked cell is a hyperlink
+        let start_idx = row as usize * cols as usize + start_col as usize;
+        if !hyperlink_cells.get(start_idx).map(|b| *b).unwrap_or(false) {
+            return None;
+        }
+        
+        // Find hyperlink boundaries
+        let (link_start, link_end) = Self::find_hyperlink_bounds_static(
+            hyperlink_cells, start_col, row, cols
+        )?;
+        
+        // Extract text using beamterm's grid
+        Self::extract_text_from_grid_static(grid, link_start, link_end, row)
+    }
+
+    /// Finds the start and end boundaries of a hyperlink (static version).
+    fn find_hyperlink_bounds_static(
+        hyperlink_cells: &BitVec,
+        start_col: u16,
+        row: u16,
+        cols: u16,
+    ) -> Option<(u16, u16)> {
+        let row_start_idx = row as usize * cols as usize;
+        
+        // Find start of hyperlink (scan left)
+        let mut link_start = start_col;
+        while link_start > 0 {
+            let idx = row_start_idx + (link_start - 1) as usize;
+            if !hyperlink_cells.get(idx).map(|b| *b).unwrap_or(false) {
+                break;
+            }
+            link_start -= 1;
+        }
+        
+        // Find end of hyperlink (scan right)
+        let mut link_end = start_col;
+        while link_end < cols - 1 {
+            let idx = row_start_idx + (link_end + 1) as usize;
+            if !hyperlink_cells.get(idx).map(|b| *b).unwrap_or(false) {
+                break;
+            }
+            link_end += 1;
+        }
+        
+        Some((link_start, link_end))
+    }
+
+    /// Extracts text from beamterm grid using get_text(CellQuery).
+    fn extract_text_from_grid_static(
+        grid: &beamterm_renderer::TerminalGrid,
+        start_col: u16,
+        end_col: u16,
+        row: u16,
+    ) -> Option<String> {
+        // Create a selection query for the hyperlink range
+        let query = select(SelectionMode::Block)
+            .start((start_col, row))
+            .end((end_col, row))
+            .trim_trailing_whitespace(true);
+            
+        let text = grid.get_text(query);
+        let trimmed = text.trim();
+        
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
         }
     }
 }
@@ -508,6 +671,20 @@ const fn into_glyph_bits(modifier: Modifier) -> u16 {
     | (m << 8) & (1 << 10) // italic
     | (m << 9) & (1 << 12) // underline
     | (m << 5) & (1 << 13) // strikethrough
+}
+
+impl std::fmt::Debug for WebGl2Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebGl2Backend")
+            .field("beamterm", &"<beamterm>")
+            .field("options", &self.options)
+            .field("cursor_position", &self.cursor_position)
+            .field("performance", &self.performance.is_some())
+            .field("hyperlink_cells", &self.hyperlink_cells.as_ref().map(|c| c.len()))
+            .field("hyperlink_mouse_handler", &self.hyperlink_mouse_handler.is_some())
+            .field("hyperlink_callback", &self.hyperlink_callback.is_some())
+            .finish()
+    }
 }
 
 #[cfg(test)]
