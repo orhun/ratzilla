@@ -33,12 +33,16 @@ pub struct WebGl2BackendOptions {
     fallback_glyph: Option<CompactString>,
     /// Override the default font atlas.
     font_atlas: Option<FontAtlasData>,
-    /// Measure performance using the `performance` API.
-    measure_performance: bool,
     /// The canvas padding color.
     canvas_padding_color: Option<Color>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
     /// Whether to use beamterm's internal mouse handler for selection.
     default_mouse_handler: bool,
+    /// Enable hyperlinks in the canvas.
+    enable_hyperlinks: bool,
+    /// Measure performance using the `performance` API.
+    measure_performance: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -79,6 +83,12 @@ impl WebGl2BackendOptions {
         self.canvas_padding_color = Some(color);
         self
     }
+    
+    /// Sets the cursor shape to use when cursor is visible.
+    pub fn cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.cursor_shape = shape;
+        self
+    }
 
     /// Sets a custom font atlas to use for rendering.
     pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
@@ -90,6 +100,12 @@ impl WebGl2BackendOptions {
     /// clipboard on selection.
     pub fn enable_mouse_selection(mut self) -> Self {
         self.default_mouse_handler = true;
+        self
+    }
+    
+    /// Enables hyperlinks in the canvas.
+    pub fn enable_hyperlinks(mut self) -> Self {
+        self.enable_hyperlinks = true;
         self
     }
 
@@ -163,10 +179,10 @@ impl WebGl2BackendOptions {
 pub struct WebGl2Backend {
     /// WebGl2 terminal renderer.
     beamterm: Beamterm,
+    /// The options used to create this backend.
+    options: WebGl2BackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// The cursor shape.
-    cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
 }
@@ -205,7 +221,7 @@ impl WebGl2Backend {
 
         let context = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
-            .fallback_glyph(&options.fallback_glyph.unwrap_or(" ".into()))
+            .fallback_glyph(&options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
             .font_atlas(options.font_atlas.take().unwrap_or_default());
 
         let context = if options.default_mouse_handler {
@@ -217,19 +233,24 @@ impl WebGl2Backend {
         Ok(Self {
             beamterm: context,
             cursor_position: None,
-            cursor_shape: CursorShape::SteadyBlock,
+            options: options,
             performance,
         })
+    }
+    
+    /// Returns the options objects used to create this backend.
+    pub fn options(&self) -> &WebGl2BackendOptions {
+        &self.options
     }
 
     /// Returns the [`CursorShape`].
     pub fn cursor_shape(&self) -> &CursorShape {
-        &self.cursor_shape
+        &self.options.cursor_shape
     }
 
     /// Set the [`CursorShape`].
     pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
-        self.cursor_shape = shape;
+        self.options.cursor_shape = shape;
         self
     }
 
@@ -273,7 +294,7 @@ impl WebGl2Backend {
     /// Draws the cursor at the specified position.
     fn draw_cursor(&mut self, pos: Position) {
         if let Some(c) = self.beamterm.grid().borrow_mut().cell_data_mut(pos.x, pos.y) {
-            match self.cursor_shape {
+            match self.options.cursor_shape {
                 CursorShape::SteadyBlock => {
                     c.flip_colors();
                 }
