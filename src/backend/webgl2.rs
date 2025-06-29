@@ -15,6 +15,8 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use std::{io::Result as IoResult, mem::swap};
+use bitvec::prelude::BitVec;
+use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -83,7 +85,7 @@ impl WebGl2BackendOptions {
         self.canvas_padding_color = Some(color);
         self
     }
-    
+
     /// Sets the cursor shape to use when cursor is visible.
     pub fn cursor_shape(mut self, shape: CursorShape) -> Self {
         self.cursor_shape = shape;
@@ -102,7 +104,7 @@ impl WebGl2BackendOptions {
         self.default_mouse_handler = true;
         self
     }
-    
+
     /// Enables hyperlinks in the canvas.
     pub fn enable_hyperlinks(mut self) -> Self {
         self.enable_hyperlinks = true;
@@ -185,6 +187,8 @@ pub struct WebGl2Backend {
     cursor_position: Option<Position>,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
+    /// Hyperlink tracking.
+    hyperlink_cells: Option<BitVec>
 }
 
 impl WebGl2Backend {
@@ -230,14 +234,21 @@ impl WebGl2Backend {
             context
         }.build()?;
 
+        let hyperlink_cells = if options.enable_hyperlinks {
+            Some(BitVec::repeat(false, context.cell_count()))
+        } else {
+            None
+        };
+
         Ok(Self {
             beamterm: context,
             cursor_position: None,
-            options: options,
+            options,
+            hyperlink_cells,
             performance,
         })
     }
-    
+
     /// Returns the options objects used to create this backend.
     pub fn options(&self) -> &WebGl2BackendOptions {
         &self.options
@@ -261,6 +272,13 @@ impl WebGl2Backend {
         // resize the terminal grid and viewport
         self.beamterm.resize(size_px.0, size_px.1)?;
 
+        // clear any hyperlink cells; we'll get them in the next draw call
+        if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
+            let cell_count = self.beamterm.cell_count();
+            hyperlink_cells.clear();
+            hyperlink_cells.resize(cell_count, false);
+        }
+
         Ok(())
     }
 
@@ -279,6 +297,36 @@ impl WebGl2Backend {
 
             self.resize_canvas()?;
         }
+
+        Ok(())
+    }
+
+    /// Updates the terminal grid with new cell content.
+    fn update_grid<'a, I>(&mut self, content: I) -> Result<(), Error> where I: Iterator<Item = (u16, u16, &'a Cell)> {
+        // If enabled, measures the time taken to synchronize the terminal buffer.
+        self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
+
+        // If hyperlink support is enabled, we need to track which cells are hyperlinks,
+        // before passing the content to the beamterm renderer.
+        if let Some(hyperlink_cells) = self.hyperlink_cells.as_mut() {
+            let w = self.beamterm.terminal_size().0 as usize;
+
+            // Mark any cells that have the hyperlink modifier set (don't blink!).
+            // At this stage, we don't care about the actual cell content,
+            // as we can extract it on demand.
+            let cells = content.inspect(|(x, y, c)| {
+                let idx = *y as usize * w + *x as usize;
+                hyperlink_cells.set(idx, c.modifier.contains(HYPERLINK_MODIFIER));
+            });
+            let cells = cells.map(|(x, y, cell)| (x, y, cell_data(cell)));
+
+            self.beamterm.update_cells_by_position(cells)
+        } else {
+            let cells = content.map(|(x, y, cell)| (x, y, cell_data(cell)));
+            self.beamterm.update_cells_by_position(cells)
+        }.map_err(Error::from)?;
+
+        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
         Ok(())
     }
@@ -329,20 +377,9 @@ impl Backend for WebGl2Backend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        if content.size_hint().1 == Some(0) {
-            // No content to draw, nothing to do
-            return Ok(());
+        if content.size_hint().1 != Some(0) {
+            self.update_grid(content)?;
         }
-
-        // Update internal cell buffer with the new content
-        self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
-
-        let cells = content.map(|(x, y, cell)| (x, y, cell_data(cell)));
-        self.beamterm
-            .update_cells_by_position(cells)
-            .map_err(Error::from)?;
-
-        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
         Ok(())
     }
@@ -354,9 +391,9 @@ impl Backend for WebGl2Backend {
     fn flush(&mut self) -> IoResult<()> {
         self.check_canvas_resize()?;
 
-        // Flushes GPU buffers and render existing content to the canvas
         self.measure_begin(WEBGL_RENDER_MARK);
         
+        // Flushes GPU buffers and render existing content to the canvas
         self.toggle_cursor(); // show cursor before rendering
         self.beamterm.render_frame().map_err(Error::from)?;
         self.toggle_cursor(); // restore cell to previous state
@@ -382,6 +419,10 @@ impl Backend for WebGl2Backend {
             .take(self.beamterm.cell_count());
 
         self.beamterm.update_cells(cells).map_err(Error::from)?;
+
+        if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
+            hyperlink_cells.clear();
+        }
 
         Ok(())
     }
