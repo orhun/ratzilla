@@ -8,6 +8,7 @@
 //!
 //! - [`CanvasBackend`]: Canvas 2D API with full Unicode support via browser font rendering.
 //!   Good fallback when WebGL2 isn't available or when dynamic character support is required.
+//!   Does not support hyperlinks or text selection, but can render dynamic Unicode/emoji.
 //!
 //! - [`DomBackend`]: Renders cells as HTML elements. Most compatible and accessible,
 //!   supports hyperlinks, but slowest for large terminals.
@@ -20,8 +21,8 @@
 //! |------------------------------|------------|---------------|------------------|
 //! | **60fps on large terminals** | ✗          | ✗             | ✓                |
 //! | **Memory Usage**             | Highest    | Medium        | Lowest           |
-//! | **Hyperlinks**               | ✓          | ✗             | ✗                |
-//! | **Text Selection**           | ✓          | ✗             | ✗                |
+//! | **Hyperlinks**               | ✓          | ✗             | ✓                |
+//! | **Text Selection**           | ✓          | ✗             | ✓                |
 //! | **Accessibility**            | ✓          | Limited       | Limited          |
 //! | **Unicode/Emoji Support**    | Full       | Full          | Limited to atlas |
 //! | **Dynamic Characters**       | ✓          | ✓             | ✗                |
@@ -31,7 +32,7 @@
 //!
 //! - **WebGl2Backend**: Preferred for most applications - consumes the least amount of resources
 //! - **CanvasBackend**: When you need dynamic Unicode/emoji or must support non-WebGL2 browsers
-//! - **DomBackend**: When you need hyperlinks, accessibility, or CSS styling
+//! - **DomBackend**: When you need better accessibility or CSS styling
 
 /// Canvas backend.
 pub mod canvas;

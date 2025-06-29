@@ -10,7 +10,9 @@ use wave_effect::WaveInterference;
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend =
-        WebGl2Backend::new_with_options(WebGl2BackendOptions::new().grid_id("container"))?;
+        WebGl2Backend::new_with_options(WebGl2BackendOptions::new()
+            .measure_performance(true)
+            .grid_id("container"))?;
     let terminal = Terminal::new(backend)?;
 
     let mut effect = WaveInterference::new().into_effect();
