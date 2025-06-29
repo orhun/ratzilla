@@ -16,9 +16,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "beamterm-data"
-version = "0.1.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5426715a90e525fe067fed3c668b56297f5943235d4d08ac4f0d0851107ab9b"
+checksum = "2faef60281971343e88492df79ca384bb5cd8faf5632578f06494db56754d0f3"
 dependencies = [
  "compact_str 0.9.0",
  "miniz_oxide",
@@ -26,15 +26,17 @@ dependencies = [
 
 [[package]]
 name = "beamterm-renderer"
-version = "0.1.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9678ebf9df1e5102cca065f991f8ecd486c65184372d94aa94131eff228dc1d7"
+checksum = "14ff872ce0b0e975d08791bc33bc2c926ea7cc768c480049cc657a116fb120ac"
 dependencies = [
  "beamterm-data",
  "compact_str 0.9.0",
  "console_error_panic_hook",
  "js-sys",
  "thiserror",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -566,6 +568,19 @@ dependencies = [
  "quote",
  "syn",
  "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-futures"
+version = "0.4.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "555d470ec0bc3bb57890405e5d4322cc9ea83cebb085523ced7be4144dac1e61"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "once_cell",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
