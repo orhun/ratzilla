@@ -5,7 +5,8 @@ use crate::{
 };
 use beamterm_renderer::{
     CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
-    TerminalMouseHandler, TerminalMouseEvent, MouseEventType, select,
+    mouse::*,
+    select,
 };
 use compact_str::CompactString;
 use ratatui::{
@@ -17,6 +18,7 @@ use ratatui::{
 };
 use std::{io::Result as IoResult, mem::swap, rc::Rc, cell::RefCell};
 use bitvec::prelude::BitVec;
+use web_sys::window;
 use crate::widgets::hyperlink::HYPERLINK_MODIFIER;
 
 // Labels used by the Performance API
@@ -42,8 +44,6 @@ pub struct WebGl2BackendOptions {
     cursor_shape: CursorShape,
     /// Whether to use beamterm's internal mouse handler for selection.
     default_mouse_handler: bool,
-    /// Enable hyperlinks in the canvas.
-    enable_hyperlinks: bool,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
     /// Hyperlink click callback.
@@ -108,17 +108,21 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Enables hyperlinks in the canvas.
-    pub fn enable_hyperlinks(mut self) -> Self {
-        self.enable_hyperlinks = true;
-        self
+    /// Enables hyperlinks in the canvas. Sets up a default mouse handler
+    /// using [`WebGl2BackendOptions::on_hyperlink_click`].
+    pub fn enable_hyperlinks(self) -> Self {
+        self.on_hyperlink_click(|url| {
+            if let Some(w) = window() {
+                w.open_with_url_and_target(url, "_blank")
+                    .unwrap_or_default();
+            }
+        })
     }
 
     /// Sets a callback for when hyperlinks are clicked
     pub fn on_hyperlink_click<F>(mut self, callback: F) -> Self 
     where F: FnMut(&str) + 'static
     {
-        self.enable_hyperlinks = true;
         self.hyperlink_callback = Some(Rc::new(RefCell::new(callback)));
         self
     }
@@ -140,7 +144,6 @@ impl std::fmt::Debug for WebGl2BackendOptions {
             .field("canvas_padding_color", &self.canvas_padding_color)
             .field("cursor_shape", &self.cursor_shape)
             .field("default_mouse_handler", &self.default_mouse_handler)
-            .field("enable_hyperlinks", &self.enable_hyperlinks)
             .field("measure_performance", &self.measure_performance)
             .field("hyperlink_callback", &"<callback>")
             .finish()
@@ -215,7 +218,7 @@ pub struct WebGl2Backend {
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
     /// Hyperlink tracking.
-    hyperlink_cells: Option<BitVec>,
+    hyperlink_cells: Option<Rc<RefCell<BitVec>>>,
     /// Mouse handler for hyperlink clicks.
     hyperlink_mouse_handler: Option<TerminalMouseHandler>,
     /// Hyperlink click callback.
@@ -265,8 +268,9 @@ impl WebGl2Backend {
             context
         }.build()?;
 
-        let hyperlink_cells = if options.enable_hyperlinks {
-            Some(BitVec::repeat(false, context.cell_count()))
+        let hyperlink_cells = if options.hyperlink_callback.is_some() {
+            let indices = BitVec::repeat(false, context.cell_count());
+            Some(Rc::new(RefCell::new(indices)))
         } else {
             None
         };
@@ -276,7 +280,8 @@ impl WebGl2Backend {
 
         // Set up hyperlink mouse handler if callback is provided
         let hyperlink_mouse_handler = if let Some(ref callback) = hyperlink_callback {
-            Some(Self::create_hyperlink_mouse_handler(&context, hyperlink_cells.as_ref(), callback.clone())?)
+            let hyperlink_cells = hyperlink_cells.clone().expect("known to exist at this point");
+            Some(Self::create_hyperlink_mouse_handler(&context, hyperlink_cells.clone(), callback.clone())?)
         } else {
             None
         };
@@ -316,7 +321,7 @@ impl WebGl2Backend {
         self.beamterm.resize(size_px.0, size_px.1)?;
 
         // Update mouse handler dimensions if it exists
-        if let Some(mouse_handler) = &self.hyperlink_mouse_handler {
+        if let Some(mouse_handler) = &mut self.hyperlink_mouse_handler {
             let (cols, rows) = self.beamterm.terminal_size();
             mouse_handler.update_dimensions(cols, rows);
         }
@@ -324,6 +329,8 @@ impl WebGl2Backend {
         // clear any hyperlink cells; we'll get them in the next draw call
         if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
             let cell_count = self.beamterm.cell_count();
+            
+            let mut hyperlink_cells = hyperlink_cells.borrow_mut();
             hyperlink_cells.clear();
             hyperlink_cells.resize(cell_count, false);
         }
@@ -359,13 +366,16 @@ impl WebGl2Backend {
         // before passing the content to the beamterm renderer.
         if let Some(hyperlink_cells) = self.hyperlink_cells.as_mut() {
             let w = self.beamterm.terminal_size().0 as usize;
+            
+            let mut hyperlink_cells = hyperlink_cells.borrow_mut();
 
             // Mark any cells that have the hyperlink modifier set (don't blink!).
             // At this stage, we don't care about the actual cell content,
             // as we can extract it on demand.
             let cells = content.inspect(|(x, y, c)| {
                 let idx = *y as usize * w + *x as usize;
-                hyperlink_cells.set(idx, c.modifier.contains(HYPERLINK_MODIFIER));
+                let is_hyperlink = c.modifier.contains(HYPERLINK_MODIFIER);
+                hyperlink_cells.set(idx, is_hyperlink);
             });
             let cells = cells.map(|(x, y, cell)| (x, y, cell_data(cell)));
 
@@ -422,26 +432,25 @@ impl WebGl2Backend {
     /// Creates a mouse handler specifically for hyperlink clicks.
     fn create_hyperlink_mouse_handler(
         beamterm: &Beamterm,
-        hyperlink_cells: Option<&BitVec>,
+        hyperlink_cells: Rc<RefCell<BitVec>>,
         callback: Rc<RefCell<dyn FnMut(&str)>>,
     ) -> Result<TerminalMouseHandler, Error> {
         let grid = beamterm.grid();
         let canvas = beamterm.canvas();
-        let hyperlink_cells_clone = hyperlink_cells.map(|cells| cells.clone());
+        let hyperlink_cells_clone = hyperlink_cells.clone();
         
         let mouse_handler = TerminalMouseHandler::new(
             &canvas,
             grid,
             move |event: TerminalMouseEvent, grid: &beamterm_renderer::TerminalGrid| {
                 // Only handle left mouse button clicks
-                if event.event_type == MouseEventType::MouseUp && event.button == 0 {
+                if event.event_type == MouseEventType::MouseUp && event.button() == 0 {
                     if let Some(url) = Self::extract_hyperlink_url_static(
-                        &hyperlink_cells_clone,
+                        hyperlink_cells_clone.clone(),
                         grid,
                         event.col,
                         event.row,
                     ) {
-                        // Call the user's hyperlink callback
                         if let Ok(mut cb) = callback.try_borrow_mut() {
                             cb(&url);
                         }
@@ -455,23 +464,17 @@ impl WebGl2Backend {
 
     /// Extracts hyperlink URL from grid coordinates (static version for use in closures).
     fn extract_hyperlink_url_static(
-        hyperlink_cells: &Option<BitVec>,
+        hyperlink_cells: Rc<RefCell<BitVec>>,
         grid: &beamterm_renderer::TerminalGrid,
         start_col: u16,
         row: u16,
     ) -> Option<String> {
-        let hyperlink_cells = hyperlink_cells.as_ref()?;
+        let hyperlink_cells = hyperlink_cells;
         let (cols, _) = grid.terminal_size();
-        
-        // Check if clicked cell is a hyperlink
-        let start_idx = row as usize * cols as usize + start_col as usize;
-        if !hyperlink_cells.get(start_idx).map(|b| *b).unwrap_or(false) {
-            return None;
-        }
-        
+
         // Find hyperlink boundaries
         let (link_start, link_end) = Self::find_hyperlink_bounds_static(
-            hyperlink_cells, start_col, row, cols
+            &*hyperlink_cells.borrow(), start_col, row, cols
         )?;
         
         // Extract text using beamterm's grid
@@ -486,6 +489,11 @@ impl WebGl2Backend {
         cols: u16,
     ) -> Option<(u16, u16)> {
         let row_start_idx = row as usize * cols as usize;
+
+        // Ensure clicked cell is a hyperlink
+        if !hyperlink_cells.get(row_start_idx + start_col as usize).map(|b| *b).unwrap_or(false) {
+            return None;
+        }
         
         // Find start of hyperlink (scan left)
         let mut link_start = start_col;
@@ -522,14 +530,12 @@ impl WebGl2Backend {
             .start((start_col, row))
             .end((end_col, row))
             .trim_trailing_whitespace(true);
-            
+
         let text = grid.get_text(query);
-        let trimmed = text.trim();
-        
-        if trimmed.is_empty() {
+        if text.is_empty() {
             None
         } else {
-            Some(trimmed.to_string())
+            Some(text.to_string())
         }
     }
 }
@@ -584,7 +590,7 @@ impl Backend for WebGl2Backend {
         self.beamterm.update_cells(cells).map_err(Error::from)?;
 
         if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
-            hyperlink_cells.clear();
+            hyperlink_cells.borrow_mut().clear();
         }
 
         Ok(())
@@ -680,7 +686,7 @@ impl std::fmt::Debug for WebGl2Backend {
             .field("options", &self.options)
             .field("cursor_position", &self.cursor_position)
             .field("performance", &self.performance.is_some())
-            .field("hyperlink_cells", &self.hyperlink_cells.as_ref().map(|c| c.len()))
+            .field("hyperlink_cells", &self.hyperlink_cells.as_ref().map(|c| c.borrow().len()))
             .field("hyperlink_mouse_handler", &self.hyperlink_mouse_handler.is_some())
             .field("hyperlink_callback", &self.hyperlink_callback.is_some())
             .finish()
