@@ -186,3 +186,41 @@ pub(crate) fn create_canvas_in_element(
 
     Ok(canvas)
 }
+
+/// Measures the actual pixel size of a DOM cell by creating a temporary test element.
+///
+/// This function creates a span with the same styling as terminal cells,
+/// measures its dimensions, and then removes it from the DOM.
+pub(super) fn measure_dom_cell_size(
+    document: &Document,
+    grid_parent: &Element,
+) -> Result<(u32, u32), Error> {
+    // Create a temporary test span with a single character
+    let test_span = document.create_element("span")?;
+    test_span.set_inner_html("W"); // Use a wide character for consistent measurement
+    test_span.set_attribute("style", "display: inline-block; visibility: hidden; position: absolute; white-space: pre; font-family: monospace;")?;
+
+    // Create a temporary container to ensure consistent measurement
+    let test_container = document.create_element("pre")?;
+    test_container.set_attribute(
+        "style",
+        "visibility: hidden; position: absolute; margin: 0; padding: 0; line-height: normal;",
+    )?;
+    test_container.append_child(&test_span)?;
+
+    // Add to DOM for measurement
+    grid_parent.append_child(&test_container)?;
+
+    // Use client dimensions for measurement
+    let width = test_span.client_width() as u32;
+    let height = test_span.client_height() as u32;
+
+    // Clean up
+    grid_parent.remove_child(&test_container)?;
+
+    // Ensure we have reasonable dimensions (fallback to canvas constants if measurement fails)
+    let width = if width > 0 { width } else { 10 };
+    let height = if height > 0 { height } else { 19 };
+
+    Ok((width, height))
+}
