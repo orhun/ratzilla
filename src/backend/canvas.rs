@@ -1,6 +1,9 @@
 use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
-use std::io::Result as IoResult;
+use std::{
+    fmt::{Debug, Formatter},
+    io::Result as IoResult,
+};
 
 use crate::{
     backend::{
@@ -8,6 +11,7 @@ use crate::{
         utils::*,
     },
     error::Error,
+    event::MouseEvent,
     CursorShape,
 };
 use ratatui::{
@@ -19,7 +23,7 @@ use ratatui::{
 };
 use web_sys::{
     js_sys::{Boolean, Map},
-    wasm_bindgen::{JsCast, JsValue},
+    wasm_bindgen::{closure::Closure, JsCast, JsValue},
 };
 
 /// Width of a single cell.
@@ -35,7 +39,7 @@ const CELL_WIDTH: f64 = 10.0;
 const CELL_HEIGHT: f64 = 19.0;
 
 /// Options for the [`CanvasBackend`].
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct CanvasBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -46,6 +50,8 @@ pub struct CanvasBackendOptions {
     /// this option may cause some performance issues when dealing with large
     /// numbers of simultaneous changes.
     always_clip_cells: bool,
+    /// Mouse event handler for the canvas.
+    mouse_event_handler: Option<Box<dyn FnMut(MouseEvent) + 'static>>,
 }
 
 impl CanvasBackendOptions {
@@ -63,6 +69,15 @@ impl CanvasBackendOptions {
     /// Sets the size of the canvas, in pixels.
     pub fn size(mut self, size: (u32, u32)) -> Self {
         self.size = Some(size);
+        self
+    }
+
+    /// Configures a mouse event handler for the canvas.
+    pub fn mouse_event_handler<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        self.mouse_event_handler = Some(Box::new(handler));
         self
     }
 }
@@ -107,6 +122,34 @@ impl Canvas {
             context,
             background_color,
         })
+    }
+
+    /// Handles mouse events.
+    ///
+    /// This method takes a closure that will be called on every `mousemove`, 'mousedown', and `mouseup`
+    /// event.
+    fn setup_mouse_event_handler<F>(
+        &self,
+        cell_size_px: (u32, u32),
+        mut handler: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            handler(MouseEvent::new(event, cell_size_px));
+        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
+
+        self.inner
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        self.inner
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        self.inner
+            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
+
+        closure.forget();
+
+        Ok(())
     }
 }
 
@@ -163,6 +206,11 @@ impl CanvasBackend {
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
         let canvas = Canvas::new(parent, width, height, Color::Black)?;
+        if let Some(handler) = options.mouse_event_handler {
+            let cell_size_px = (CELL_WIDTH as u32, CELL_HEIGHT as u32);
+            canvas.setup_mouse_event_handler(cell_size_px, handler)?;
+        }
+
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
         Ok(Self {
@@ -421,6 +469,17 @@ impl CanvasBackend {
         self.canvas.context.restore();
 
         Ok(())
+    }
+}
+
+impl Debug for CanvasBackendOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CanvasBackendOptions")
+            .field("grid_id", &self.grid_id)
+            .field("size", &self.size)
+            .field("always_clip_cells", &self.always_clip_cells)
+            .field("mouse_event_handler", &self.mouse_event_handler.is_some())
+            .finish()
     }
 }
 

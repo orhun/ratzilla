@@ -11,15 +11,20 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{
+    backend::utils::*, error::Error, event::MouseEvent, widgets::hyperlink::HYPERLINK_MODIFIER,
+    CursorShape,
+};
 
 /// Options for the [`DomBackend`].
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct DomBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
     /// The cursor shape.
     cursor_shape: CursorShape,
+    /// Mouse event handler for the canvas.
+    mouse_event_handler: Option<Box<dyn FnMut(MouseEvent) + 'static>>,
 }
 
 impl DomBackendOptions {
@@ -28,6 +33,7 @@ impl DomBackendOptions {
         Self {
             grid_id,
             cursor_shape,
+            mouse_event_handler: None,
         }
     }
 
@@ -47,6 +53,15 @@ impl DomBackendOptions {
     pub fn cursor_shape(&self) -> &CursorShape {
         &self.cursor_shape
     }
+
+    /// Configures a mouse event handler for the canvas.
+    pub fn mouse_event_handler<F>(mut self, handler: F) -> Self
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        self.mouse_event_handler = Some(Box::new(handler));
+        self
+    }
 }
 
 /// DOM backend.
@@ -55,7 +70,6 @@ impl DomBackendOptions {
 ///
 /// In other words, it transforms the [`Cell`]s into `<span>`s which are then
 /// appended to a `<pre>` element.
-#[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
@@ -77,6 +91,10 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Cached cell size in pixels (width, height).
+    cell_size_px: Option<(u32, u32)>,
+    /// Mouse event handler if configured.
+    mouse_event_handler: Option<Box<dyn FnMut(MouseEvent) + 'static>>,
 }
 
 impl DomBackend {
@@ -100,9 +118,12 @@ impl DomBackend {
     }
 
     /// Constructs a new [`DomBackend`] with the given options.
-    pub fn new_with_options(options: DomBackendOptions) -> Result<Self, Error> {
+    pub fn new_with_options(mut options: DomBackendOptions) -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+
+        let mouse_event_handler = options.mouse_event_handler.take();
+
         let mut backend = Self {
             initialized: Rc::new(RefCell::new(false)),
             buffer: vec![],
@@ -114,9 +135,12 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
+            cell_size_px: None,
+            mouse_event_handler,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
+
         Ok(backend)
     }
 
@@ -138,6 +162,56 @@ impl DomBackend {
         self.cells.clear();
         self.buffer = get_sized_buffer();
         self.prev_buffer = self.buffer.clone();
+        // Reset cell size cache when grid is reset
+        self.cell_size_px = None;
+        Ok(())
+    }
+
+    /// Measures and caches the actual cell size in pixels.
+    fn measure_cell_size(&mut self) -> Result<(u32, u32), Error> {
+        if let Some(cached_size) = self.cell_size_px {
+            return Ok(cached_size);
+        }
+
+        let cell_size = measure_dom_cell_size(&self.document, &self.grid_parent)?;
+        self.cell_size_px = Some(cell_size);
+        Ok(cell_size)
+    }
+
+    /// Sets up mouse event handling for the DOM grid.
+    fn setup_mouse_event_handler(&mut self) -> Result<(), Error> {
+        if self.mouse_event_handler.is_none() {
+            return Ok(());
+        }
+
+        let cell_size_px = self.measure_cell_size()?;
+        let mut handler = self.mouse_event_handler.take().unwrap();
+
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            // Get the grid element's bounding rectangle for proper coordinate calculation
+            if let Some(target) = event.current_target() {
+                if let Ok(element) = target.dyn_into::<web_sys::Element>() {
+                    let rect = element.get_bounding_client_rect();
+                    let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
+                    handler(MouseEvent::new_relative(event, cell_size_px, grid_rect));
+                } else {
+                    // Fallback to viewport-relative coordinates if we can't get the element
+                    handler(MouseEvent::new(event, cell_size_px));
+                }
+            } else {
+                // Fallback to viewport-relative coordinates if no target
+                handler(MouseEvent::new(event, cell_size_px));
+            }
+        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
+
+        self.grid
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        self.grid
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        self.grid
+            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
+
+        closure.forget();
         Ok(())
     }
 
@@ -267,6 +341,9 @@ impl Backend for DomBackend {
             self.prerender()?;
             // Set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
+
+            // Set up mouse event handler after the grid is rendered
+            self.setup_mouse_event_handler()?;
         }
         // Check if the buffer has changed since the last render and update the grid
         if self.buffer != self.prev_buffer {
@@ -338,5 +415,44 @@ impl Backend for DomBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for DomBackendOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DomBackendOptions")
+            .field("grid_id", &self.grid_id)
+            .field("cursor_shape", &self.cursor_shape)
+            .field("mouse_event_handler", &self.mouse_event_handler.is_some())
+            .finish()
+    }
+}
+
+impl std::fmt::Debug for DomBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DomBackend")
+            .field("initialized", &self.initialized)
+            .field(
+                "buffer",
+                &format!(
+                    "{}x{} buffer",
+                    self.buffer.len(),
+                    self.buffer.first().map_or(0, |row| row.len())
+                ),
+            )
+            .field(
+                "prev_buffer",
+                &format!(
+                    "{}x{} buffer",
+                    self.prev_buffer.len(),
+                    self.prev_buffer.first().map_or(0, |row| row.len())
+                ),
+            )
+            .field("cells", &format!("{} cells", self.cells.len()))
+            .field("options", &self.options)
+            .field("cursor_position", &self.cursor_position)
+            .field("cell_size_px", &self.cell_size_px)
+            .field("mouse_event_handler", &self.mouse_event_handler.is_some())
+            .finish()
     }
 }
