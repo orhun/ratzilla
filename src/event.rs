@@ -18,10 +18,10 @@ pub struct MouseEvent {
     pub button: MouseButton,
     /// The triggered event.
     pub event: MouseEventKind,
-    /// The x coordinate of the mouse.
-    pub x: u32,
-    /// The y coordinate of the mouse.
-    pub y: u32,
+    /// The x grid coordinate of the mouse.
+    pub col: u16,
+    /// The y grid coordinate of the mouse.
+    pub row: u16,
     /// Whether the control key is pressed.
     pub ctrl: bool,
     /// Whether the alt key is pressed.
@@ -138,12 +138,14 @@ pub enum MouseButton {
     Back,
     /// Forward mouse button
     Forward,
-    /// Unidentified mouse button
+    /// Unnamed mouse button
+    Other(i32),
+    /// Either left mouse button or no button during move events
     Unidentified,
 }
 
 /// A mouse event.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum MouseEventKind {
     /// Mouse moved
     Moved,
@@ -156,22 +158,92 @@ pub enum MouseEventKind {
 }
 
 /// Convert a [`web_sys::MouseEvent`] to a [`MouseEvent`].
-impl From<web_sys::MouseEvent> for MouseEvent {
-    fn from(event: web_sys::MouseEvent) -> Self {
+impl MouseEvent {
+    /// Determines the correct mouse button for the event, handling the JS API behavior
+    /// where move events always report button 0 (Left) regardless of actual button state.
+    fn resolve_mouse_button(event_type: MouseEventKind, raw_button: i16) -> MouseButton {
+        use MouseButton::*;
+        match (event_type, raw_button.into()) {
+            (MouseEventKind::Moved, Left) => Unidentified,
+            (_, button) => button,
+        }
+    }
+
+    /// Converts pixel coordinates to grid coordinates.
+    fn pixels_to_grid_coords(pixel_x: u32, pixel_y: u32, cell_size_px: (u32, u32)) -> (u16, u16) {
+        let col = (pixel_x / cell_size_px.0) as u16;
+        let row = (pixel_y / cell_size_px.1) as u16;
+        (col, row)
+    }
+
+    /// Creates a new [`MouseEvent`] from a web mouse event and cell size information.
+    ///
+    /// This uses viewport-relative coordinates.
+    ///
+    /// # Arguments
+    /// * `event` - The web mouse event from the browser
+    /// * `cell_size_px` - The pixel dimensions of a terminal cell (width, height)
+    pub fn new(event: web_sys::MouseEvent, cell_size_px: (u32, u32)) -> Self {
+        debug_assert!(event.x() <= 0xffff);
+        debug_assert!(event.y() <= 0xffff);
+
         let ctrl = event.ctrl_key();
         let alt = event.alt_key();
         let shift = event.shift_key();
         let event_type = event.type_().into();
+        let button = Self::resolve_mouse_button(event_type, event.button());
+        let (col, row) = Self::pixels_to_grid_coords(
+            event.client_x() as u32,
+            event.client_y() as u32,
+            cell_size_px,
+        );
+
         MouseEvent {
-            // Button is only valid if it is a mousedown or mouseup event.
-            button: if event_type == MouseEventKind::Moved {
-                MouseButton::Unidentified
-            } else {
-                event.button().into()
-            },
+            button,
             event: event_type,
-            x: event.client_x() as u32,
-            y: event.client_y() as u32,
+            col,
+            row,
+            ctrl,
+            alt,
+            shift,
+        }
+    }
+
+    /// Creates a new [`MouseEvent`] from a web mouse event with coordinates relative to a grid element.
+    ///
+    /// This calculates mouse coordinates relative to the specified grid element's bounding rectangle.
+    ///
+    /// # Arguments
+    /// * `event` - The web mouse event from the browser
+    /// * `cell_size_px` - The pixel dimensions of a terminal cell (width, height)
+    /// * `grid_rect` - The bounding rectangle of the grid element (left, top, width, height)
+    pub fn new_relative(
+        event: web_sys::MouseEvent,
+        cell_size_px: (u32, u32),
+        grid_rect: (f64, f64, f64, f64),
+    ) -> Self {
+        debug_assert!(event.x() <= 0xffff);
+        debug_assert!(event.y() <= 0xffff);
+
+        let ctrl = event.ctrl_key();
+        let alt = event.alt_key();
+        let shift = event.shift_key();
+        let event_type = event.type_().into();
+        let button = Self::resolve_mouse_button(event_type, event.button());
+
+        // Calculate mouse position relative to the grid element
+        let (left, top, _width, _height) = grid_rect;
+        let relative_x = event.client_x() as f64 - left;
+        let relative_y = event.client_y() as f64 - top;
+        let mouse_x = relative_x.max(0.0) as u32;
+        let mouse_y = relative_y.max(0.0) as u32;
+        let (col, row) = Self::pixels_to_grid_coords(mouse_x, mouse_y, cell_size_px);
+
+        MouseEvent {
+            button,
+            event: event_type,
+            col,
+            row,
             ctrl,
             alt,
             shift,
