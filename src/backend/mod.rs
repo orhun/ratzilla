@@ -26,6 +26,9 @@
 //! | **Accessibility**            | ✓          | Limited       | Limited          |
 //! | **Unicode/Emoji Support**    | Full       | Full          | Limited to atlas |
 //! | **Dynamic Characters**       | ✓          | ✓             | ✗                |
+//! | **Font Variants**            | ✓          | Regular only  | ✓                |
+//! | **Underline**                | ✓          | ✗             | ✓                |
+//! | **Strikethrough**            | ✓          | ✗             | ✓                |
 //! | **Browser Support**          | All        | All           | Modern (2017+)   |
 //!
 //! ## Choosing a Backend
