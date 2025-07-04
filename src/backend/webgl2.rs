@@ -16,7 +16,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use std::{cell::RefCell, io::Result as IoResult, mem::swap, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, io::Result as IoResult, mem::swap, rc::Rc};
 use web_sys::{wasm_bindgen::JsCast, window, Element};
 
 // Labels used by the Performance API
@@ -24,7 +24,7 @@ const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
 
 /// Options for the [`WebGl2Backend`].
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct WebGl2BackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -45,7 +45,7 @@ pub struct WebGl2BackendOptions {
     /// Measure performance using the `performance` API.
     measure_performance: bool,
     /// Hyperlink click callback.
-    hyperlink_callback: Option<Rc<RefCell<dyn FnMut(&str)>>>,
+    hyperlink_callback: Option<HyperlinkCallback>,
 }
 
 impl WebGl2BackendOptions {
@@ -122,7 +122,7 @@ impl WebGl2BackendOptions {
     where
         F: FnMut(&str) + 'static,
     {
-        self.hyperlink_callback = Some(Rc::new(RefCell::new(callback)));
+        self.hyperlink_callback = Some(HyperlinkCallback::new(callback));
         self
     }
 
@@ -206,7 +206,7 @@ pub struct WebGl2Backend {
     /// Mouse handler for hyperlink clicks.
     hyperlink_mouse_handler: Option<TerminalMouseHandler>,
     /// Hyperlink click callback.
-    hyperlink_callback: Option<Rc<RefCell<dyn FnMut(&str)>>>,
+    hyperlink_callback: Option<HyperlinkCallback>,
     /// Current cursor state over hyperlinks (shared with mouse handler).
     cursor_over_hyperlink: Option<Rc<RefCell<bool>>>,
 }
@@ -283,7 +283,7 @@ impl WebGl2Backend {
             Some(Self::create_hyperlink_mouse_handler(
                 &context,
                 hyperlink_cells.clone(),
-                callback.clone(),
+                callback.callback.clone(),
                 cursor_state,
             )?)
         } else {
@@ -784,41 +784,28 @@ const fn into_glyph_bits(modifier: Modifier) -> u16 {
     | (m << 5) & (1 << 13) // strikethrough
 }
 
-impl std::fmt::Debug for WebGl2Backend {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WebGl2Backend")
-            .field("beamterm", &"<beamterm>")
-            .field("options", &self.options)
-            .field("cursor_position", &self.cursor_position)
-            .field("performance", &self.performance.is_some())
-            .field(
-                "hyperlink_cells",
-                &self.hyperlink_cells.as_ref().map(|c| c.borrow().len()),
-            )
-            .field(
-                "hyperlink_mouse_handler",
-                &self.hyperlink_mouse_handler.is_some(),
-            )
-            .field("hyperlink_callback", &self.hyperlink_callback.is_some())
-            .field(
-                "cursor_over_hyperlink",
-                &self.cursor_over_hyperlink.as_ref().map(|c| *c.borrow()),
-            )
-            .finish()
+/// A `Debug`-derive friendly convenience wrapper
+#[derive(Clone)]
+struct HyperlinkCallback {
+    callback: Rc<RefCell<dyn FnMut(&str)>>,
+}
+
+impl HyperlinkCallback {
+    /// Creates a new [`HyperlinkCallback`] with the given callback.
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnMut(&str) + 'static,
+    {
+        Self {
+            callback: Rc::new(RefCell::new(callback)),
+        }
     }
 }
 
-impl std::fmt::Debug for WebGl2BackendOptions {
+impl std::fmt::Debug for HyperlinkCallback {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WebGl2BackendOptions")
-            .field("grid_id", &self.grid_id)
-            .field("size", &self.size)
-            .field("fallback_glyph", &self.fallback_glyph)
-            .field("canvas_padding_color", &self.canvas_padding_color)
-            .field("cursor_shape", &self.cursor_shape)
-            .field("default_mouse_handler", &self.default_mouse_handler)
-            .field("measure_performance", &self.measure_performance)
-            .field("hyperlink_callback", &"<callback>")
+        f.debug_struct("CallbackWrapper")
+            .field("callback", &"<callback>")
             .finish()
     }
 }
