@@ -44,12 +44,39 @@ pub trait WebRenderer {
     ///
     /// This method takes a closure that will be called on every `mousemove`, 'mousedown', and `mouseup`
     /// event.
-    fn on_mouse_event<F>(&self, mut callback: F)
+    fn on_mouse_event<F>(&mut self, callback: F)
+    where
+        F: FnMut(MouseEvent) + 'static;
+
+    /// Requests an animation frame.
+    fn request_animation_frame(f: &Closure<dyn FnMut()>) {
+        window()
+            .unwrap()
+            .request_animation_frame(f.as_ref().unchecked_ref())
+            .unwrap();
+    }
+}
+
+pub(crate) trait BackendExt: Backend {
+    fn actual_dimensions(&self) -> (u32, u32);
+}
+
+/// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
+///
+/// This implementation creates a loop that calls the [`Terminal::draw`] method.
+impl<T> WebRenderer for Terminal<T>
+where
+    T: Backend + BackendExt + 'static,
+{
+    fn on_mouse_event<F>(&mut self, mut callback: F)
     where
         F: FnMut(MouseEvent) + 'static,
     {
+        let myself: *mut Terminal<T> = self;
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
-            callback(event.into());
+            let me: &mut Terminal<T> = unsafe { myself.as_mut().unwrap() };
+            let dimensions = me.backend().actual_dimensions();
+            callback(MouseEvent::from_event_with_dimensions(event, dimensions));
         });
         let window = window().unwrap();
         let document = window.document().unwrap();
@@ -65,22 +92,6 @@ pub trait WebRenderer {
         closure.forget();
     }
 
-    /// Requests an animation frame.
-    fn request_animation_frame(f: &Closure<dyn FnMut()>) {
-        window()
-            .unwrap()
-            .request_animation_frame(f.as_ref().unchecked_ref())
-            .unwrap();
-    }
-}
-
-/// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
-///
-/// This implementation creates a loop that calls the [`Terminal::draw`] method.
-impl<T> WebRenderer for Terminal<T>
-where
-    T: Backend + 'static,
-{
     fn draw_web<F>(mut self, mut render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static,

@@ -1,12 +1,12 @@
 use std::{cell::RefCell, io, rc::Rc};
 
 use ratatui::layout::Position;
-use ratzilla::ratatui::{
+use ratzilla::{ratatui::{
     layout::Alignment,
     style::Color,
     widgets::{Block, Paragraph},
     Terminal,
-};
+}, CanvasBackend};
 
 use ratzilla::{
     event::KeyCode, event::MouseButton, event::MouseEventKind, DomBackend, WebRenderer,
@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    let backend = DomBackend::new()?;
+    let backend = CanvasBackend::new()?;
     let mut terminal = Terminal::new(backend)?;
 
     terminal.on_key_event({

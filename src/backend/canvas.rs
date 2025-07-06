@@ -6,9 +6,7 @@ use crate::{
     backend::{
         color::{actual_bg_color, actual_fg_color},
         utils::*,
-    },
-    error::Error,
-    CursorShape,
+    }, error::Error, render::BackendExt, CursorShape
 };
 use ratatui::{
     backend::WindowSize,
@@ -421,6 +419,12 @@ impl CanvasBackend {
         self.canvas.context.restore();
 
         Ok(())
+    }
+}
+
+impl BackendExt for CanvasBackend{
+    fn actual_dimensions(&self) -> (u32, u32) {
+        (self.canvas.inner.client_width() as u32,self.canvas.inner.client_height() as u32)
     }
 }
 

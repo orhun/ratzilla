@@ -11,7 +11,10 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{
+    backend::utils::*, error::Error, render::BackendExt, utils,
+    widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape,
+};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -204,6 +207,20 @@ impl DomBackend {
             }
         }
         Ok(())
+    }
+}
+
+impl BackendExt for DomBackend {
+    fn actual_dimensions(&self) -> (u32, u32) {
+        let size = match utils::is_mobile() {
+            true => get_raw_screen_size(),
+            false => {
+                let dim = get_raw_window_size();
+                (dim.0 as i32, dim.1 as i32)
+            }
+        };
+
+        (size.0 as u32 , size.1 as u32)
     }
 }
 
