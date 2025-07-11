@@ -17,7 +17,7 @@ pub trait WebRenderer {
     /// TODO: Clarify and validate this.
     ///
     /// [`requestAnimationFrame`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
-    fn draw_web<F>(self, render_callback: F)
+    fn draw_web<F>(self: Rc<Self>, render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static;
 
@@ -44,7 +44,7 @@ pub trait WebRenderer {
     ///
     /// This method takes a closure that will be called on every `mousemove`, 'mousedown', and `mouseup`
     /// event.
-    fn on_mouse_event<F>(&mut self, callback: F)
+    fn on_mouse_event<F>(&self, callback: F)
     where
         F: FnMut(MouseEvent) + 'static;
 
@@ -58,7 +58,7 @@ pub trait WebRenderer {
 }
 
 pub(crate) trait BackendExt: Backend {
-    fn actual_dimensions(&self) -> (u32, u32);
+    fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent;
 }
 
 /// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
@@ -66,17 +66,16 @@ pub(crate) trait BackendExt: Backend {
 /// This implementation creates a loop that calls the [`Terminal::draw`] method.
 impl<T> WebRenderer for Terminal<T>
 where
-    T: Backend + BackendExt + 'static,
+    T: BackendExt + 'static,
 {
-    fn on_mouse_event<F>(&mut self, mut callback: F)
+    fn on_mouse_event<F>(&self, mut callback: F)
     where
         F: FnMut(MouseEvent) + 'static,
     {
-        let myself: *mut Terminal<T> = self;
+        let myself = self as *const Terminal<T>;
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::MouseEvent| {
-            let me: &mut Terminal<T> = unsafe { myself.as_mut().unwrap() };
-            let dimensions = me.backend().actual_dimensions();
-            callback(MouseEvent::from_event_with_dimensions(event, dimensions));
+            let event = unsafe{ myself.as_ref().unwrap().backend().web_mouse_to_rat_event(event)};
+            callback(event);
         });
         let window = window().unwrap();
         let document = window.document().unwrap();
@@ -92,15 +91,16 @@ where
         closure.forget();
     }
 
-    fn draw_web<F>(mut self, mut render_callback: F)
+    fn draw_web<F>(self: Rc<Self>, mut render_callback: F)
     where
         F: FnMut(&mut Frame) + 'static,
     {
         let callback = Rc::new(RefCell::new(None));
         *callback.borrow_mut() = Some(Closure::wrap(Box::new({
             let cb = callback.clone();
+            let mut me = self.clone();
             move || {
-                self.draw(|frame| {
+                Rc::get_mut(&mut me).unwrap().draw(|frame| {
                     render_callback(frame);
                 })
                 .unwrap();

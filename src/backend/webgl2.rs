@@ -1,7 +1,5 @@
 use crate::{
-    backend::{color::to_rgb, utils::*},
-    error::Error,
-    CursorShape,
+    backend::{color::to_rgb, utils::*}, error::Error, event::MouseEvent, render::BackendExt, CursorShape
 };
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
 use ratatui::{
@@ -309,6 +307,16 @@ impl WebGl2Backend {
                 .measure_with_start_mark(label, label)
                 .unwrap_or_default();
         }
+    }
+}
+
+impl BackendExt for WebGl2Backend {
+    fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent {
+        let mut event: MouseEvent = mouse_event.into();
+        //The height and width being derived from trial and error
+        event.x = event.x / 9;
+        event.y = event.y / 19;
+        return event;
     }
 }
 

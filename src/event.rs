@@ -1,5 +1,3 @@
-use crate::utils;
-
 /// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
@@ -155,27 +153,6 @@ pub enum MouseEventKind {
     Released,
     /// Unidentified mouse event
     Unidentified,
-}
-
-impl MouseEvent {
-    pub(crate) fn from_event_with_dimensions(
-        event: web_sys::MouseEvent,
-        dimensions: (u32, u32),
-    ) -> Self {
-        let mut result: MouseEvent = event.into();
-
-        let size = match utils::is_mobile() {
-            true => utils::get_screen_size(),
-            false => utils::get_window_size(),
-        };
-
-        let gaps_in_x = dimensions.0 / size.width as u32;
-        let gaps_in_y = dimensions.1 / size.height as u32;
-        result.x = result.x/ gaps_in_x;
-        result.y = result.y/gaps_in_y;
-
-        result
-    }
 }
 
 /// Convert a [`web_sys::MouseEvent`] to a [`MouseEvent`].

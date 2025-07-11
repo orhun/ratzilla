@@ -6,7 +6,7 @@ use crate::{
     backend::{
         color::{actual_bg_color, actual_fg_color},
         utils::*,
-    }, error::Error, render::BackendExt, CursorShape
+    }, error::Error, event::MouseEvent, render::BackendExt, CursorShape
 };
 use ratatui::{
     backend::WindowSize,
@@ -84,7 +84,16 @@ impl Canvas {
         height: u32,
         background_color: Color,
     ) -> Result<Self, Error> {
+        //console::log_1(&Array::from(&JsValue::from(format!(
+        //    "BEFORE: {} - {}",
+        //    width, height
+        //))));
         let canvas = create_canvas_in_element(&parent_element, width, height)?;
+        //console::log(&Array::from(&JsValue::from(format!(
+        //    "CANVAS SIZE: {} - {}",
+        //    canvas.width(), canvas.height()
+        //))));
+
 
         let context_options = Map::new();
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
@@ -127,7 +136,7 @@ pub struct CanvasBackend {
     /// Changed buffer cells
     changed_cells: BitVec,
     /// Canvas.
-    canvas: Canvas,
+    canvas: Box<Canvas>,
     /// Cursor position.
     cursor_position: Option<Position>,
     /// The cursor shape.
@@ -160,7 +169,8 @@ impl CanvasBackend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let canvas = Canvas::new(parent, width, height, Color::Black)?;
+        let canvas = Box::new(Canvas::new(parent, width, height, Color::Black)?);
+
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
         Ok(Self {
@@ -422,9 +432,13 @@ impl CanvasBackend {
     }
 }
 
-impl BackendExt for CanvasBackend{
-    fn actual_dimensions(&self) -> (u32, u32) {
-        (self.canvas.inner.client_width() as u32,self.canvas.inner.client_height() as u32)
+impl BackendExt for CanvasBackend {
+    fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent {
+        let mut event: MouseEvent = mouse_event.into();
+        //The height and width being used are the contants set here
+        event.x = event.x / CELL_WIDTH as u32;
+        event.y = event.y / CELL_HEIGHT as u32;
+        return event;
     }
 }
 

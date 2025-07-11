@@ -12,7 +12,7 @@ use ratzilla::{DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
     let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = std::rc::Rc::new(Terminal::new(backend)?);
 
     terminal.draw_web(move |f| {
         let canvas = canvas::Canvas::default()

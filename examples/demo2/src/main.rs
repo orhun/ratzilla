@@ -44,7 +44,7 @@ fn main() -> std::io::Result<()> {
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let viewport = Viewport::Fixed(Rect::new(0, 0, 81, 18));
-    let terminal = Terminal::with_options(backend, TerminalOptions { viewport })?;
+    let terminal = std::rc::Rc::new(Terminal::with_options(backend, TerminalOptions { viewport })?);
     let app = Rc::new(RefCell::new(App::default()));
     terminal.on_key_event({
         let app = app.clone();

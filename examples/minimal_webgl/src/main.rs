@@ -9,7 +9,7 @@ use ratzilla::ratatui::{
 };
 
 use ratzilla::{
-    event::KeyCode, event::MouseButton, event::MouseEventKind, DomBackend, WebRenderer,
+    event::KeyCode, event::MouseButton, event::MouseEventKind, WebGl2Backend, WebRenderer,
 };
 
 fn main() -> io::Result<()> {
@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    let backend = DomBackend::new()?;
+    let backend = WebGl2Backend::new()?;
     let terminal = Rc::new(Terminal::new(backend)?);
 
     terminal.on_key_event({

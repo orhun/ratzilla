@@ -54,7 +54,7 @@ impl Default for State {
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = std::rc::Rc::new(Terminal::new(backend)?);
     let mut state = State::default();
     terminal.on_key_event(move |key| handle_key_event(key));
     terminal.draw_web(move |f| ui(f, &mut state));

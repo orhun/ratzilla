@@ -16,7 +16,7 @@ use ratzilla::{event::KeyCode, DomBackend, WebRenderer};
 
 fn main() -> io::Result<()> {
     let backend = DomBackend::new()?.set_cursor_shape(CursorShape::SteadyUnderScore);
-    let terminal = Terminal::new(backend)?;
+    let terminal = Rc::new(Terminal::new(backend)?);
 
     let app = Rc::new(RefCell::new(App::new()));
 

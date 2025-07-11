@@ -15,7 +15,7 @@ use ratzilla::{
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = Rc::new(Terminal::new(backend)?);
 
     let state = Rc::new(App::default());
     let event_state = Rc::clone(&state);

@@ -11,11 +11,12 @@ use ratzilla::{
     },
     CanvasBackend, WebRenderer,
 };
+use std::rc::Rc;
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = CanvasBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = Rc::new(Terminal::new(backend)?);
     let mut app = ColorsWidget::default();
     terminal.draw_web(move |frame| {
         frame.render_widget(&mut app, frame.area());

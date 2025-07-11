@@ -22,7 +22,7 @@ use std::{cell::RefCell, rc::Rc};
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let backend = WebGl2Backend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = Rc::new(Terminal::new(backend)?);
 
     let mut fps_recorder = FpsRecorder::new();
     let mut rendered_frames = 0; // used for screen cycling

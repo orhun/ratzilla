@@ -9,7 +9,7 @@ use ratzilla::{ratatui::{
 }, CanvasBackend};
 
 use ratzilla::{
-    event::KeyCode, event::MouseButton, event::MouseEventKind, DomBackend, WebRenderer,
+    event::KeyCode, event::MouseButton, event::MouseEventKind, WebRenderer,
 };
 
 fn main() -> io::Result<()> {
@@ -19,7 +19,7 @@ fn main() -> io::Result<()> {
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
     let backend = CanvasBackend::new()?;
-    let mut terminal = Terminal::new(backend)?;
+    let terminal = Rc::new(Terminal::new(backend)?);
 
     terminal.on_key_event({
         let counter_cloned = counter.clone();
@@ -50,8 +50,6 @@ fn main() -> io::Result<()> {
         let mouse_position = mouse_position.borrow();
         let mouse_button = mouse_button.borrow();
         let mouse_event_kind = mouse_event_kind.borrow();
-
-        let area = f.area();
 
         f.render_widget(
             Paragraph::new(format!(

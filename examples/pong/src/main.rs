@@ -64,7 +64,7 @@ fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
     let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = std::rc::Rc::new(Terminal::new(backend)?);
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {

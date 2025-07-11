@@ -12,8 +12,7 @@ use web_sys::{
 };
 
 use crate::{
-    backend::utils::*, error::Error, render::BackendExt, utils,
-    widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape,
+    backend::utils::*, error::Error, event::MouseEvent, render::BackendExt, utils, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape
 };
 
 /// Options for the [`DomBackend`].
@@ -211,16 +210,26 @@ impl DomBackend {
 }
 
 impl BackendExt for DomBackend {
-    fn actual_dimensions(&self) -> (u32, u32) {
+    fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent {
+        let mut event: MouseEvent = mouse_event.into();
+        //The height and width being used are dependent on the device
         let size = match utils::is_mobile() {
+            true => utils::get_screen_size(),
+            false => utils::get_window_size(),
+        };
+
+        let dimensions = match utils::is_mobile() {
             true => get_raw_screen_size(),
             false => {
                 let dim = get_raw_window_size();
                 (dim.0 as i32, dim.1 as i32)
             }
         };
-
-        (size.0 as u32 , size.1 as u32)
+        let gaps_in_x: u32 = (dimensions.0 / size.width as i32) as u32;
+        let gaps_in_y: u32 = (dimensions.1 / size.height as i32) as u32;
+        event.x = event.x / gaps_in_x;
+        event.y = event.y / gaps_in_y;
+        return event;
     }
 }
 

@@ -36,7 +36,7 @@ fn main() -> Result<()> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
     let mut backend = CanvasBackend::new_with_size(1600, 900)?;
     backend.set_background_color(Color::Rgb(18, 18, 18));
-    let terminal = Terminal::new(backend)?;
+    let terminal = std::rc::Rc::new(Terminal::new(backend)?);
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
