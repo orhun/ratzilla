@@ -84,16 +84,7 @@ impl Canvas {
         height: u32,
         background_color: Color,
     ) -> Result<Self, Error> {
-        //console::log_1(&Array::from(&JsValue::from(format!(
-        //    "BEFORE: {} - {}",
-        //    width, height
-        //))));
         let canvas = create_canvas_in_element(&parent_element, width, height)?;
-        //console::log(&Array::from(&JsValue::from(format!(
-        //    "CANVAS SIZE: {} - {}",
-        //    canvas.width(), canvas.height()
-        //))));
-
 
         let context_options = Map::new();
         context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
@@ -281,7 +272,7 @@ impl CanvasBackend {
     /// 1. Only processes cells that have changed since the last render.
     /// 2. Tracks the last foreground color used to avoid unnecessary style changes
     /// 3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
-    /// or when `always_clip_cells` is enabled.
+    ///    or when `always_clip_cells` is enabled.
     fn draw_symbols(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
         let mut index = 0;
@@ -436,9 +427,9 @@ impl BackendExt for CanvasBackend {
     fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent {
         let mut event: MouseEvent = mouse_event.into();
         //The height and width being used are the contants set here
-        event.x = event.x / CELL_WIDTH as u32;
-        event.y = event.y / CELL_HEIGHT as u32;
-        return event;
+        event.x /= CELL_WIDTH as u32;
+        event.y /= CELL_HEIGHT as u32;
+        event
     }
 }
 

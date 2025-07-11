@@ -227,9 +227,9 @@ impl BackendExt for DomBackend {
         };
         let gaps_in_x: u32 = (dimensions.0 / size.width as i32) as u32;
         let gaps_in_y: u32 = (dimensions.1 / size.height as i32) as u32;
-        event.x = event.x / gaps_in_x;
-        event.y = event.y / gaps_in_y;
-        return event;
+        event.x /= gaps_in_x;
+        event.y /= gaps_in_y;
+        event
     }
 }
 

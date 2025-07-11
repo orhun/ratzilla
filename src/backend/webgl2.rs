@@ -314,9 +314,9 @@ impl BackendExt for WebGl2Backend {
     fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent {
         let mut event: MouseEvent = mouse_event.into();
         //The height and width being derived from trial and error
-        event.x = event.x / 9;
-        event.y = event.y / 19;
-        return event;
+        event.x /= 9;
+        event.y /= 19;
+        event
     }
 }
 
