@@ -7,8 +7,7 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast},
-    window, Document, Element, Window,
+    wasm_bindgen::{prelude::Closure, JsCast}, window, Document, Element, HtmlElement, Window
 };
 
 use crate::{
@@ -214,22 +213,16 @@ impl BackendExt for DomBackend {
         let mut event: MouseEvent = mouse_event.into();
         //The height and width being used are dependent on the device
         let size = match utils::is_mobile() {
-            true => utils::get_screen_size(),
-            false => utils::get_window_size(),
+            true => (10,19),
+            false => (10,20),
         };
-
-        let dimensions = match utils::is_mobile() {
-            true => get_raw_screen_size(),
-            false => {
-                let dim = get_raw_window_size();
-                (dim.0 as i32, dim.1 as i32)
-            }
-        };
-        let gaps_in_x: u32 = (dimensions.0 / size.width as i32) as u32;
-        let gaps_in_y: u32 = (dimensions.1 / size.height as i32) as u32;
-        event.x /= gaps_in_x;
-        event.y /= gaps_in_y;
+        event.x /= size.0;
+        event.y /= size.1;
         event
+    }
+
+    fn get_main_element(&self)-> &web_sys::HtmlElement {
+        self.grid.dyn_ref().unwrap()
     }
 }
 

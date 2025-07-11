@@ -9,6 +9,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier, Style},
 };
+use web_sys::wasm_bindgen::JsCast;
 use std::{cmp::min, io::Result as IoResult, mem::swap};
 
 // Labels used by the Performance API
@@ -317,6 +318,10 @@ impl BackendExt for WebGl2Backend {
         event.x /= 9;
         event.y /= 19;
         event
+    }
+
+    fn get_main_element(&self)-> &web_sys::HtmlElement {
+        self.context.renderer.canvas().dyn_ref().unwrap()
     }
 }
 

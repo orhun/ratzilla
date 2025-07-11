@@ -1,6 +1,6 @@
 use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, rc::Rc};
-use web_sys::{wasm_bindgen::prelude::*, window};
+use web_sys::{wasm_bindgen::prelude::*, window, HtmlElement};
 
 use crate::event::{KeyEvent, MouseEvent};
 
@@ -59,6 +59,7 @@ pub trait WebRenderer {
 
 pub(crate) trait BackendExt: Backend {
     fn web_mouse_to_rat_event(&self, mouse_event: web_sys::MouseEvent) -> MouseEvent;
+    fn get_main_element(&self)-> &HtmlElement;
 }
 
 /// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
@@ -77,17 +78,15 @@ where
             let event = unsafe{ myself.as_ref().unwrap().backend().web_mouse_to_rat_event(event)};
             callback(event);
         });
-        let window = window().unwrap();
-        let document = window.document().unwrap();
-        document
-            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
-            .unwrap();
-        document
-            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
-            .unwrap();
-        document
-            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
-            .unwrap();
+        self.backend().get_main_element()
+            .add_event_listener_with_callback("mousemove",
+                closure.as_ref().unchecked_ref()).unwrap();
+        self.backend().get_main_element()
+            .add_event_listener_with_callback("mousedown",
+                closure.as_ref().unchecked_ref()).unwrap();
+        self.backend().get_main_element()
+            .add_event_listener_with_callback("mouseup",
+                closure.as_ref().unchecked_ref()).unwrap();
         closure.forget();
     }
 

@@ -431,6 +431,10 @@ impl BackendExt for CanvasBackend {
         event.y /= CELL_HEIGHT as u32;
         event
     }
+
+    fn get_main_element(&self)-> &web_sys::HtmlElement {
+        self.canvas.inner.dyn_ref().unwrap()
+    }
 }
 
 impl Backend for CanvasBackend {
