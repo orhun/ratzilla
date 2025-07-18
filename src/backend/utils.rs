@@ -6,6 +6,7 @@ use crate::{
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
+    layout::Size,
     style::{Color, Modifier},
 };
 use web_sys::{
@@ -126,11 +127,20 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     vec![vec![Cell::default(); size.width as usize]; size.height as usize]
 }
 
+pub(crate) fn size_to_buffer_size(size: Size) -> Size {
+    Size {
+        width: size.width / 10_u16,
+        height: size.height / 19_u16,
+    }
+}
+
 /// Returns a buffer based on the canvas size.
 pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
-    let width = canvas.client_width() as u16 / 10_u16;
-    let height = canvas.client_height() as u16 / 19_u16;
-    vec![vec![Cell::default(); width as usize]; height as usize]
+    let width = canvas.client_width() as u16;
+    let height = canvas.client_height() as u16;
+
+    let size = size_to_buffer_size(Size { width, height });
+    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
 }
 
 /// Returns the document object from the window.

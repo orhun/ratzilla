@@ -1,6 +1,11 @@
 use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
-use std::io::Result as IoResult;
+use std::{
+    io::Result as IoResult,
+    mem::ManuallyDrop,
+    rc::Rc,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use crate::{
     backend::{
@@ -19,7 +24,8 @@ use ratatui::{
 };
 use web_sys::{
     js_sys::{Boolean, Map},
-    wasm_bindgen::{JsCast, JsValue},
+    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
+    Element,
 };
 
 /// Width of a single cell.
@@ -70,12 +76,36 @@ impl CanvasBackendOptions {
 /// Canvas renderer.
 #[derive(Debug)]
 struct Canvas {
+    /// The canvas's parent element
+    parent: Element,
+    /// Whether the canvas has been initialized.
+    initialized: Rc<AtomicBool>,
     /// Canvas element.
     inner: web_sys::HtmlCanvasElement,
     /// Rendering context.
     context: web_sys::CanvasRenderingContext2d,
     /// Background color.
     background_color: Color,
+}
+
+fn init_ctx(
+    canvas: &web_sys::HtmlCanvasElement,
+) -> Result<web_sys::CanvasRenderingContext2d, Error> {
+    let context_options = Map::new();
+    context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
+    context_options.set(
+        &JsValue::from_str("desynchronized"),
+        &Boolean::from(JsValue::TRUE),
+    );
+
+    let context = canvas
+        .get_context_with_context_options("2d", &context_options)?
+        .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .expect("Unable to cast canvas context");
+    context.set_font("16px monospace");
+    context.set_text_baseline("top");
+    Ok(context)
 }
 
 impl Canvas {
@@ -88,25 +118,29 @@ impl Canvas {
     ) -> Result<Self, Error> {
         let canvas = create_canvas_in_element(&parent_element, width, height)?;
 
-        let context_options = Map::new();
-        context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
-        context_options.set(
-            &JsValue::from_str("desynchronized"),
-            &Boolean::from(JsValue::TRUE),
-        );
-        let context = canvas
-            .get_context_with_context_options("2d", &context_options)?
-            .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
-            .dyn_into::<web_sys::CanvasRenderingContext2d>()
-            .expect("Unable to cast canvas context");
-        context.set_font("16px monospace");
-        context.set_text_baseline("top");
+        let initialized: Rc<AtomicBool> = Rc::new(false.into());
+        let closure = ManuallyDrop::new(Closure::<dyn FnMut(_)>::new({
+            let initialized = Rc::clone(&initialized);
+            move |_: web_sys::Event| {
+                initialized.store(false, Ordering::Relaxed);
+            }
+        }));
+        web_sys::window()
+            .unwrap()
+            .set_onresize(Some(closure.as_ref().unchecked_ref()));
 
         Ok(Self {
+            parent: parent_element,
+            initialized,
+            context: init_ctx(&canvas)?,
             inner: canvas,
-            context,
             background_color,
         })
+    }
+
+    fn re_init_ctx(&mut self) -> Result<(), Error> {
+        self.context = init_ctx(&self.inner)?;
+        Ok(())
     }
 }
 
@@ -115,17 +149,10 @@ impl Canvas {
 /// This backend renders the buffer onto a HTML canvas element.
 #[derive(Debug)]
 pub struct CanvasBackend {
-    /// Whether the canvas has been initialized.
-    initialized: bool,
-    /// Always clip foreground drawing to the cell rectangle. Helpful when
-    /// dealing with out-of-bounds rendering from problematic fonts. Enabling
-    /// this option may cause some performance issues when dealing with large
-    /// numbers of simultaneous changes.
-    always_clip_cells: bool,
+    /// The options passed to the backend upon instantiation
+    options: CanvasBackendOptions,
     /// Current buffer.
     buffer: Vec<Vec<Cell>>,
-    /// Previous buffer.
-    prev_buffer: Vec<Vec<Cell>>,
     /// Changed buffer cells
     changed_cells: BitVec,
     /// Canvas.
@@ -141,8 +168,7 @@ pub struct CanvasBackend {
 impl CanvasBackend {
     /// Constructs a new [`CanvasBackend`].
     pub fn new() -> Result<Self, Error> {
-        let (width, height) = get_raw_window_size();
-        Self::new_with_size(width.into(), height.into())
+        Self::new_with_options(CanvasBackendOptions::default())
     }
 
     /// Constructs a new [`CanvasBackend`] with the given size.
@@ -164,18 +190,50 @@ impl CanvasBackend {
 
         let canvas = Canvas::new(parent, width, height, Color::Black)?;
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
-        let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
+        let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
-            prev_buffer: buffer.clone(),
-            always_clip_cells: options.always_clip_cells,
+            options,
             buffer,
-            initialized: false,
             changed_cells,
             canvas,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
         })
+    }
+
+    fn buffer_size(&self) -> Size {
+        Size::new(self.buffer[0].len() as u16, self.buffer.len() as u16)
+    }
+
+    fn initialize(&mut self) -> Result<(), Error> {
+        let (width, height) = self.options.size.unwrap_or_else(|| {
+            (
+                self.canvas.parent.client_width() as u32,
+                self.canvas.parent.client_height() as u32,
+            )
+        });
+
+        self.canvas.inner.set_width(width);
+        self.canvas.inner.set_height(height);
+        self.canvas.re_init_ctx()?;
+
+        let new_buffer_size = size_to_buffer_size(Size {
+            width: width as u16,
+            height: height as u16,
+        });
+        if self.buffer_size() != new_buffer_size {
+            for line in &mut self.buffer {
+                line.resize_with(new_buffer_size.width as usize, || Cell::default());
+            }
+            self.buffer
+                .resize_with(new_buffer_size.height as usize, || {
+                    vec![Cell::default(); new_buffer_size.width as usize]
+                });
+            self.changed_cells = bitvec![usize::MAX; self.buffer.len() * self.buffer[0].len()];
+        }
+
+        Ok(())
     }
 
     /// Sets the background color of the canvas.
@@ -226,13 +284,14 @@ impl CanvasBackend {
                 self.canvas.inner.client_width() as f64,
                 self.canvas.inner.client_height() as f64,
             );
+            self.initialize()?;
+            // NOTE: The draw_* functions each traverse the buffer once, instead of
+            // traversing it once per cell; this is done to reduce the number of
+            // WASM calls per cell.
+            self.changed_cells.set_elements(usize::MAX);
         }
         self.canvas.context.translate(5_f64, 5_f64)?;
 
-        // NOTE: The draw_* functions each traverse the buffer once, instead of
-        // traversing it once per cell; this is done to reduce the number of
-        // WASM calls per cell.
-        self.resolve_changed_cells(force_redraw);
         self.draw_background()?;
         self.draw_symbols()?;
         self.draw_cursor()?;
@@ -241,23 +300,8 @@ impl CanvasBackend {
         }
 
         self.canvas.context.translate(-5_f64, -5_f64)?;
+        self.changed_cells.set_elements(0x00);
         Ok(())
-    }
-
-    /// Updates the representation of the changed cells.
-    ///
-    /// This function updates the `changed_cells` vector to indicate which cells
-    /// have changed.
-    fn resolve_changed_cells(&mut self, force_redraw: bool) {
-        let mut index = 0;
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, cell) in line.iter().enumerate() {
-                let prev_cell = &self.prev_buffer[y][x];
-                self.changed_cells
-                    .set(index, force_redraw || cell != prev_cell);
-                index += 1;
-            }
-        }
     }
 
     /// Draws the text symbols on the canvas.
@@ -283,7 +327,7 @@ impl CanvasBackend {
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
                 // Skip empty cells
-                if !changed_cells[index] || cell.symbol() == " " {
+                if !changed_cells.get(index).map(|c| *c).unwrap_or(true) || cell.symbol() == " " {
                     index += 1;
                     continue;
                 }
@@ -292,7 +336,7 @@ impl CanvasBackend {
                 // We need to reset the canvas context state in two scenarios:
                 // 1. When we need to create a clipping path (for potentially problematic glyphs)
                 // 2. When the text color changes
-                if self.always_clip_cells || !cell.symbol().is_ascii() {
+                if self.options.always_clip_cells || !cell.symbol().is_ascii() {
                     self.canvas.context.restore();
                     self.canvas.context.save();
 
@@ -359,7 +403,7 @@ impl CanvasBackend {
         for (y, line) in self.buffer.iter().enumerate() {
             let mut row_renderer = RowColorOptimizer::new();
             for (x, cell) in line.iter().enumerate() {
-                if changed_cells[index] {
+                if changed_cells.get(index).map(|c| *c).unwrap_or(true) {
                     // Only calls `draw_region` if the color is different from the previous one
                     row_renderer
                         .process_color((x, y), actual_bg_color(cell))
@@ -433,19 +477,26 @@ impl Backend for CanvasBackend {
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
-            let line = &mut self.buffer[y];
-            line.extend(std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())));
-            line[x] = cell.clone();
+            if let Some(line) = self.buffer.get_mut(y) {
+                line.get_mut(x).map(|c| *c = cell.clone());
+                if let Some(mut cell) = self.changed_cells.get_mut((y * line.len()) + x) {
+                    cell.set(true);
+                }
+            }
         }
 
         // Draw the cursor if set
         if let Some(pos) = self.cursor_position {
             let y = pos.y as usize;
             let x = pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() {
-                let cursor_style = self.cursor_shape.show(line[x].style());
-                line[x].set_style(cursor_style);
+            if let Some(line) = self.buffer.get_mut(y) {
+                if x < line.len() {
+                    let cursor_style = self.cursor_shape.show(line[x].style());
+                    line.get_mut(x).map(|c| c.set_style(cursor_style));
+                    if let Some(mut cell) = self.changed_cells.get_mut((y * line.len()) + x) {
+                        cell.set(true);
+                    }
+                }
             }
         }
 
@@ -457,19 +508,10 @@ impl Backend for CanvasBackend {
     /// This function is called after the [`CanvasBackend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
-        // Only runs once.
-        if !self.initialized {
-            self.update_grid(true)?;
-            self.prev_buffer = self.buffer.clone();
-            self.initialized = true;
-            return Ok(());
+        let initialized = self.canvas.initialized.swap(true, Ordering::Relaxed);
+        if self.changed_cells.any() || !initialized {
+            self.update_grid(!initialized)?;
         }
-
-        if self.buffer != self.prev_buffer {
-            self.update_grid(false)?;
-        }
-
-        self.prev_buffer = self.buffer.clone();
 
         Ok(())
     }
@@ -501,15 +543,19 @@ impl Backend for CanvasBackend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        self.buffer = get_sized_buffer();
+        self.buffer
+            .iter_mut()
+            .flatten()
+            .for_each(|c| *c = Cell::default());
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
-        Ok(Size::new(
-            self.buffer[0].len().saturating_sub(1) as u16,
-            self.buffer.len().saturating_sub(1) as u16,
-        ))
+        let size = self.buffer_size();
+        Ok(Size {
+            width: size.width.saturating_sub(1),
+            height: size.height.saturating_sub(1),
+        })
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {

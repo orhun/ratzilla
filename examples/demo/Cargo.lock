@@ -288,6 +288,7 @@ name = "demo"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "console_error_panic_hook",
  "rand",
  "ratzilla",
  "tachyonfx",
