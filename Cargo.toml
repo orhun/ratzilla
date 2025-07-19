@@ -44,3 +44,5 @@ console_error_panic_hook = "0.1.7"
 thiserror = "2.0.12"
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc", "std"] }
 beamterm-renderer = "0.1.1"
+sledgehammer_bindgen = { version = "0.6.0", features = ["web"] }
+sledgehammer_utils = "0.3.1"

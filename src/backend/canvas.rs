@@ -1,5 +1,6 @@
 use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
+use sledgehammer_bindgen::bindgen;
 use std::{
     io::Result as IoResult,
     rc::Rc,
@@ -23,8 +24,12 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{
-    js_sys::{Boolean, Map},
-    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
+    js_sys::Uint16Array,
+    wasm_bindgen::{
+        self,
+        prelude::{wasm_bindgen, Closure},
+        JsCast,
+    },
     Element,
 };
 
@@ -69,17 +74,173 @@ impl CanvasBackendOptions {
     }
 }
 
+#[wasm_bindgen(inline_js = r#"
+export class RatzillaCanvas {
+    constructor() {}
+
+    measure_text(text) {
+        return this.ctx.measureText(text);
+    }
+
+    get_canvas() {
+        return this.canvas;
+    }
+
+    reinit_canvas() {
+        this.canvas.width = this.parent.clientWidth;
+        this.canvas.height = this.parent.clientHeight;
+        return new Uint16Array([this.canvas.width, this.canvas.height]);
+    }
+}
+"#)]
+extern "C" {
+    #[wasm_bindgen]
+    /// External JS class for managing the actual HTML canvas, context,
+    /// and parent element.
+    pub type RatzillaCanvas;
+
+    #[wasm_bindgen(method)]
+    fn measure_text(this: &RatzillaCanvas, text: &str) -> web_sys::TextMetrics;
+
+    #[wasm_bindgen(method)]
+    fn get_canvas(this: &RatzillaCanvas) -> web_sys::HtmlCanvasElement;
+
+    #[wasm_bindgen(method)]
+    fn reinit_canvas(this: &RatzillaCanvas) -> Uint16Array;
+}
+
+#[bindgen]
+mod js {
+    #[extends(RatzillaCanvas)]
+    /// Responsible for buffering the calls to the canvas and
+    /// canvas context
+    struct Buffer;
+
+    const BASE: &str = r#"src/backend/canvas_import.js"#;
+
+    fn clear_rect() {
+        r#"
+            this.ctx.clearRect(
+                0,
+                0,
+                this.canvas.clientWidth,
+                this.canvas.clientHeight,
+            );
+        "#
+    }
+
+    fn translate(x: u16, y: u16) {
+        r#"
+            this.ctx.translate($x$, $y$);
+        "#
+    }
+
+    fn translate_neg(x: u16, y: u16) {
+        r#"
+            this.ctx.translate(-$x$, -$y$);
+        "#
+    }
+
+    fn save() {
+        r#"
+            this.ctx.save();
+        "#
+    }
+
+    fn restore() {
+        r#"
+            this.ctx.restore();
+        "#
+    }
+
+    fn begin_path() {
+        r#"
+            this.ctx.beginPath();
+        "#
+    }
+
+    fn clip() {
+        r#"
+            this.ctx.clip();
+        "#
+    }
+
+    fn rect(x: u16, y: u16, w: u16, h: u16) {
+        r#"
+            this.ctx.rect($x$, $y$, $w$, $h$)
+        "#
+    }
+
+    fn fill_rect(x: u16, y: u16, w: u16, h: u16) {
+        r#"
+            this.ctx.fillRect($x$, $y$, $w$, $h$)
+        "#
+    }
+
+    fn stroke_rect(x: u16, y: u16, w: u16, h: u16) {
+        r#"
+            this.ctx.strokeRect($x$, $y$, $w$, $h$)
+        "#
+    }
+
+    fn fill_text(text: &str, x: u16, y: u16) {
+        r#"
+            this.ctx.fillText($text$, $x$, $y$);
+        "#
+    }
+
+    fn set_fill_style_str(style: &str) {
+        r#"
+            this.ctx.fillStyle = $style$;
+        "#
+    }
+
+    fn set_stroke_style_str(style: &str) {
+        r#"
+            this.ctx.strokeStyle = $style$;
+        "#
+    }
+
+    fn create_canvas_in_element(parent: &str) {
+        r#"
+            this.parent = document.getElementById($parent$);
+            if (this.parent == null) {
+                this.parent = document.body;
+            }
+            this.canvas = document.createElement("canvas");
+            this.parent.appendChild(this.canvas);
+        "#
+    }
+
+    fn reinit_canvas() {
+        r#"
+            this.canvas.width = this.parent.clientWidth;
+            this.canvas.height = this.parent.clientHeight;
+        "#
+    }
+
+    fn init_ctx(font_str: &str<u8, fontstr>) {
+        r#"
+            this.ctx = this.canvas.getContext("2d", {
+                alpha: true,
+                desynchronized: true
+            });
+            this.ctx.font = $font_str$;
+            this.ctx.textBaseline = "top";
+        "#
+    }
+}
+
 /// Canvas renderer.
-#[derive(Debug)]
 struct Canvas {
-    /// The canvas's parent element
-    parent: Element,
+    /// The buffer of draw calls to the canvas
+    buffer: Buffer,
     /// Whether the canvas has been initialized.
     initialized: Rc<AtomicBool>,
-    /// Canvas element.
+    /// The inner HTML canvas element
+    ///
+    /// Use **only** for implementing `WebBackend`
     inner: web_sys::HtmlCanvasElement,
-    /// Rendering context.
-    context: web_sys::CanvasRenderingContext2d,
     /// Background color.
     background_color: Color,
     /// An optional string which sets a custom font for the canvas
@@ -98,38 +259,13 @@ struct Canvas {
     cell_ascent: f64,
 }
 
-fn init_ctx(
-    canvas: &web_sys::HtmlCanvasElement,
-    font_str: Option<&str>,
-) -> Result<web_sys::CanvasRenderingContext2d, Error> {
-    let context_options = Map::new();
-    context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
-    context_options.set(
-        &JsValue::from_str("desynchronized"),
-        &Boolean::from(JsValue::TRUE),
-    );
-
-    let context = canvas
-        .get_context_with_context_options("2d", &context_options)?
-        .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .expect("Unable to cast canvas context");
-    context.set_font(font_str.unwrap_or("16px monospace"));
-    context.set_text_baseline("top");
-    Ok(context)
-}
-
 impl Canvas {
     /// Constructs a new [`Canvas`].
     fn new(
-        parent_element: web_sys::Element,
-        width: u32,
-        height: u32,
+        parent_element: &str,
         background_color: Color,
         font_str: Option<String>,
     ) -> Result<Self, Error> {
-        let canvas = create_canvas_in_element(&parent_element, width, height)?;
-
         let initialized: Rc<AtomicBool> = Rc::new(false.into());
         let closure = Closure::<dyn FnMut(_)>::new({
             let initialized = Rc::clone(&initialized);
@@ -142,23 +278,35 @@ impl Canvas {
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
         closure.forget();
 
-        let context = init_ctx(&canvas, font_str.as_deref())?;
+        let mut buffer = Buffer::default();
+        buffer.create_canvas_in_element(parent_element);
 
-        let font_measurement = context.measure_text("█")?;
-
-        Ok(Self {
-            parent: parent_element,
+        let mut canvas = Self {
+            inner: {
+                let ratzilla_canvas: &RatzillaCanvas = buffer.js_channel().as_ref();
+                ratzilla_canvas.get_canvas()
+            },
+            buffer,
             initialized,
-            context,
-            inner: canvas,
             background_color,
             font_str,
-            cell_width: font_measurement.width().floor(),
-            cell_height: (font_measurement.font_bounding_box_ascent().abs()
-                + font_measurement.font_bounding_box_descent().abs())
-            .floor(),
-            cell_ascent: font_measurement.font_bounding_box_ascent().floor(),
-        })
+            cell_width: 0.0,
+            cell_height: 0.0,
+            cell_ascent: 0.0,
+        };
+
+        canvas.init_ctx();
+        canvas.buffer.flush();
+
+        let ratzilla_canvas: &RatzillaCanvas = canvas.buffer.js_channel().as_ref();
+        let font_measurement = ratzilla_canvas.measure_text("█");
+        canvas.cell_width = font_measurement.width().floor();
+        canvas.cell_height = (font_measurement.font_bounding_box_ascent().abs()
+            + font_measurement.font_bounding_box_descent().abs())
+        .floor();
+        canvas.cell_ascent = font_measurement.font_bounding_box_ascent().floor();
+
+        Ok(canvas)
     }
 
     fn font_metrics(&self) -> Size {
@@ -168,16 +316,15 @@ impl Canvas {
         }
     }
 
-    fn re_init_ctx(&mut self) -> Result<(), Error> {
-        self.context = init_ctx(&self.inner, self.font_str.as_deref())?;
-        Ok(())
+    fn init_ctx(&mut self) {
+        self.buffer
+            .init_ctx(self.font_str.as_deref().unwrap_or("16px monospace"));
     }
 }
 
 /// Canvas backend.
 ///
 /// This backend renders the buffer onto a HTML canvas element.
-#[derive(Debug)]
 pub struct CanvasBackend {
     /// The options passed to the backend upon instantiation
     options: CanvasBackendOptions,
@@ -212,14 +359,12 @@ impl CanvasBackend {
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(mut options: CanvasBackendOptions) -> Result<Self, Error> {
         // Parent element of canvas (uses <body> unless specified)
-        let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
+        let parent = options.grid_id.as_deref().unwrap_or_default();
 
-        let (width, height) = options
-            .size
-            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
-
-        let canvas = Canvas::new(parent, width, height, Color::Black, options.font_str.take())?;
-        let buffer = get_sized_buffer_from_canvas(&canvas.inner, canvas.font_metrics());
+        let canvas = Canvas::new(parent, Color::Black, options.font_str.take())?;
+        let ratzilla_canvas: &RatzillaCanvas = canvas.buffer.js_channel().as_ref();
+        let buffer =
+            get_sized_buffer_from_canvas(&ratzilla_canvas.get_canvas(), canvas.font_metrics());
         let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
             options,
@@ -237,16 +382,11 @@ impl CanvasBackend {
     }
 
     fn initialize(&mut self) -> Result<(), Error> {
-        let (width, height) = self.options.size.unwrap_or_else(|| {
-            (
-                self.canvas.parent.client_width() as u32,
-                self.canvas.parent.client_height() as u32,
-            )
-        });
-
-        self.canvas.inner.set_width(width);
-        self.canvas.inner.set_height(height);
-        self.canvas.re_init_ctx()?;
+        let ratzilla_canvas: &RatzillaCanvas = self.canvas.buffer.js_channel().as_ref();
+        let canvas_size = ratzilla_canvas.reinit_canvas();
+        // TODO: Find a way to not use a Javascript array
+        let (width, height) = (canvas_size.get_index(0), canvas_size.get_index(1));
+        self.canvas.init_ctx();
 
         let new_buffer_size = size_to_buffer_size(
             Size {
@@ -311,13 +451,8 @@ impl CanvasBackend {
     // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
     fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
         if force_redraw {
-            self.canvas.context.clear_rect(
-                0.0,
-                0.0,
-                self.canvas.inner.client_width() as f64,
-                self.canvas.inner.client_height() as f64,
-            );
             self.initialize()?;
+            self.canvas.buffer.clear_rect();
             // NOTE: The draw_* functions each traverse the buffer once, instead of
             // traversing it once per cell; this is done to reduce the number of
             // WASM calls per cell.
@@ -325,7 +460,9 @@ impl CanvasBackend {
         }
         let left_margin = (self.canvas.cell_width / 2.0).floor();
         let top_margin = (self.canvas.cell_height / 2.0).floor();
-        self.canvas.context.translate(left_margin, top_margin)?;
+        self.canvas
+            .buffer
+            .translate(left_margin as _, top_margin as _);
 
         self.draw_background()?;
         self.draw_symbols()?;
@@ -334,7 +471,10 @@ impl CanvasBackend {
             self.draw_debug()?;
         }
 
-        self.canvas.context.translate(-left_margin, -top_margin)?;
+        self.canvas
+            .buffer
+            .translate_neg(left_margin as _, top_margin as _);
+        self.canvas.buffer.flush();
         self.changed_cells.set_elements(0x00);
         Ok(())
     }
@@ -357,7 +497,7 @@ impl CanvasBackend {
         let changed_cells = &self.changed_cells;
         let mut index = 0;
 
-        self.canvas.context.save();
+        self.canvas.buffer.save();
         let mut last_color = None;
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, cell) in line.iter().enumerate() {
@@ -372,41 +512,41 @@ impl CanvasBackend {
                 // 1. When we need to create a clipping path (for potentially problematic glyphs)
                 // 2. When the text color changes
                 if self.options.always_clip_cells || !cell.symbol().is_ascii() {
-                    self.canvas.context.restore();
-                    self.canvas.context.save();
+                    self.canvas.buffer.restore();
+                    self.canvas.buffer.save();
 
-                    self.canvas.context.begin_path();
-                    self.canvas.context.rect(
-                        x as f64 * self.canvas.cell_width,
-                        y as f64 * self.canvas.cell_height,
-                        self.canvas.cell_width,
-                        self.canvas.cell_height,
+                    self.canvas.buffer.begin_path();
+                    self.canvas.buffer.rect(
+                        (x as f64 * self.canvas.cell_width) as _,
+                        (y as f64 * self.canvas.cell_height) as _,
+                        self.canvas.cell_width as _,
+                        self.canvas.cell_height as _,
                     );
-                    self.canvas.context.clip();
+                    self.canvas.buffer.clip();
 
                     last_color = None; // reset last color to avoid clipping
                     let color = get_canvas_color(color, Color::White);
-                    self.canvas.context.set_fill_style_str(&color);
+                    self.canvas.buffer.set_fill_style_str(&color);
                 } else if last_color != Some(color) {
-                    self.canvas.context.restore();
-                    self.canvas.context.save();
+                    self.canvas.buffer.restore();
+                    self.canvas.buffer.save();
 
                     last_color = Some(color);
 
                     let color = get_canvas_color(color, Color::White);
-                    self.canvas.context.set_fill_style_str(&color);
+                    self.canvas.buffer.set_fill_style_str(&color);
                 }
 
-                self.canvas.context.fill_text(
+                self.canvas.buffer.fill_text(
                     cell.symbol(),
-                    x as f64 * self.canvas.cell_width,
-                    y as f64 * self.canvas.cell_height + self.canvas.cell_ascent,
-                )?;
+                    (x as f64 * self.canvas.cell_width) as _,
+                    (y as f64 * self.canvas.cell_height + self.canvas.cell_ascent) as _,
+                );
 
                 index += 1;
             }
         }
-        self.canvas.context.restore();
+        self.canvas.buffer.restore();
 
         Ok(())
     }
@@ -420,17 +560,17 @@ impl CanvasBackend {
     /// color, and then it draws the accumulated rectangle.
     fn draw_background(&mut self) -> Result<(), Error> {
         let changed_cells = &self.changed_cells;
-        self.canvas.context.save();
+        self.canvas.buffer.save();
 
-        let draw_region = |(rect, color): (Rect, Color)| {
-            let color = get_canvas_color(color, self.canvas.background_color);
+        let draw_region = |(rect, color, canvas): (Rect, Color, &mut Canvas)| {
+            let color = get_canvas_color(color, canvas.background_color);
 
-            self.canvas.context.set_fill_style_str(&color);
-            self.canvas.context.fill_rect(
-                rect.x as f64 * self.canvas.cell_width,
-                rect.y as f64 * self.canvas.cell_height,
-                rect.width as f64 * self.canvas.cell_width,
-                rect.height as f64 * self.canvas.cell_height,
+            canvas.buffer.set_fill_style_str(&color);
+            canvas.buffer.fill_rect(
+                (rect.x as f64 * canvas.cell_width) as _,
+                (rect.y as f64 * canvas.cell_height) as _,
+                (rect.width as f64 * canvas.cell_width) as _,
+                (rect.height as f64 * canvas.cell_height) as _,
             );
         };
 
@@ -442,19 +582,23 @@ impl CanvasBackend {
                     // Only calls `draw_region` if the color is different from the previous one
                     row_renderer
                         .process_color((x, y), actual_bg_color(cell))
-                        .map(draw_region);
+                        .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
                 } else {
                     // Cell is unchanged so we must flush any held region
                     // to avoid clearing the foreground (symbol) of the cell
-                    row_renderer.flush().map(draw_region);
+                    row_renderer
+                        .flush()
+                        .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
                 }
                 index += 1;
             }
             // Flush the remaining region after traversing the row
-            row_renderer.flush().map(draw_region);
+            row_renderer
+                .flush()
+                .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
         }
 
-        self.canvas.context.restore();
+        self.canvas.buffer.restore();
 
         Ok(())
     }
@@ -465,15 +609,15 @@ impl CanvasBackend {
             let cell = &self.buffer[pos.y as usize][pos.x as usize];
 
             if cell.modifier.contains(Modifier::UNDERLINED) {
-                self.canvas.context.save();
+                self.canvas.buffer.save();
 
-                self.canvas.context.fill_text(
+                self.canvas.buffer.fill_text(
                     "_",
-                    pos.x as f64 * self.canvas.cell_width,
-                    pos.y as f64 * self.canvas.cell_height + self.canvas.cell_ascent,
-                )?;
+                    (pos.x as f64 * self.canvas.cell_width) as _,
+                    (pos.y as f64 * self.canvas.cell_height + self.canvas.cell_ascent) as _,
+                );
 
-                self.canvas.context.restore();
+                self.canvas.buffer.restore();
             }
         }
 
@@ -482,22 +626,22 @@ impl CanvasBackend {
 
     /// Draws cell boundaries for debugging.
     fn draw_debug(&mut self) -> Result<(), Error> {
-        self.canvas.context.save();
+        self.canvas.buffer.save();
 
         let color = self.debug_mode.as_ref().unwrap();
         for (y, line) in self.buffer.iter().enumerate() {
             for (x, _) in line.iter().enumerate() {
-                self.canvas.context.set_stroke_style_str(color);
-                self.canvas.context.stroke_rect(
-                    x as f64 * self.canvas.cell_width,
-                    y as f64 * self.canvas.cell_height,
-                    self.canvas.cell_width,
-                    self.canvas.cell_height,
+                self.canvas.buffer.set_stroke_style_str(color);
+                self.canvas.buffer.stroke_rect(
+                    (x as f64 * self.canvas.cell_width) as _,
+                    (y as f64 * self.canvas.cell_height) as _,
+                    self.canvas.cell_width as _,
+                    self.canvas.cell_height as _,
                 );
             }
         }
 
-        self.canvas.context.restore();
+        self.canvas.buffer.restore();
 
         Ok(())
     }
