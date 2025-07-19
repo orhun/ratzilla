@@ -6,7 +6,50 @@ use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use ratzilla::{CanvasBackend, DomBackend, WebGl2Backend};
 use ratzilla::ratatui::{Terminal, TerminalOptions};
 use ratzilla::ratatui::backend::Backend;
-use crate::{fps, inject_backend_footer, BackendType};
+use crate::fps;
+use crate::utils::inject_backend_footer;
+
+
+/// Available backend types
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum BackendType {
+    #[default]
+    Dom,
+    Canvas,
+    WebGl2,
+}
+
+impl BackendType {
+    /// Get the backend type from a string
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "dom" => Some(BackendType::Dom),
+            "canvas" => Some(BackendType::Canvas),
+            "webgl2" => Some(BackendType::WebGl2),
+            _ => None,
+        }
+    }
+
+    /// Get the string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BackendType::Dom => "dom",
+            BackendType::Canvas => "canvas",
+            BackendType::WebGl2 => "webgl2",
+        }
+    }
+
+    /// Get a human-readable name
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            BackendType::Dom => "DOM",
+            BackendType::Canvas => "Canvas",
+            BackendType::WebGl2 => "WebGL2",
+        }
+    }
+}
+
+
 
 /// Enum wrapper for different backends
 pub enum RatzillaBackend {

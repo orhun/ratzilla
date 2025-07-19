@@ -10,8 +10,7 @@ use ratzilla::{
     event::KeyCode, event::MouseButton, event::MouseEventKind, WebRenderer,
 };
 
-use examples_shared::{BackendType};
-use examples_shared::backend::multi_backend_builder;
+use examples_shared::backend::{multi_backend_builder, BackendType};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
