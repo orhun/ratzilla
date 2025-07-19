@@ -9,8 +9,7 @@ use ratzilla::ratatui::{
 };
 
 use ratzilla::{WebRenderer};
-use examples_shared::{BackendType};
-use examples_shared::backend::multi_backend_builder;
+use examples_shared::backend::{BackendType};
 
 fn main() -> io::Result<()> {
     let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)

@@ -33,8 +33,7 @@ use ratzilla::{
     ratatui::{layout::Rect, TerminalOptions, Viewport},
     WebRenderer,
 };
-use examples_shared::{BackendType};
-use examples_shared::backend::multi_backend_builder;
+use examples_shared::backend::{BackendType};
 
 pub use self::{
     colors::{color_from_oklab, RgbSwatch},

@@ -11,8 +11,7 @@ use ratzilla::{
     event::{KeyCode, KeyEvent},
     WebRenderer,
 };
-use examples_shared::{BackendType};
-use examples_shared::backend::multi_backend_builder;
+use examples_shared::backend::{BackendType};
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));

@@ -221,7 +221,7 @@ pub struct MultiBackendBuilder {
 }
 
 impl MultiBackendBuilder {
-    fn new(default_backend: BackendType) -> Self {
+    pub fn new(default_backend: BackendType) -> Self {
         Self {
             default_backend,
             ..Self::default()
@@ -272,11 +272,6 @@ impl MultiBackendBuilder {
 
         Ok((backend_type, terminal))
     }
-}
-
-/// Create a new MultiBackendBuilder with the default backend type
-pub fn multi_backend_builder(default: BackendType) -> MultiBackendBuilder {
-    MultiBackendBuilder::new(default)
 }
 
 /// Read the backend type from query parameters, fallback to default

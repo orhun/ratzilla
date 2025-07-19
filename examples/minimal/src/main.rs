@@ -10,7 +10,7 @@ use ratzilla::{
     event::KeyCode, event::MouseButton, event::MouseEventKind, WebRenderer,
 };
 
-use examples_shared::backend::{multi_backend_builder, BackendType};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
@@ -18,7 +18,8 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)
+    let default = BackendType::Dom;
+    let (_backend_type, terminal) = MultiBackendBuilder::new(default)
         .build_terminal()?;
 
     terminal.on_key_event({

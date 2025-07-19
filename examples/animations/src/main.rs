@@ -7,8 +7,7 @@ use ratzilla::{
     },
     WebRenderer,
 };
-use examples_shared::{BackendType};
-use examples_shared::backend::multi_backend_builder;
+use examples_shared::backend::{BackendType};
 use tachyonfx::{
     fx, CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion,
     Shader,
