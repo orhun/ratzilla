@@ -11,7 +11,10 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{
+    backend::utils::*, error::Error, render::WebBackend, widgets::hyperlink::HYPERLINK_MODIFIER,
+    CursorShape,
+};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -338,5 +341,11 @@ impl Backend for DomBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+impl WebBackend for DomBackend {
+    fn listening_element(&self) -> &Element {
+        &self.grid_parent
     }
 }

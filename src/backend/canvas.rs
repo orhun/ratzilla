@@ -2,7 +2,6 @@ use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
 use std::{
     io::Result as IoResult,
-    mem::ManuallyDrop,
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -13,6 +12,7 @@ use crate::{
         utils::*,
     },
     error::Error,
+    render::WebBackend,
     CursorShape,
 };
 use ratatui::{
@@ -117,15 +117,16 @@ impl Canvas {
         let canvas = create_canvas_in_element(&parent_element, width, height)?;
 
         let initialized: Rc<AtomicBool> = Rc::new(false.into());
-        let closure = ManuallyDrop::new(Closure::<dyn FnMut(_)>::new({
+        let closure = Closure::<dyn FnMut(_)>::new({
             let initialized = Rc::clone(&initialized);
             move |_: web_sys::Event| {
                 initialized.store(false, Ordering::Relaxed);
             }
-        }));
+        });
         web_sys::window()
             .unwrap()
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
+        closure.forget();
 
         let context = init_ctx(&canvas)?;
 
@@ -600,6 +601,12 @@ impl Backend for CanvasBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+impl WebBackend for CanvasBackend {
+    fn listening_element(&self) -> &Element {
+        &self.canvas.inner
     }
 }
 
