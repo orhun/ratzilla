@@ -1,10 +1,36 @@
 #!/usr/bin/env bash
 
-mkdir dist
+mkdir -p dist
 for example in examples/*; do
   example_name=$(basename "$example")
+  
+  # Skip if not a directory
+  if [ ! -d "$example" ]; then
+    continue
+  fi
+  
+  # Skip if no Cargo.toml (not a Rust project)
+  if [ ! -f "$example/Cargo.toml" ]; then
+    echo "Skipping $example_name: no Cargo.toml found"
+    continue
+  fi
+  
+  # Skip if no index.html (not a web example)  
+  if [ ! -f "$example/index.html" ]; then
+    echo "Skipping $example_name: no index.html found"
+    continue
+  fi
+  
+  # Skip shared library
+  if [ "$example_name" == "shared" ]; then
+    echo "Skipping $example_name: shared library"
+    continue
+  fi
+  
+  echo "Building $example_name..."
   mkdir -p dist/"$example_name"
   pushd "$example" || exit
+  
   if [ "$example_name" == "website" ]; then
     trunk build --release --public-url https://orhun.dev/ratzilla/
     cp -r dist/* ../../dist/
