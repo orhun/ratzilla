@@ -28,18 +28,6 @@ use web_sys::{
     Element,
 };
 
-/// Width of a single cell.
-///
-/// This will be used for multiplying the cell's x position to get the actual pixel
-/// position on the canvas.
-const CELL_WIDTH: f64 = 10.0;
-
-/// Height of a single cell.
-///
-/// This will be used for multiplying the cell's y position to get the actual pixel
-/// position on the canvas.
-const CELL_HEIGHT: f64 = 19.0;
-
 /// Options for the [`CanvasBackend`].
 #[derive(Debug, Default)]
 pub struct CanvasBackendOptions {
@@ -86,6 +74,16 @@ struct Canvas {
     context: web_sys::CanvasRenderingContext2d,
     /// Background color.
     background_color: Color,
+    /// Width of a single cell.
+    ///
+    /// This will be used for multiplying the cell's x position to get the actual pixel
+    /// position on the canvas.
+    cell_width: f64,
+    /// Height of a single cell.
+    ///
+    /// This will be used for multiplying the cell's y position to get the actual pixel
+    /// position on the canvas.
+    cell_height: f64,
 }
 
 fn init_ctx(
@@ -129,13 +127,28 @@ impl Canvas {
             .unwrap()
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
 
+        let context = init_ctx(&canvas)?;
+
+        let font_measurement = context.measure_text("|")?;
+
         Ok(Self {
             parent: parent_element,
             initialized,
-            context: init_ctx(&canvas)?,
+            context,
             inner: canvas,
             background_color,
+            // cell_width: font_measurement.actual_bounding_box_left().abs()
+            //     + font_measurement.actual_bounding_box_right().abs(),
+            cell_width: font_measurement.width().floor(),
+            cell_height: font_measurement.font_bounding_box_descent().abs().floor(),
         })
+    }
+
+    fn font_metrics(&self) -> Size {
+        Size {
+            width: self.cell_width as u16,
+            height: self.cell_height as u16,
+        }
     }
 
     fn re_init_ctx(&mut self) -> Result<(), Error> {
@@ -189,7 +202,7 @@ impl CanvasBackend {
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
         let canvas = Canvas::new(parent, width, height, Color::Black)?;
-        let buffer = get_sized_buffer_from_canvas(&canvas.inner);
+        let buffer = get_sized_buffer_from_canvas(&canvas.inner, canvas.font_metrics());
         let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
             options,
@@ -218,10 +231,13 @@ impl CanvasBackend {
         self.canvas.inner.set_height(height);
         self.canvas.re_init_ctx()?;
 
-        let new_buffer_size = size_to_buffer_size(Size {
-            width: width as u16,
-            height: height as u16,
-        });
+        let new_buffer_size = size_to_buffer_size(
+            Size {
+                width: width as u16,
+                height: height as u16,
+            },
+            self.canvas.font_metrics(),
+        );
         if self.buffer_size() != new_buffer_size {
             for line in &mut self.buffer {
                 line.resize_with(new_buffer_size.width as usize, || Cell::default());
@@ -342,10 +358,10 @@ impl CanvasBackend {
 
                     self.canvas.context.begin_path();
                     self.canvas.context.rect(
-                        x as f64 * CELL_WIDTH,
-                        y as f64 * CELL_HEIGHT,
-                        CELL_WIDTH,
-                        CELL_HEIGHT,
+                        x as f64 * self.canvas.cell_width,
+                        y as f64 * self.canvas.cell_height,
+                        self.canvas.cell_width,
+                        self.canvas.cell_height,
                     );
                     self.canvas.context.clip();
 
@@ -364,8 +380,8 @@ impl CanvasBackend {
 
                 self.canvas.context.fill_text(
                     cell.symbol(),
-                    x as f64 * CELL_WIDTH,
-                    y as f64 * CELL_HEIGHT,
+                    x as f64 * self.canvas.cell_width,
+                    y as f64 * self.canvas.cell_height,
                 )?;
 
                 index += 1;
@@ -392,10 +408,10 @@ impl CanvasBackend {
 
             self.canvas.context.set_fill_style_str(&color);
             self.canvas.context.fill_rect(
-                rect.x as f64 * CELL_WIDTH,
-                rect.y as f64 * CELL_HEIGHT,
-                rect.width as f64 * CELL_WIDTH,
-                rect.height as f64 * CELL_HEIGHT,
+                rect.x as f64 * self.canvas.cell_width,
+                rect.y as f64 * self.canvas.cell_height,
+                rect.width as f64 * self.canvas.cell_width,
+                rect.height as f64 * self.canvas.cell_height,
             );
         };
 
@@ -434,8 +450,8 @@ impl CanvasBackend {
 
                 self.canvas.context.fill_text(
                     "_",
-                    pos.x as f64 * CELL_WIDTH,
-                    pos.y as f64 * CELL_HEIGHT,
+                    pos.x as f64 * self.canvas.cell_width,
+                    pos.y as f64 * self.canvas.cell_height,
                 )?;
 
                 self.canvas.context.restore();
@@ -454,10 +470,10 @@ impl CanvasBackend {
             for (x, _) in line.iter().enumerate() {
                 self.canvas.context.set_stroke_style_str(color);
                 self.canvas.context.stroke_rect(
-                    x as f64 * CELL_WIDTH,
-                    y as f64 * CELL_HEIGHT,
-                    CELL_WIDTH,
-                    CELL_HEIGHT,
+                    x as f64 * self.canvas.cell_width,
+                    y as f64 * self.canvas.cell_height,
+                    self.canvas.cell_width,
+                    self.canvas.cell_height,
                 );
             }
         }
