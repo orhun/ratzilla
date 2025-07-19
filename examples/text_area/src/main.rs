@@ -8,12 +8,12 @@ use ratzilla::{
     },
     WebRenderer,
 };
-use examples_shared::backend::{BackendType};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Dom)
         .build_terminal()?;
 
     let app = Rc::new(RefCell::new(App::new()));

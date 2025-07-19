@@ -49,7 +49,11 @@ impl BackendType {
     }
 }
 
-
+impl From<BackendType> for MultiBackendBuilder {
+    fn from(backend_type: BackendType) -> Self {
+        MultiBackendBuilder::new(backend_type)
+    }
+}
 
 /// Enum wrapper for different backends
 pub enum RatzillaBackend {

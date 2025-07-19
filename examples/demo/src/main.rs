@@ -12,7 +12,7 @@ use app::App;
 use clap::Parser;
 use ratzilla::event::KeyCode;
 use ratzilla::WebRenderer;
-use examples_shared::backend::BackendType;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use ratzilla::{
     backend::webgl2::WebGl2BackendOptions,
     backend::canvas::CanvasBackendOptions,
@@ -46,8 +46,7 @@ fn main() -> Result<()> {
         .measure_performance(true)
         .size((1600, 900));
 
-    let default = BackendType::WebGl2;
-    let (_backend_type, terminal) = MultiBackendBuilder::new(default)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::WebGl2)
         .canvas_options(canvas_options)
         .webgl2_options(webgl2_options)
         .build_terminal()?;

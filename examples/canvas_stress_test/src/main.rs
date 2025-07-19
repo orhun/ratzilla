@@ -14,14 +14,13 @@ use ratzilla::{ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
 }, WebRenderer};
-use examples_shared::backend::BackendType;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let default = BackendType::WebGl2;
-    let (_backend_type, terminal) = MultiBackendBuilder::new(default)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::WebGl2)
         .webgl2_options(WebGl2BackendOptions::new().measure_performance(true))
         .build_terminal()?;
 

@@ -9,10 +9,10 @@ use ratzilla::ratatui::{
 };
 
 use ratzilla::{WebRenderer};
-use examples_shared::backend::{BackendType};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
-    let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Dom)
         .build_terminal()?;
 
     terminal.draw_web(move |f| {

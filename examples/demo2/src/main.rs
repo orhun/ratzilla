@@ -33,7 +33,7 @@ use ratzilla::{
     ratatui::{layout::Rect, TerminalOptions, Viewport},
     WebRenderer,
 };
-use examples_shared::backend::{BackendType};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 pub use self::{
     colors::{color_from_oklab, RgbSwatch},
@@ -47,7 +47,7 @@ fn main() -> std::io::Result<()> {
     // using vhs in a 1280x640 sized window (github social preview size)
     let viewport = Viewport::Fixed(Rect::new(0, 0, 81, 18));
     
-    let (_backend_type, terminal) = multi_backend_builder(BackendType::Canvas)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Canvas)
         .webgl2_options(WebGl2BackendOptions::new().measure_performance(true))
         .terminal_options(TerminalOptions { viewport })
         .build_terminal()?;

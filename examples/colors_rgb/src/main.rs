@@ -11,12 +11,11 @@ use ratzilla::{
     },
     WebRenderer,
 };
-use examples_shared::backend::BackendType;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let default = BackendType::Canvas;
-    let (_backend_type, terminal) = MultiBackendBuilder::new(default)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Canvas)
         .build_terminal()?;
     let mut app = ColorsWidget::default();
     terminal.draw_web(move |frame| {

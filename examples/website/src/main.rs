@@ -11,7 +11,7 @@ use ratzilla::{
     widgets::Hyperlink,
     WebRenderer,
 };
-use examples_shared::backend::BackendType;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use tachyonfx::{
     fx::{self, RepeatMode},
     CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion, Shader,
@@ -54,8 +54,7 @@ impl Default for State {
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let default = BackendType::Dom;
-    let (_backend_type, terminal) = MultiBackendBuilder::new(default)
+    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Dom)
         .build_terminal()?;
     let mut state = State::default();
     terminal.on_key_event(move |key| handle_key_event(key));
