@@ -10,10 +10,12 @@ use std::{cell::RefCell, io::Result, rc::Rc};
 
 use app::App;
 use clap::Parser;
+use ratzilla::backend::canvas::{CanvasBackend, CanvasBackendOptions};
 use ratzilla::event::KeyCode;
 use ratzilla::ratatui::style::Color;
 use ratzilla::ratatui::Terminal;
-use ratzilla::{CanvasBackend, WebRenderer};
+use ratzilla::WebRenderer;
+use wasm_bindgen::prelude::*;
 
 mod app;
 
@@ -32,15 +34,19 @@ struct Cli {
     unicode: bool,
 }
 
-fn main() -> Result<()> {
+#[wasm_bindgen]
+pub fn main() {
     console_error_panic_hook::set_once();
 
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    // let mut backend = CanvasBackend::new_with_size(1600, 900)?;
-    let mut backend = CanvasBackend::new()?;
+    // let mut backend = CanvasBackend::new_with_size(1600, 900).unwrap();
+    let mut backend = CanvasBackend::new_with_options(
+        CanvasBackendOptions::new().font(String::from("16px Fira Code")),
+    )
+    .unwrap();
     // backend.set_debug_mode(Some("red"));
     backend.set_background_color(Color::Rgb(18, 18, 18));
-    let terminal = Terminal::new(backend)?;
+    let terminal = Terminal::new(backend).unwrap();
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
@@ -72,6 +78,4 @@ fn main() -> Result<()> {
         let elapsed = app_state.on_tick();
         ui::draw(elapsed, f, &mut app_state);
     });
-
-    Ok(())
 }

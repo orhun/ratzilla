@@ -292,6 +292,7 @@ dependencies = [
  "rand",
  "ratzilla",
  "tachyonfx",
+ "wasm-bindgen",
  "web-time",
 ]
 
