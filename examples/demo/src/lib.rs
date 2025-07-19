@@ -6,7 +6,7 @@
 //! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
 //! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{cell::RefCell, io::Result, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use app::App;
 use clap::Parser;
