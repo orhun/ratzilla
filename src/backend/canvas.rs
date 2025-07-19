@@ -306,7 +306,9 @@ impl CanvasBackend {
             // WASM calls per cell.
             self.changed_cells.set_elements(usize::MAX);
         }
-        self.canvas.context.translate(5_f64, 5_f64)?;
+        let left_margin = (self.canvas.cell_width / 2.0).floor();
+        let top_margin = (self.canvas.cell_height / 2.0).floor();
+        self.canvas.context.translate(left_margin, top_margin)?;
 
         self.draw_background()?;
         self.draw_symbols()?;
@@ -315,7 +317,7 @@ impl CanvasBackend {
             self.draw_debug()?;
         }
 
-        self.canvas.context.translate(-5_f64, -5_f64)?;
+        self.canvas.context.translate(-left_margin, -top_margin)?;
         self.changed_cells.set_elements(0x00);
         Ok(())
     }
