@@ -225,6 +225,7 @@ dependencies = [
  "ratzilla",
  "wasm-bindgen",
  "web-sys",
+ "web-time",
 ]
 
 [[package]]

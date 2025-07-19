@@ -12,10 +12,11 @@ use ratzilla::ratatui::{
     widgets::{Block, Paragraph},
 };
 use ratzilla::{event::KeyCode, WebRenderer};
-use examples_shared::{backend_from_query_param, BackendType};
+use examples_shared::{BackendType};
+use examples_shared::backend::multi_backend_builder;
 
 fn main() -> io::Result<()> {
-    let (_backend_type, terminal) = backend_from_query_param(BackendType::Dom)
+    let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)
         .dom_options(ratzilla::backend::dom::DomBackendOptions::new(None, CursorShape::SteadyUnderScore))
         .build_terminal()?;
 

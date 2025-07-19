@@ -1,10 +1,4 @@
-use ratzilla::{
-    backend::{canvas::CanvasBackendOptions, dom::DomBackendOptions, webgl2::WebGl2BackendOptions},
-    ratatui::{prelude::Backend, Terminal, TerminalOptions},
-    CanvasBackend, DomBackend, WebGl2Backend,
-};
-use std::{cell::RefCell, io};
-use web_sys::{wasm_bindgen::JsValue, Url};
+use web_sys::wasm_bindgen::JsValue;
 
 
 pub mod backend;

@@ -7,7 +7,8 @@ use ratzilla::{
     },
     WebRenderer,
 };
-use examples_shared::{backend_from_query_param, BackendType};
+use examples_shared::{BackendType};
+use examples_shared::backend::multi_backend_builder;
 use tachyonfx::{
     fx, CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion,
     Shader,
@@ -15,7 +16,7 @@ use tachyonfx::{
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let (_backend_type, terminal) = backend_from_query_param(BackendType::Canvas)
+    let (_backend_type, terminal) = multi_backend_builder(BackendType::Canvas)
         .build_terminal()?;
     let mut effect = fx::sequence(&[
         // first we "sweep in" the text from the left, before reversing the effect

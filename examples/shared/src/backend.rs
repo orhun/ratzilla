@@ -6,10 +6,10 @@ use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use ratzilla::{CanvasBackend, DomBackend, WebGl2Backend};
 use ratzilla::ratatui::{Terminal, TerminalOptions};
 use ratzilla::ratatui::backend::Backend;
-use crate::{backend, fps, inject_backend_footer, BackendType};
+use crate::{fps, inject_backend_footer, BackendType};
 
 /// Enum wrapper for different backends
-enum RatzillaBackend {
+pub enum RatzillaBackend {
     Dom(DomBackend),
     Canvas(CanvasBackend),
     WebGl2(WebGl2Backend),

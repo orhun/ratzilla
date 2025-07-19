@@ -14,7 +14,8 @@ use ratzilla::ratatui::{
     },
     Terminal,
 };
-use examples_shared::{backend_from_query_param, BackendType};
+use examples_shared::{BackendType};
+use examples_shared::backend::multi_backend_builder;
 
 struct App {
     count: u64,
@@ -64,7 +65,7 @@ impl App {
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
-    let (_backend_type, terminal) = backend_from_query_param(BackendType::Dom)
+    let (_backend_type, terminal) = multi_backend_builder(BackendType::Dom)
         .build_terminal()?;
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
