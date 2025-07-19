@@ -1,6 +1,7 @@
 use crate::{
     backend::{color::to_rgb, utils::*},
     error::Error,
+    render::WebBackend,
     CursorShape,
 };
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
@@ -426,6 +427,12 @@ impl Backend for WebGl2Backend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+impl WebBackend for WebGl2Backend {
+    fn listening_element(&self) -> &web_sys::Element {
+        self.context.renderer.canvas()
     }
 }
 
