@@ -40,6 +40,8 @@ pub struct CanvasBackendOptions {
     /// this option may cause some performance issues when dealing with large
     /// numbers of simultaneous changes.
     always_clip_cells: bool,
+    /// An optional string which sets a custom font for the canvas
+    font_str: Option<String>,
 }
 
 impl CanvasBackendOptions {
@@ -74,6 +76,8 @@ struct Canvas {
     context: web_sys::CanvasRenderingContext2d,
     /// Background color.
     background_color: Color,
+    /// An optional string which sets a custom font for the canvas
+    font_str: Option<String>,
     /// Width of a single cell.
     ///
     /// This will be used for multiplying the cell's x position to get the actual pixel
@@ -90,6 +94,7 @@ struct Canvas {
 
 fn init_ctx(
     canvas: &web_sys::HtmlCanvasElement,
+    font_str: Option<&str>,
 ) -> Result<web_sys::CanvasRenderingContext2d, Error> {
     let context_options = Map::new();
     context_options.set(&JsValue::from_str("alpha"), &Boolean::from(JsValue::TRUE));
@@ -103,7 +108,7 @@ fn init_ctx(
         .ok_or_else(|| Error::UnableToRetrieveCanvasContext)?
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .expect("Unable to cast canvas context");
-    context.set_font("16px monospace");
+    context.set_font(font_str.unwrap_or("16px monospace"));
     context.set_text_baseline("top");
     Ok(context)
 }
@@ -115,6 +120,7 @@ impl Canvas {
         width: u32,
         height: u32,
         background_color: Color,
+        font_str: Option<String>,
     ) -> Result<Self, Error> {
         let canvas = create_canvas_in_element(&parent_element, width, height)?;
 
@@ -130,7 +136,7 @@ impl Canvas {
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
         closure.forget();
 
-        let context = init_ctx(&canvas)?;
+        let context = init_ctx(&canvas, font_str.as_deref())?;
 
         let font_measurement = context.measure_text("█")?;
 
@@ -140,6 +146,7 @@ impl Canvas {
             context,
             inner: canvas,
             background_color,
+            font_str,
             cell_width: font_measurement.width().floor(),
             cell_height: (font_measurement.font_bounding_box_ascent().abs()
                 + font_measurement.font_bounding_box_descent().abs())
@@ -156,7 +163,7 @@ impl Canvas {
     }
 
     fn re_init_ctx(&mut self) -> Result<(), Error> {
-        self.context = init_ctx(&self.inner)?;
+        self.context = init_ctx(&self.inner, self.font_str.as_deref())?;
         Ok(())
     }
 }
@@ -197,7 +204,7 @@ impl CanvasBackend {
     }
 
     /// Constructs a new [`CanvasBackend`] with the given options.
-    pub fn new_with_options(options: CanvasBackendOptions) -> Result<Self, Error> {
+    pub fn new_with_options(mut options: CanvasBackendOptions) -> Result<Self, Error> {
         // Parent element of canvas (uses <body> unless specified)
         let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
@@ -205,7 +212,7 @@ impl CanvasBackend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let canvas = Canvas::new(parent, width, height, Color::Black)?;
+        let canvas = Canvas::new(parent, width, height, Color::Black, options.font_str.take())?;
         let buffer = get_sized_buffer_from_canvas(&canvas.inner, canvas.font_metrics());
         let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
