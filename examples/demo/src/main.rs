@@ -38,6 +38,7 @@ fn main() -> Result<()> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
     // let mut backend = CanvasBackend::new_with_size(1600, 900)?;
     let mut backend = CanvasBackend::new()?;
+    // backend.set_debug_mode(Some("red"));
     backend.set_background_color(Color::Rgb(18, 18, 18));
     let terminal = Terminal::new(backend)?;
     terminal.on_key_event({
@@ -56,6 +57,9 @@ fn main() -> Result<()> {
                 }
                 KeyCode::Down => {
                     app_state.on_down();
+                }
+                KeyCode::Char(' ') => {
+                    app_state.pause_unpause();
                 }
                 KeyCode::Char(c) => app_state.on_key(c),
                 _ => {}

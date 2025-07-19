@@ -84,6 +84,8 @@ struct Canvas {
     /// This will be used for multiplying the cell's y position to get the actual pixel
     /// position on the canvas.
     cell_height: f64,
+    /// The font ascent of the `|` character as measured by the canvas
+    cell_ascent: f64,
 }
 
 fn init_ctx(
@@ -130,7 +132,7 @@ impl Canvas {
 
         let context = init_ctx(&canvas)?;
 
-        let font_measurement = context.measure_text("|")?;
+        let font_measurement = context.measure_text("█")?;
 
         Ok(Self {
             parent: parent_element,
@@ -138,10 +140,11 @@ impl Canvas {
             context,
             inner: canvas,
             background_color,
-            // cell_width: font_measurement.actual_bounding_box_left().abs()
-            //     + font_measurement.actual_bounding_box_right().abs(),
             cell_width: font_measurement.width().floor(),
-            cell_height: font_measurement.font_bounding_box_descent().abs().floor(),
+            cell_height: (font_measurement.font_bounding_box_ascent().abs()
+                + font_measurement.font_bounding_box_descent().abs())
+            .floor(),
+            cell_ascent: font_measurement.font_bounding_box_ascent().floor(),
         })
     }
 
@@ -384,7 +387,7 @@ impl CanvasBackend {
                 self.canvas.context.fill_text(
                     cell.symbol(),
                     x as f64 * self.canvas.cell_width,
-                    y as f64 * self.canvas.cell_height,
+                    y as f64 * self.canvas.cell_height + self.canvas.cell_ascent,
                 )?;
 
                 index += 1;
@@ -454,7 +457,7 @@ impl CanvasBackend {
                 self.canvas.context.fill_text(
                     "_",
                     pos.x as f64 * self.canvas.cell_width,
-                    pos.y as f64 * self.canvas.cell_height,
+                    pos.y as f64 * self.canvas.cell_height + self.canvas.cell_ascent,
                 )?;
 
                 self.canvas.context.restore();
