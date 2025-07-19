@@ -61,6 +61,12 @@ impl CanvasBackendOptions {
         self.size = Some(size);
         self
     }
+
+    /// Sets the font that the canvas will use
+    pub fn font(mut self, font: Option<String>) -> Self {
+        self.font_str = font;
+        self
+    }
 }
 
 /// Canvas renderer.
