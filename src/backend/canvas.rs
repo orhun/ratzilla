@@ -24,7 +24,7 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{
-    js_sys::Uint16Array,
+    js_sys::{Float64Array, Uint16Array},
     wasm_bindgen::{
         self,
         prelude::{wasm_bindgen, Closure},
@@ -38,8 +38,6 @@ use web_sys::{
 pub struct CanvasBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
-    /// Override the automatically detected size.
-    size: Option<(u32, u32)>,
     /// Always clip foreground drawing to the cell rectangle. Helpful when
     /// dealing with out-of-bounds rendering from problematic fonts. Enabling
     /// this option may cause some performance issues when dealing with large
@@ -61,12 +59,6 @@ impl CanvasBackendOptions {
         self
     }
 
-    /// Sets the size of the canvas, in pixels.
-    pub fn size(mut self, size: (u32, u32)) -> Self {
-        self.size = Some(size);
-        self
-    }
-
     /// Sets the font that the canvas will use
     pub fn font(mut self, font: String) -> Self {
         self.font_str = Some(font);
@@ -83,12 +75,14 @@ extern "C" {
     pub type RatzillaCanvas;
 
     #[wasm_bindgen(method)]
-    fn measure_text(this: &RatzillaCanvas, text: &str) -> web_sys::TextMetrics;
+    /// Returns the cell width, cell height, and cell ascent in that order
+    fn measure_text(this: &RatzillaCanvas, text: &str) -> Float64Array;
 
     #[wasm_bindgen(method)]
     fn get_canvas(this: &RatzillaCanvas) -> web_sys::HtmlCanvasElement;
 
     #[wasm_bindgen(method)]
+    /// Returns the new number of cells in width and height in that order
     fn reinit_canvas(this: &RatzillaCanvas) -> Uint16Array;
 }
 
@@ -108,29 +102,6 @@ mod js {
     struct Buffer;
 
     const BASE: &str = r#"src/backend/canvas_import.js"#;
-
-    fn clear_rect() {
-        r#"
-            this.ctx.clearRect(
-                0,
-                0,
-                this.canvas.clientWidth,
-                this.canvas.clientHeight,
-            );
-        "#
-    }
-
-    fn translate(x: u16, y: u16) {
-        r#"
-            this.ctx.translate($x$, $y$);
-        "#
-    }
-
-    fn translate_neg(x: u16, y: u16) {
-        r#"
-            this.ctx.translate(-$x$, -$y$);
-        "#
-    }
 
     fn save() {
         r#"
@@ -199,25 +170,16 @@ mod js {
                 this.parent = document.body;
             }
             this.canvas = document.createElement("canvas");
-            this.parent.appendChild(this.canvas);
-        "#
-    }
-
-    fn reinit_canvas() {
-        r#"
             this.canvas.width = this.parent.clientWidth;
             this.canvas.height = this.parent.clientHeight;
+            this.parent.appendChild(this.canvas);
         "#
     }
 
     fn init_ctx(font_str: &str<u8, fontstr>) {
         r#"
-            this.ctx = this.canvas.getContext("2d", {
-                alpha: true,
-                desynchronized: true
-            });
-            this.ctx.font = $font_str$;
-            this.ctx.textBaseline = "top";
+            this.font_str = $font_str$;
+            super.init_ctx();
         "#
     }
 }
@@ -283,16 +245,13 @@ impl Canvas {
             cell_ascent: 0.0,
         };
 
-        canvas.buffer.reinit_canvas();
         canvas.init_ctx();
         canvas.buffer.flush();
 
         let font_measurement = canvas.buffer.ratzilla_canvas().measure_text("█");
-        canvas.cell_width = font_measurement.width().floor();
-        canvas.cell_height = (font_measurement.font_bounding_box_ascent().abs()
-            + font_measurement.font_bounding_box_descent().abs())
-        .floor();
-        canvas.cell_ascent = font_measurement.font_bounding_box_ascent().floor();
+        canvas.cell_width = font_measurement.get_index(0);
+        canvas.cell_height = font_measurement.get_index(1);
+        canvas.cell_ascent = font_measurement.get_index(2);
 
         Ok(canvas)
     }
@@ -314,8 +273,11 @@ impl Canvas {
 ///
 /// This backend renders the buffer onto a HTML canvas element.
 pub struct CanvasBackend {
-    /// The options passed to the backend upon instantiation
-    options: CanvasBackendOptions,
+    /// Always clip foreground drawing to the cell rectangle. Helpful when
+    /// dealing with out-of-bounds rendering from problematic fonts. Enabling
+    /// this option may cause some performance issues when dealing with large
+    /// numbers of simultaneous changes.
+    always_clip_cells: bool,
     /// Current buffer.
     buffer: Vec<Vec<Cell>>,
     /// Changed buffer cells
@@ -336,14 +298,6 @@ impl CanvasBackend {
         Self::new_with_options(CanvasBackendOptions::default())
     }
 
-    /// Constructs a new [`CanvasBackend`] with the given size.
-    pub fn new_with_size(width: u32, height: u32) -> Result<Self, Error> {
-        Self::new_with_options(CanvasBackendOptions {
-            size: Some((width, height)),
-            ..Default::default()
-        })
-    }
-
     /// Constructs a new [`CanvasBackend`] with the given options.
     pub fn new_with_options(mut options: CanvasBackendOptions) -> Result<Self, Error> {
         // Parent element of canvas (uses <body> unless specified)
@@ -356,7 +310,7 @@ impl CanvasBackend {
         );
         let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
-            options,
+            always_clip_cells: options.always_clip_cells,
             buffer,
             changed_cells,
             canvas,
@@ -371,18 +325,13 @@ impl CanvasBackend {
     }
 
     fn initialize(&mut self) -> Result<(), Error> {
-        let canvas_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
         // TODO: Find a way to not use a Javascript array
-        let (width, height) = (canvas_size.get_index(0), canvas_size.get_index(1));
-        self.canvas.init_ctx();
+        let new_buffer_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
 
-        let new_buffer_size = size_to_buffer_size(
-            Size {
-                width: width as u16,
-                height: height as u16,
-            },
-            self.canvas.font_metrics(),
-        );
+        let new_buffer_size = Size {
+            width: new_buffer_size.get_index(0),
+            height: new_buffer_size.get_index(1),
+        };
         if self.buffer_size() != new_buffer_size {
             for line in &mut self.buffer {
                 line.resize_with(new_buffer_size.width as usize, || Cell::default());
@@ -444,14 +393,7 @@ impl CanvasBackend {
     fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
         if force_redraw {
             self.initialize()?;
-            self.canvas.buffer.clear_rect();
-            self.changed_cells.set_elements(usize::MAX);
         }
-        let left_margin = (self.canvas.cell_width / 2.0).floor();
-        let top_margin = (self.canvas.cell_height / 2.0).floor();
-        self.canvas
-            .buffer
-            .translate(left_margin as _, top_margin as _);
 
         self.draw_background()?;
         self.draw_symbols()?;
@@ -460,9 +402,6 @@ impl CanvasBackend {
             self.draw_debug()?;
         }
 
-        self.canvas
-            .buffer
-            .translate_neg(left_margin as _, top_margin as _);
         self.canvas.buffer.flush();
         self.changed_cells.set_elements(0x00);
         Ok(())
@@ -500,7 +439,7 @@ impl CanvasBackend {
                 // We need to reset the canvas context state in two scenarios:
                 // 1. When we need to create a clipping path (for potentially problematic glyphs)
                 // 2. When the text color changes
-                if self.options.always_clip_cells || !cell.symbol().is_ascii() {
+                if self.always_clip_cells || !cell.symbol().is_ascii() {
                     self.canvas.buffer.restore();
                     self.canvas.buffer.save();
 
@@ -719,11 +658,7 @@ impl Backend for CanvasBackend {
     }
 
     fn size(&self) -> IoResult<Size> {
-        let size = self.buffer_size();
-        Ok(Size {
-            width: size.width.saturating_sub(1),
-            height: size.height.saturating_sub(1),
-        })
+        Ok(self.buffer_size())
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
