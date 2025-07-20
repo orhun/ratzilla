@@ -54,7 +54,17 @@ impl From<BackendType> for MultiBackendBuilder {
     }
 }
 
-/// Enum wrapper for different backends
+/// Enum wrapper for different Ratzilla backends that implements the Ratatui Backend trait.
+/// 
+/// This enum allows switching between different rendering backends at runtime while
+/// providing a unified interface. All backend operations are delegated to the wrapped
+/// backend implementation.
+/// 
+/// # Backends
+/// 
+/// - `Dom`: HTML DOM-based rendering with accessibility features
+/// - `Canvas`: Canvas 2D API rendering with full Unicode support  
+/// - `WebGl2`: GPU-accelerated rendering using WebGL2 and beamterm-renderer
 pub enum RatzillaBackend {
     Dom(DomBackend),
     Canvas(CanvasBackend),
@@ -149,12 +159,27 @@ impl Backend for RatzillaBackend {
     }
 }
 
-/// Backend wrapper that automatically tracks FPS
+/// Backend wrapper that automatically tracks FPS by recording frames on each flush.
+///
+/// This wrapper delegates all Backend trait methods to the inner RatzillaBackend
+/// while recording frame timing information when `flush()` is called successfully.
+/// The FPS data can be accessed through the `fps` module functions.
+///
+/// # Example
+/// 
+/// ```rust
+/// let backend = RatzillaBackend::Dom(dom_backend);
+/// let fps_backend = FpsTrackingBackend::new(backend);
+/// let terminal = Terminal::new(fps_backend)?;
+/// ```
 pub struct FpsTrackingBackend {
     inner: RatzillaBackend,
 }
 
 impl FpsTrackingBackend {
+    /// Create a new FPS tracking backend that wraps the given backend.
+    /// 
+    /// Frame timing will be recorded automatically on each successful flush operation.
     pub fn new(backend: RatzillaBackend) -> Self {
         Self { inner: backend }
     }
@@ -213,6 +238,30 @@ impl Backend for FpsTrackingBackend {
     }
 }
 
+/// Builder for creating terminals with different backend types and configuration options.
+///
+/// This builder provides a fluent API for configuring terminal and backend options
+/// before creating a terminal instance. It supports automatic backend selection
+/// from URL query parameters and includes FPS tracking by default.
+///
+/// # Backend Selection
+///
+/// The builder uses the following priority order for backend selection:
+/// 1. `?backend=<type>` URL query parameter (dom, canvas, or webgl2)
+/// 2. Fallback backend specified in `with_fallback()`
+/// 3. Default backend (DOM)
+///
+/// # Example
+///
+/// ```rust
+/// use ratzilla::backend::canvas::CanvasBackendOptions;
+/// use ratzilla::ratatui::TerminalOptions;
+/// 
+/// let (backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::Canvas)
+///     .terminal_options(TerminalOptions::default())
+///     .canvas_options(CanvasBackendOptions::default())
+///     .build_terminal()?;
+/// ```
 #[derive(Debug, Default)]
 pub struct MultiBackendBuilder {
     default_backend: BackendType,
@@ -224,6 +273,9 @@ pub struct MultiBackendBuilder {
 }
 
 impl MultiBackendBuilder {
+    /// Create a new builder with the specified fallback backend type.
+    ///
+    /// The fallback backend will be used if no backend is specified in the URL query parameters.
     pub fn with_fallback(default_backend: BackendType) -> Self {
         Self {
             default_backend,
@@ -231,29 +283,57 @@ impl MultiBackendBuilder {
         }
     }
 
+    /// Set terminal configuration options.
+    ///
+    /// These options control terminal behavior such as viewport behavior and drawing settings.
     pub fn terminal_options(mut self, options: TerminalOptions) -> Self {
         self.terminal_options = options;
         self
     }
 
-    /// Set options for the Canvas backend
+    /// Set options for the Canvas backend.
+    ///
+    /// These options control Canvas 2D rendering behavior such as font settings,
+    /// cursor appearance, and Unicode support.
     pub fn canvas_options(mut self, options: CanvasBackendOptions) -> Self {
         self.canvas_options = options;
         self
     }
 
-    /// Set options for the DOM backend
+    /// Set options for the DOM backend.
+    ///
+    /// These options control DOM rendering behavior such as accessibility features,
+    /// element styling, and focus management.
     pub fn dom_options(mut self, options: DomBackendOptions) -> Self {
         self.dom_options = options;
         self
     }
 
-    /// Set options for the WebGL2 backend
+    /// Set options for the WebGL2 backend.
+    ///
+    /// These options control WebGL2 rendering behavior such as shader configuration,
+    /// GPU memory management, and performance settings.
     pub fn webgl2_options(mut self, options: WebGl2BackendOptions) -> Self {
         self.webgl2_options = options;
         self
     }
 
+    /// Build the terminal with the configured options and backend selection.
+    ///
+    /// This method:
+    /// 1. Determines the backend type from URL query parameters or fallback
+    /// 2. Creates the appropriate backend with the configured options
+    /// 3. Wraps the backend with FPS tracking
+    /// 4. Creates and returns the terminal with the selected backend
+    /// 5. Injects a backend footer into the DOM (best effort)
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the selected backend type and the configured terminal instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if backend creation or terminal initialization fails.
     pub fn build_terminal(self) -> io::Result<(BackendType, Terminal<FpsTrackingBackend>)> {
         let backend_type = parse_backend_from_url(self.default_backend);
         let backend = create_backend_with_options(
@@ -277,7 +357,11 @@ impl MultiBackendBuilder {
     }
 }
 
-/// Read the backend type from query parameters, fallback to default
+/// Parse the backend type from URL query parameters, with fallback to default.
+///
+/// Checks for a `?backend=<type>` query parameter in the current page URL.
+/// Valid backend types are "dom", "canvas", and "webgl2" (case-insensitive).
+/// If no valid backend is found in the URL, returns the provided default.
 fn parse_backend_from_url(default: BackendType) -> BackendType {
     let backend_param = window()
         .map(|w| w.location())
@@ -291,6 +375,25 @@ fn parse_backend_from_url(default: BackendType) -> BackendType {
     }
 }
 
+/// Create a backend instance with the specified type and options.
+///
+/// Creates the appropriate backend variant (DOM, Canvas, or WebGL2) using the provided
+/// configuration options. Options default to `Default::default()` if `None` is provided.
+///
+/// # Arguments
+///
+/// * `backend_type` - The type of backend to create
+/// * `dom_options` - Configuration options for DOM backend (if applicable)
+/// * `canvas_options` - Configuration options for Canvas backend (if applicable)  
+/// * `webgl2_options` - Configuration options for WebGL2 backend (if applicable)
+///
+/// # Returns
+///
+/// The created backend wrapped in a `RatzillaBackend` enum.
+///
+/// # Errors
+///
+/// Returns an error if the backend creation fails (e.g., WebGL2 not supported).
 fn create_backend_with_options(
     backend_type: BackendType,
     dom_options: Option<DomBackendOptions>,
