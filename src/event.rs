@@ -1,5 +1,3 @@
-use crate::event::MouseButton::Left;
-
 /// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {

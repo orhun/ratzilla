@@ -73,7 +73,6 @@ impl DomBackendOptions {
 ///
 /// In other words, it transforms the [`Cell`]s into `<span>`s which are then
 /// appended to a `<pre>` element.
-#[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
@@ -199,12 +198,13 @@ impl DomBackend {
                     let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
                     handler.call(MouseEvent::new_relative(event, cell_size_px, grid_rect));
                 } else {
-                    // Fallback to viewport-relative coordinates if we can't get the element
-                    handler.call(MouseEvent::new(event, cell_size_px));
+                    // this will maybe not happen, but if it does, we panic in dev
+                    // but ignore it in release builds. to be fixed if it happens.
+                    debug_assert!(false, "target is no longer a valid element");
                 }
             } else {
-                // Fallback to viewport-relative coordinates if no target
-                handler.call(MouseEvent::new(event, cell_size_px));
+                // same as above, this will maybe not happen, but if it does, we should fix it
+                debug_assert!(false, "no current target for mouse event");
             }
         }) as Box<dyn FnMut(web_sys::MouseEvent)>);
 
