@@ -75,6 +75,13 @@ extern "C" {
     pub type RatzillaCanvas;
 
     #[wasm_bindgen(method)]
+    /// Does the initial construction of the RatzillaCanvas class
+    ///
+    /// `sledgehammer_bindgen` only lets you have an empty constructor,
+    /// so we must initialize the class after construction
+    fn create_canvas_in_element(this: &RatzillaCanvas, parent: &str, font_str: &str);
+
+    #[wasm_bindgen(method)]
     /// Returns the cell width, cell height, and cell ascent in that order
     fn measure_text(this: &RatzillaCanvas, text: &str) -> Float64Array;
 
@@ -101,7 +108,15 @@ mod js {
     /// canvas context
     struct Buffer;
 
-    const BASE: &str = r#"src/backend/canvas_import.js"#;
+    const BASE: &str = r#"src/backend/ratzilla_canvas.js"#;
+
+    fn clear_rect() {
+        r#"
+            this.ctx.clearRect(
+                0, 0, this.canvas.width, this.canvas.height
+            );
+        "#
+    }
 
     fn save() {
         r#"
@@ -162,26 +177,6 @@ mod js {
             this.ctx.strokeStyle = $style$;
         "#
     }
-
-    fn create_canvas_in_element(parent: &str) {
-        r#"
-            this.parent = document.getElementById($parent$);
-            if (this.parent == null) {
-                this.parent = document.body;
-            }
-            this.canvas = document.createElement("canvas");
-            this.canvas.width = this.parent.clientWidth;
-            this.canvas.height = this.parent.clientHeight;
-            this.parent.appendChild(this.canvas);
-        "#
-    }
-
-    fn init_ctx(font_str: &str<u8, fontstr>) {
-        r#"
-            this.font_str = $font_str$;
-            super.init_ctx();
-        "#
-    }
 }
 
 /// Canvas renderer.
@@ -196,8 +191,6 @@ struct Canvas {
     inner: web_sys::HtmlCanvasElement,
     /// Background color.
     background_color: Color,
-    /// An optional string which sets a custom font for the canvas
-    font_str: Option<String>,
     /// Width of a single cell.
     ///
     /// This will be used for multiplying the cell's x position to get the actual pixel
@@ -231,22 +224,21 @@ impl Canvas {
             .set_onresize(Some(closure.as_ref().unchecked_ref()));
         closure.forget();
 
-        let mut buffer = Buffer::default();
-        buffer.create_canvas_in_element(parent_element);
+        let buffer = Buffer::default();
+        buffer.ratzilla_canvas().create_canvas_in_element(
+            parent_element,
+            font_str.as_deref().unwrap_or("16px monospace"),
+        );
 
         let mut canvas = Self {
             inner: buffer.ratzilla_canvas().get_canvas(),
             buffer,
             initialized,
             background_color,
-            font_str,
             cell_width: 0.0,
             cell_height: 0.0,
             cell_ascent: 0.0,
         };
-
-        canvas.init_ctx();
-        canvas.buffer.flush();
 
         let font_measurement = canvas.buffer.ratzilla_canvas().measure_text("█");
         canvas.cell_width = font_measurement.get_index(0);
@@ -261,11 +253,6 @@ impl Canvas {
             width: self.cell_width as u16,
             height: self.cell_height as u16,
         }
-    }
-
-    fn init_ctx(&mut self) {
-        self.buffer
-            .init_ctx(self.font_str.as_deref().unwrap_or("16px monospace"));
     }
 }
 
@@ -390,11 +377,8 @@ impl CanvasBackend {
     // NOTE: The draw_* functions each traverse the buffer once, instead of
     // traversing it once per cell; this is done to reduce the number of
     // WASM calls per cell.
-    fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
-        if force_redraw {
-            self.initialize()?;
-        }
-
+    fn update_grid(&mut self) -> Result<(), Error> {
+        // self.canvas.buffer.clear_rect();
         self.draw_background()?;
         self.draw_symbols()?;
         self.draw_cursor()?;
@@ -615,9 +599,14 @@ impl Backend for CanvasBackend {
     /// This function is called after the [`CanvasBackend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
+        if self.changed_cells.any() {
+            self.update_grid()?;
+        }
+
         let initialized = self.canvas.initialized.swap(true, Ordering::Relaxed);
-        if self.changed_cells.any() || !initialized {
-            self.update_grid(!initialized)?;
+
+        if !initialized {
+            self.initialize()?;
         }
 
         Ok(())

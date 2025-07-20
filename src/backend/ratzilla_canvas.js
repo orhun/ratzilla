@@ -1,6 +1,17 @@
 export class RatzillaCanvas {
     constructor() {}
 
+    create_canvas_in_element(parent, font_str) {
+        this.parent = document.getElementById(parent);
+        if (this.parent == null) {
+            this.parent = document.body;
+        }
+        this.canvas = document.createElement("canvas");
+        this.parent.appendChild(this.canvas);
+        this.font_str = font_str;
+        this.init_ctx();
+    }
+
     measure_text(text) {
         let metrics = this.ctx.measureText(text);
         this.cellWidth = Math.floor(metrics.width);
