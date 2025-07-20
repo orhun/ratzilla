@@ -42,17 +42,15 @@ pub(crate) fn inject_backend_footer(current_backend: BackendType) -> Result<(), 
 
         let link = if is_current {
             format!(
-                "<span style=\"{}\">● {}</span>",
+                "<span style=\"{}\">● {backend}</span>",
                 style,
-                backend.display_name()
             )
         } else {
             format!(
-                "<a href=\"{}?backend={}\" style=\"{}\">{}</a>",
+                "<a href=\"{}?backend={}\" style=\"{}\">{backend}</a>",
                 base_url,
                 backend.as_str(),
                 style,
-                backend.display_name()
             )
         };
 

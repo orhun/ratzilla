@@ -12,7 +12,7 @@ use ratzilla::{WebRenderer};
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
-    let (_backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::Dom)
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
         .build_terminal()?;
 
     terminal.draw_web(move |f| {

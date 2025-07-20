@@ -1,4 +1,6 @@
 use std::io;
+use std::fmt;
+use std::convert::TryFrom;
 use web_sys::{window, Url};
 use ratzilla::backend::canvas::CanvasBackendOptions;
 use ratzilla::backend::dom::DomBackendOptions;
@@ -19,16 +21,6 @@ pub enum BackendType {
 }
 
 impl BackendType {
-    /// Get the backend type from a string
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "dom" => Some(BackendType::Dom),
-            "canvas" => Some(BackendType::Canvas),
-            "webgl2" => Some(BackendType::WebGl2),
-            _ => None,
-        }
-    }
-
     /// Get the string representation
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -37,20 +29,24 @@ impl BackendType {
             BackendType::WebGl2 => "webgl2",
         }
     }
+}
 
-    /// Get a human-readable name
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            BackendType::Dom => "DOM",
-            BackendType::Canvas => "Canvas",
-            BackendType::WebGl2 => "WebGL2",
+impl TryFrom<String> for BackendType {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.to_lowercase().as_str() {
+            "dom" => Ok(BackendType::Dom),
+            "canvas" => Ok(BackendType::Canvas),
+            "webgl2" => Ok(BackendType::WebGl2),
+            _ => Err(format!("Invalid backend type: '{}'. Valid options are: dom, canvas, webgl2", s)),
         }
     }
 }
 
-impl From<BackendType> for MultiBackendBuilder {
-    fn from(backend_type: BackendType) -> Self {
-        MultiBackendBuilder::with_fallback(backend_type)
+impl fmt::Display for BackendType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -69,6 +65,17 @@ pub enum RatzillaBackend {
     Dom(DomBackend),
     Canvas(CanvasBackend),
     WebGl2(WebGl2Backend),
+}
+
+impl RatzillaBackend {
+    /// Get the backend type for this backend instance.
+    pub fn backend_type(&self) -> BackendType {
+        match self {
+            RatzillaBackend::Dom(_) => BackendType::Dom,
+            RatzillaBackend::Canvas(_) => BackendType::Canvas,
+            RatzillaBackend::WebGl2(_) => BackendType::WebGl2,
+        }
+    }
 }
 
 impl Backend for RatzillaBackend {
@@ -164,14 +171,6 @@ impl Backend for RatzillaBackend {
 /// This wrapper delegates all Backend trait methods to the inner RatzillaBackend
 /// while recording frame timing information when `flush()` is called successfully.
 /// The FPS data can be accessed through the `fps` module functions.
-///
-/// # Example
-/// 
-/// ```rust
-/// let backend = RatzillaBackend::Dom(dom_backend);
-/// let fps_backend = FpsTrackingBackend::new(backend);
-/// let terminal = Terminal::new(fps_backend)?;
-/// ```
 pub struct FpsTrackingBackend {
     inner: RatzillaBackend,
 }
@@ -182,6 +181,17 @@ impl FpsTrackingBackend {
     /// Frame timing will be recorded automatically on each successful flush operation.
     pub fn new(backend: RatzillaBackend) -> Self {
         Self { inner: backend }
+    }
+
+    /// Get the backend type for the wrapped backend.
+    pub fn backend_type(&self) -> BackendType {
+        self.inner.backend_type()
+    }
+}
+
+impl From<RatzillaBackend> for FpsTrackingBackend {
+    fn from(backend: RatzillaBackend) -> Self {
+        Self::new(backend)
     }
 }
 
@@ -254,13 +264,18 @@ impl Backend for FpsTrackingBackend {
 /// # Example
 ///
 /// ```rust
+/// use examples_shared::backend::{BackendType, MultiBackendBuilder};
 /// use ratzilla::backend::canvas::CanvasBackendOptions;
+/// use ratzilla::backend::webgl2::WebGl2BackendOptions;
 /// use ratzilla::ratatui::TerminalOptions;
-/// 
-/// let (backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::Canvas)
-///     .terminal_options(TerminalOptions::default())
-///     .canvas_options(CanvasBackendOptions::default())
+///
+/// let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+///     .canvas_options(CanvasBackendOptions::new().grid_id("terminal-id"))
+///     .webgl2_options(WebGl2BackendOptions::new().size((1200, 800)))
 ///     .build_terminal()?;
+///
+/// // Get backend type if needed
+/// let backend_type = terminal.backend().backend_type();
 /// ```
 #[derive(Debug, Default)]
 pub struct MultiBackendBuilder {
@@ -329,12 +344,25 @@ impl MultiBackendBuilder {
     ///
     /// # Returns
     ///
-    /// A tuple containing the selected backend type and the configured terminal instance.
+    /// The configured terminal instance. You can get the backend type using
+    /// `terminal.backend().backend_type()` if needed.
     ///
     /// # Errors
     ///
     /// Returns an error if backend creation or terminal initialization fails.
-    pub fn build_terminal(self) -> io::Result<(BackendType, Terminal<FpsTrackingBackend>)> {
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use examples_shared::backend::{BackendType, MultiBackendBuilder};
+    /// let terminal = MultiBackendBuilder::with_fallback(BackendType::Canvas)
+    ///     .build_terminal()?;
+    ///
+    /// // Get backend type if needed
+    /// let backend_type = terminal.backend().backend_type();
+    /// println!("Using {backend_type} backend");
+    /// ```
+    pub fn build_terminal(self) -> io::Result<Terminal<FpsTrackingBackend>> {
         let backend_type = parse_backend_from_url(self.default_backend);
         let backend = create_backend_with_options(
             backend_type,
@@ -347,13 +375,20 @@ impl MultiBackendBuilder {
         fps::init_fps_recorder();
 
         // Wrap backend with FPS tracking
-        let fps_backend = FpsTrackingBackend::new(backend);
+        let fps_backend: FpsTrackingBackend = backend.into();
         let terminal = Terminal::with_options(fps_backend, self.terminal_options)?;
 
         // Inject footer (ignore errors)
         let _ = inject_backend_footer(backend_type);
 
-        Ok((backend_type, terminal))
+        Ok(terminal)
+    }
+
+}
+
+impl From<BackendType> for MultiBackendBuilder {
+    fn from(backend_type: BackendType) -> Self {
+        MultiBackendBuilder::with_fallback(backend_type)
     }
 }
 
@@ -363,16 +398,12 @@ impl MultiBackendBuilder {
 /// Valid backend types are "dom", "canvas", and "webgl2" (case-insensitive).
 /// If no valid backend is found in the URL, returns the provided default.
 fn parse_backend_from_url(default: BackendType) -> BackendType {
-    let backend_param = window()
-        .map(|w| w.location())
-        .and_then(|l| l.href().ok())
+    window()
+        .and_then(|w| w.location().href().ok())
         .and_then(|url| Url::new(url.as_str()).ok())
-        .and_then(|url| url.search_params().get("backend"));
-
-    match backend_param {
-        Some(backend_str) => BackendType::from_str(&backend_str).unwrap_or(default),
-        None => default,
-    }
+        .and_then(|url| url.search_params().get("backend"))
+        .and_then(|backend| BackendType::try_from(backend).ok())
+        .unwrap_or(default)
 }
 
 /// Create a backend instance with the specified type and options.

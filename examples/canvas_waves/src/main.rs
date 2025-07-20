@@ -10,7 +10,7 @@ use wave_effect::WaveInterference;
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let (_backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
         .webgl2_options(WebGl2BackendOptions::new().measure_performance(true).grid_id("container"))
         .build_terminal()?;
 

@@ -13,7 +13,7 @@ use examples_shared::backend::{BackendType, MultiBackendBuilder};
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    let (_backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::Dom)
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
         .build_terminal()?;
 
     let app = Rc::new(RefCell::new(App::new()));
