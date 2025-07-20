@@ -1,6 +1,7 @@
 use crate::{
     backend::color::ansi_to_rgb,
     error::Error,
+    event::MouseEvent,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
 use compact_str::{format_compact, CompactString};
@@ -8,10 +9,39 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
+use std::fmt::Debug;
 use web_sys::{
     wasm_bindgen::{JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
 };
+
+/// A handler for mouse events.
+pub(super) struct MouseEventHandler {
+    callback: Box<dyn FnMut(MouseEvent) + 'static>,
+}
+
+impl MouseEventHandler {
+    /// Creates a new `MouseEventHandler` with the given callback.
+    pub fn new<F>(handler: F) -> Self
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        Self {
+            callback: Box::new(handler),
+        }
+    }
+
+    /// Invokes the callback with the given mouse event.
+    pub fn call(&mut self, event: MouseEvent) {
+        (self.callback)(event);
+    }
+}
+
+impl Debug for MouseEventHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MouseEventHandler").finish_non_exhaustive()
+    }
+}
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {

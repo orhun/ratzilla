@@ -12,19 +12,22 @@ use web_sys::{
 };
 
 use crate::{
-    backend::utils::*, error::Error, event::MouseEvent, widgets::hyperlink::HYPERLINK_MODIFIER,
+    backend::utils::{MouseEventHandler, *},
+    error::Error,
+    event::MouseEvent,
+    widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
 
 /// Options for the [`DomBackend`].
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DomBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
     /// The cursor shape.
     cursor_shape: CursorShape,
     /// Mouse event handler for the canvas.
-    mouse_event_handler: Option<Box<dyn FnMut(MouseEvent) + 'static>>,
+    mouse_event_handler: Option<MouseEventHandler>,
 }
 
 impl DomBackendOptions {
@@ -59,7 +62,7 @@ impl DomBackendOptions {
     where
         F: FnMut(MouseEvent) + 'static,
     {
-        self.mouse_event_handler = Some(Box::new(handler));
+        self.mouse_event_handler = Some(MouseEventHandler::new(handler));
         self
     }
 }
@@ -70,6 +73,7 @@ impl DomBackendOptions {
 ///
 /// In other words, it transforms the [`Cell`]s into `<span>`s which are then
 /// appended to a `<pre>` element.
+#[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
@@ -94,7 +98,7 @@ pub struct DomBackend {
     /// Cached cell size in pixels (width, height).
     cell_size_px: Option<(u32, u32)>,
     /// Mouse event handler if configured.
-    mouse_event_handler: Option<Box<dyn FnMut(MouseEvent) + 'static>>,
+    mouse_event_handler: Option<MouseEventHandler>,
 }
 
 impl DomBackend {
@@ -193,14 +197,14 @@ impl DomBackend {
                 if let Ok(element) = target.dyn_into::<web_sys::Element>() {
                     let rect = element.get_bounding_client_rect();
                     let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
-                    handler(MouseEvent::new_relative(event, cell_size_px, grid_rect));
+                    handler.call(MouseEvent::new_relative(event, cell_size_px, grid_rect));
                 } else {
                     // Fallback to viewport-relative coordinates if we can't get the element
-                    handler(MouseEvent::new(event, cell_size_px));
+                    handler.call(MouseEvent::new(event, cell_size_px));
                 }
             } else {
                 // Fallback to viewport-relative coordinates if no target
-                handler(MouseEvent::new(event, cell_size_px));
+                handler.call(MouseEvent::new(event, cell_size_px));
             }
         }) as Box<dyn FnMut(web_sys::MouseEvent)>);
 
@@ -415,16 +419,6 @@ impl Backend for DomBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
-    }
-}
-
-impl std::fmt::Debug for DomBackendOptions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DomBackendOptions")
-            .field("grid_id", &self.grid_id)
-            .field("cursor_shape", &self.cursor_shape)
-            .field("mouse_event_handler", &self.mouse_event_handler.is_some())
-            .finish()
     }
 }
 
