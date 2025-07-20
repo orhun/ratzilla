@@ -283,6 +283,7 @@ impl Canvas {
             cell_ascent: 0.0,
         };
 
+        canvas.buffer.reinit_canvas();
         canvas.init_ctx();
         canvas.buffer.flush();
 
@@ -436,13 +437,14 @@ impl CanvasBackend {
     // accordingly.
     //
     // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
+    //
+    // NOTE: The draw_* functions each traverse the buffer once, instead of
+    // traversing it once per cell; this is done to reduce the number of
+    // WASM calls per cell.
     fn update_grid(&mut self, force_redraw: bool) -> Result<(), Error> {
         if force_redraw {
             self.initialize()?;
             self.canvas.buffer.clear_rect();
-            // NOTE: The draw_* functions each traverse the buffer once, instead of
-            // traversing it once per cell; this is done to reduce the number of
-            // WASM calls per cell.
             self.changed_cells.set_elements(usize::MAX);
         }
         let left_margin = (self.canvas.cell_width / 2.0).floor();
