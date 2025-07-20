@@ -9,7 +9,6 @@ use ratzilla::ratatui::backend::Backend;
 use crate::fps;
 use crate::utils::inject_backend_footer;
 
-
 /// Available backend types
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum BackendType {
