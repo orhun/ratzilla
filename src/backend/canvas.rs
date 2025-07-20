@@ -74,25 +74,8 @@ impl CanvasBackendOptions {
     }
 }
 
-#[wasm_bindgen(inline_js = r#"
-export class RatzillaCanvas {
-    constructor() {}
-
-    measure_text(text) {
-        return this.ctx.measureText(text);
-    }
-
-    get_canvas() {
-        return this.canvas;
-    }
-
-    reinit_canvas() {
-        this.canvas.width = this.parent.clientWidth;
-        this.canvas.height = this.parent.clientHeight;
-        return new Uint16Array([this.canvas.width, this.canvas.height]);
-    }
-}
-"#)]
+// Mirrors usage in https://github.com/DioxusLabs/dioxus/blob/main/packages/interpreter/src/unified_bindings.rs
+#[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen]
     /// External JS class for managing the actual HTML canvas, context,
@@ -107,6 +90,14 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     fn reinit_canvas(this: &RatzillaCanvas) -> Uint16Array;
+}
+
+impl Buffer {
+    /// Converts the buffer to its baseclass
+    pub fn ratzilla_canvas(&self) -> &RatzillaCanvas {
+        use wasm_bindgen::prelude::JsCast;
+        self.js_channel().unchecked_ref()
+    }
 }
 
 #[bindgen]
@@ -282,10 +273,7 @@ impl Canvas {
         buffer.create_canvas_in_element(parent_element);
 
         let mut canvas = Self {
-            inner: {
-                let ratzilla_canvas: &RatzillaCanvas = buffer.js_channel().as_ref();
-                ratzilla_canvas.get_canvas()
-            },
+            inner: buffer.ratzilla_canvas().get_canvas(),
             buffer,
             initialized,
             background_color,
@@ -298,8 +286,7 @@ impl Canvas {
         canvas.init_ctx();
         canvas.buffer.flush();
 
-        let ratzilla_canvas: &RatzillaCanvas = canvas.buffer.js_channel().as_ref();
-        let font_measurement = ratzilla_canvas.measure_text("█");
+        let font_measurement = canvas.buffer.ratzilla_canvas().measure_text("█");
         canvas.cell_width = font_measurement.width().floor();
         canvas.cell_height = (font_measurement.font_bounding_box_ascent().abs()
             + font_measurement.font_bounding_box_descent().abs())
@@ -362,9 +349,10 @@ impl CanvasBackend {
         let parent = options.grid_id.as_deref().unwrap_or_default();
 
         let canvas = Canvas::new(parent, Color::Black, options.font_str.take())?;
-        let ratzilla_canvas: &RatzillaCanvas = canvas.buffer.js_channel().as_ref();
-        let buffer =
-            get_sized_buffer_from_canvas(&ratzilla_canvas.get_canvas(), canvas.font_metrics());
+        let buffer = get_sized_buffer_from_canvas(
+            &canvas.buffer.ratzilla_canvas().get_canvas(),
+            canvas.font_metrics(),
+        );
         let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
             options,
@@ -382,8 +370,7 @@ impl CanvasBackend {
     }
 
     fn initialize(&mut self) -> Result<(), Error> {
-        let ratzilla_canvas: &RatzillaCanvas = self.canvas.buffer.js_channel().as_ref();
-        let canvas_size = ratzilla_canvas.reinit_canvas();
+        let canvas_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
         // TODO: Find a way to not use a Javascript array
         let (width, height) = (canvas_size.get_index(0), canvas_size.get_index(1));
         self.canvas.init_ctx();
