@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    let (_backend_type, terminal) = MultiBackendBuilder::new(BackendType::Dom)
+    let (_backend_type, terminal) = MultiBackendBuilder::with_fallback(BackendType::Dom)
         .build_terminal()?;
 
     terminal.on_key_event({

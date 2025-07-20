@@ -50,7 +50,7 @@ impl BackendType {
 
 impl From<BackendType> for MultiBackendBuilder {
     fn from(backend_type: BackendType) -> Self {
-        MultiBackendBuilder::new(backend_type)
+        MultiBackendBuilder::with_fallback(backend_type)
     }
 }
 
@@ -224,7 +224,7 @@ pub struct MultiBackendBuilder {
 }
 
 impl MultiBackendBuilder {
-    pub fn new(default_backend: BackendType) -> Self {
+    pub fn with_fallback(default_backend: BackendType) -> Self {
         Self {
             default_backend,
             ..Self::default()
