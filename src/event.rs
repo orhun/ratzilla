@@ -1,3 +1,5 @@
+use crate::event::MouseButton::Left;
+
 /// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
@@ -159,23 +161,6 @@ pub enum MouseEventKind {
 
 /// Convert a [`web_sys::MouseEvent`] to a [`MouseEvent`].
 impl MouseEvent {
-    /// Determines the correct mouse button for the event, handling the JS API behavior
-    /// where move events always report button 0 (Left) regardless of actual button state.
-    fn resolve_mouse_button(event_type: MouseEventKind, raw_button: i16) -> MouseButton {
-        use MouseButton::*;
-        match (event_type, raw_button.into()) {
-            (MouseEventKind::Moved, Left) => Unidentified,
-            (_, button) => button,
-        }
-    }
-
-    /// Converts pixel coordinates to grid coordinates.
-    fn pixels_to_grid_coords(pixel_x: u32, pixel_y: u32, cell_size_px: (u32, u32)) -> (u16, u16) {
-        let col = (pixel_x / cell_size_px.0) as u16;
-        let row = (pixel_y / cell_size_px.1) as u16;
-        (col, row)
-    }
-
     /// Creates a new [`MouseEvent`] from a web mouse event and cell size information.
     ///
     /// This uses viewport-relative coordinates.
@@ -184,9 +169,6 @@ impl MouseEvent {
     /// * `event` - The web mouse event from the browser
     /// * `cell_size_px` - The pixel dimensions of a terminal cell (width, height)
     pub fn new(event: web_sys::MouseEvent, cell_size_px: (u32, u32)) -> Self {
-        debug_assert!(event.x() <= 0xffff);
-        debug_assert!(event.y() <= 0xffff);
-
         let ctrl = event.ctrl_key();
         let alt = event.alt_key();
         let shift = event.shift_key();
@@ -248,6 +230,23 @@ impl MouseEvent {
             alt,
             shift,
         }
+    }
+
+    /// Determines the correct mouse button for the event, handling the JS API behavior
+    /// where move events always report button 0 (Left) regardless of actual button state.
+    fn resolve_mouse_button(event_type: MouseEventKind, raw_button: i16) -> MouseButton {
+        use MouseButton::*;
+        match (event_type, raw_button.into()) {
+            (MouseEventKind::Moved, Left) => Unidentified,
+            (_, button) => button,
+        }
+    }
+
+    /// Converts pixel coordinates to grid coordinates.
+    fn pixels_to_grid_coords(pixel_x: u32, pixel_y: u32, cell_size_px: (u32, u32)) -> (u16, u16) {
+        let col = (pixel_x / cell_size_px.0) as u16;
+        let row = (pixel_y / cell_size_px.1) as u16;
+        (col, row)
     }
 }
 
