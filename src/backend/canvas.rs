@@ -1,4 +1,3 @@
-use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
 use sledgehammer_bindgen::bindgen;
 use std::{
@@ -144,19 +143,19 @@ mod js {
 
     fn rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
-            this.ctx.rect($x$, $y$, $w$, $h$)
+            this.ctx.rect($x$, $y$, $w$, $h$);
         "#
     }
 
     fn fill_rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
-            this.ctx.fillRect($x$, $y$, $w$, $h$)
+            this.ctx.fillRect($x$, $y$, $w$, $h$);
         "#
     }
 
     fn stroke_rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
-            this.ctx.strokeRect($x$, $y$, $w$, $h$)
+            this.ctx.strokeRect($x$, $y$, $w$, $h$);
         "#
     }
 
@@ -247,13 +246,6 @@ impl Canvas {
 
         Ok(canvas)
     }
-
-    fn font_metrics(&self) -> Size {
-        Size {
-            width: self.cell_width as u16,
-            height: self.cell_height as u16,
-        }
-    }
 }
 
 /// Canvas backend.
@@ -265,10 +257,8 @@ pub struct CanvasBackend {
     /// this option may cause some performance issues when dealing with large
     /// numbers of simultaneous changes.
     always_clip_cells: bool,
-    /// Current buffer.
-    buffer: Vec<Vec<Cell>>,
-    /// Changed buffer cells
-    changed_cells: BitVec,
+    /// The size of the current screen in cells
+    buffer_size: Size,
     /// Canvas.
     canvas: Canvas,
     /// Cursor position.
@@ -291,44 +281,24 @@ impl CanvasBackend {
         let parent = options.grid_id.as_deref().unwrap_or_default();
 
         let canvas = Canvas::new(parent, Color::Black, options.font_str.take())?;
-        let buffer = get_sized_buffer_from_canvas(
-            &canvas.buffer.ratzilla_canvas().get_canvas(),
-            canvas.font_metrics(),
-        );
-        let changed_cells = bitvec![1; buffer.len() * buffer[0].len()];
         Ok(Self {
             always_clip_cells: options.always_clip_cells,
-            buffer,
-            changed_cells,
             canvas,
+            buffer_size: Size::ZERO,
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
         })
     }
 
-    fn buffer_size(&self) -> Size {
-        Size::new(self.buffer[0].len() as u16, self.buffer.len() as u16)
-    }
-
     fn initialize(&mut self) -> Result<(), Error> {
         // TODO: Find a way to not use a Javascript array
         let new_buffer_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
 
-        let new_buffer_size = Size {
+        self.buffer_size = Size {
             width: new_buffer_size.get_index(0),
             height: new_buffer_size.get_index(1),
         };
-        if self.buffer_size() != new_buffer_size {
-            for line in &mut self.buffer {
-                line.resize_with(new_buffer_size.width as usize, || Cell::default());
-            }
-            self.buffer
-                .resize_with(new_buffer_size.height as usize, || {
-                    vec![Cell::default(); new_buffer_size.width as usize]
-                });
-            self.changed_cells = bitvec![usize::MAX; self.buffer.len() * self.buffer[0].len()];
-        }
 
         Ok(())
     }
@@ -369,180 +339,13 @@ impl CanvasBackend {
         self.debug_mode = color.map(Into::into);
     }
 
-    // Compare the current buffer to the previous buffer and updates the canvas
-    // accordingly.
-    //
-    // If `force_redraw` is `true`, the entire canvas will be cleared and redrawn.
-    //
-    // NOTE: The draw_* functions each traverse the buffer once, instead of
-    // traversing it once per cell; this is done to reduce the number of
-    // WASM calls per cell.
-    fn update_grid(&mut self) -> Result<(), Error> {
-        // self.canvas.buffer.clear_rect();
-        self.draw_background()?;
-        self.draw_symbols()?;
-        self.draw_cursor()?;
-        if self.debug_mode.is_some() {
-            self.draw_debug()?;
-        }
-
-        self.canvas.buffer.flush();
-        self.changed_cells.set_elements(0x00);
-        Ok(())
-    }
-
-    /// Draws the text symbols on the canvas.
-    ///
-    /// This method renders the textual content of each cell in the buffer, optimizing canvas operations
-    /// by minimizing state changes across the WebAssembly boundary.
-    ///
-    /// # Optimization Strategy
-    ///
-    /// Rather than saving/restoring the canvas context for every cell (which would be expensive),
-    /// this implementation:
-    ///
-    /// 1. Only processes cells that have changed since the last render.
-    /// 2. Tracks the last foreground color used to avoid unnecessary style changes
-    /// 3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
-    /// or when `always_clip_cells` is enabled.
-    fn draw_symbols(&mut self) -> Result<(), Error> {
-        let changed_cells = &self.changed_cells;
-        let mut index = 0;
-
-        self.canvas.buffer.save();
-        let mut last_color = None;
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, cell) in line.iter().enumerate() {
-                // Skip empty cells
-                if !changed_cells.get(index).map(|c| *c).unwrap_or(true) || cell.symbol() == " " {
-                    index += 1;
-                    continue;
-                }
-                let color = actual_fg_color(cell);
-
-                // We need to reset the canvas context state in two scenarios:
-                // 1. When we need to create a clipping path (for potentially problematic glyphs)
-                // 2. When the text color changes
-                if self.always_clip_cells || !cell.symbol().is_ascii() {
-                    self.canvas.buffer.restore();
-                    self.canvas.buffer.save();
-
-                    self.canvas.buffer.begin_path();
-                    self.canvas.buffer.rect(
-                        (x as f64 * self.canvas.cell_width) as _,
-                        (y as f64 * self.canvas.cell_height) as _,
-                        self.canvas.cell_width as _,
-                        self.canvas.cell_height as _,
-                    );
-                    self.canvas.buffer.clip();
-
-                    last_color = None; // reset last color to avoid clipping
-                    let color = get_canvas_color(color, Color::White);
-                    self.canvas.buffer.set_fill_style_str(&color);
-                } else if last_color != Some(color) {
-                    self.canvas.buffer.restore();
-                    self.canvas.buffer.save();
-
-                    last_color = Some(color);
-
-                    let color = get_canvas_color(color, Color::White);
-                    self.canvas.buffer.set_fill_style_str(&color);
-                }
-
-                self.canvas.buffer.fill_text(
-                    cell.symbol(),
-                    (x as f64 * self.canvas.cell_width) as _,
-                    (y as f64 * self.canvas.cell_height + self.canvas.cell_ascent) as _,
-                );
-
-                index += 1;
-            }
-        }
-        self.canvas.buffer.restore();
-
-        Ok(())
-    }
-
-    /// Draws the background of the cells.
-    ///
-    /// This function uses [`RowColorOptimizer`] to optimize the drawing of the background
-    /// colors by batching adjacent cells with the same color into a single rectangle.
-    ///
-    /// In other words, it accumulates "what to draw" until it finds a different
-    /// color, and then it draws the accumulated rectangle.
-    fn draw_background(&mut self) -> Result<(), Error> {
-        let changed_cells = &self.changed_cells;
-        self.canvas.buffer.save();
-
-        let draw_region = |(rect, color, canvas): (Rect, Color, &mut Canvas)| {
-            let color = get_canvas_color(color, canvas.background_color);
-
-            canvas.buffer.set_fill_style_str(&color);
-            canvas.buffer.fill_rect(
-                (rect.x as f64 * canvas.cell_width) as _,
-                (rect.y as f64 * canvas.cell_height) as _,
-                (rect.width as f64 * canvas.cell_width) as _,
-                (rect.height as f64 * canvas.cell_height) as _,
-            );
-        };
-
-        let mut index = 0;
-        for (y, line) in self.buffer.iter().enumerate() {
-            let mut row_renderer = RowColorOptimizer::new();
-            for (x, cell) in line.iter().enumerate() {
-                if changed_cells.get(index).map(|c| *c).unwrap_or(true) {
-                    // Only calls `draw_region` if the color is different from the previous one
-                    row_renderer
-                        .process_color((x, y), actual_bg_color(cell))
-                        .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
-                } else {
-                    // Cell is unchanged so we must flush any held region
-                    // to avoid clearing the foreground (symbol) of the cell
-                    row_renderer
-                        .flush()
-                        .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
-                }
-                index += 1;
-            }
-            // Flush the remaining region after traversing the row
-            row_renderer
-                .flush()
-                .map(|(rect, color)| draw_region((rect, color, &mut self.canvas)));
-        }
-
-        self.canvas.buffer.restore();
-
-        Ok(())
-    }
-
-    /// Draws the cursor on the canvas.
-    fn draw_cursor(&mut self) -> Result<(), Error> {
-        if let Some(pos) = self.cursor_position {
-            let cell = &self.buffer[pos.y as usize][pos.x as usize];
-
-            if cell.modifier.contains(Modifier::UNDERLINED) {
-                self.canvas.buffer.save();
-
-                self.canvas.buffer.fill_text(
-                    "_",
-                    (pos.x as f64 * self.canvas.cell_width) as _,
-                    (pos.y as f64 * self.canvas.cell_height + self.canvas.cell_ascent) as _,
-                );
-
-                self.canvas.buffer.restore();
-            }
-        }
-
-        Ok(())
-    }
-
     /// Draws cell boundaries for debugging.
     fn draw_debug(&mut self) -> Result<(), Error> {
         self.canvas.buffer.save();
 
         let color = self.debug_mode.as_ref().unwrap();
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, _) in line.iter().enumerate() {
+        for y in 0..self.buffer_size.height {
+            for x in 0..self.buffer_size.width {
                 self.canvas.buffer.set_stroke_style_str(color);
                 self.canvas.buffer.stroke_rect(
                     (x as f64 * self.canvas.cell_width) as _,
@@ -565,31 +368,130 @@ impl Backend for CanvasBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        for (x, y, cell) in content {
-            let y = y as usize;
-            let x = x as usize;
-            if let Some(line) = self.buffer.get_mut(y) {
-                line.get_mut(x).map(|c| *c = cell.clone());
-                if let Some(mut cell) = self.changed_cells.get_mut((y * line.len()) + x) {
-                    cell.set(true);
-                }
-            }
+        let initialized = self.canvas.initialized.swap(true, Ordering::Relaxed);
+
+        if !initialized {
+            self.initialize()?;
         }
 
-        // Draw the cursor if set
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-            if let Some(line) = self.buffer.get_mut(y) {
-                if x < line.len() {
-                    let cursor_style = self.cursor_shape.show(line[x].style());
-                    line.get_mut(x).map(|c| c.set_style(cursor_style));
-                    if let Some(mut cell) = self.changed_cells.get_mut((y * line.len()) + x) {
-                        cell.set(true);
-                    }
+        self.canvas.buffer.save();
+
+        let draw_region = |(rect, color, canvas, cell_buffer): (
+            Rect,
+            Color,
+            &mut Canvas,
+            &mut Vec<(u16, u16, &Cell)>,
+        )| {
+            let color = get_canvas_color(color, canvas.background_color);
+
+            canvas.buffer.set_fill_style_str(&color);
+            canvas.buffer.fill_rect(
+                (rect.x as f64 * canvas.cell_width) as _,
+                (rect.y as f64 * canvas.cell_height) as _,
+                (rect.width as f64 * canvas.cell_width) as _,
+                (rect.height as f64 * canvas.cell_height) as _,
+            );
+
+            // Draws the text symbols on the canvas.
+            //
+            // This method renders the textual content of each cell in the buffer, optimizing canvas operations
+            // by minimizing state changes across the WebAssembly boundary.
+            //
+            // # Optimization Strategy
+            //
+            // Rather than saving/restoring the canvas context for every cell (which would be expensive),
+            // this implementation:
+            //
+            // 1. Only processes cells that have changed since the last render.
+            // 2. Tracks the last foreground color used to avoid unnecessary style changes
+            // 3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
+            // or when `always_clip_cells` is enabled
+            let mut last_color = None;
+            canvas.buffer.save();
+            for (x, y, cell) in cell_buffer.drain(..) {
+                let color = actual_fg_color(cell);
+
+                // We need to reset the canvas context state in two scenarios:
+                // 1. When we need to create a clipping path (for potentially problematic glyphs)
+                // 2. When the text color changes
+                if self.always_clip_cells || !cell.symbol().is_ascii() {
+                    canvas.buffer.restore();
+                    canvas.buffer.save();
+
+                    canvas.buffer.begin_path();
+                    canvas.buffer.rect(
+                        (x as f64 * canvas.cell_width) as _,
+                        (y as f64 * canvas.cell_height) as _,
+                        canvas.cell_width as _,
+                        canvas.cell_height as _,
+                    );
+                    canvas.buffer.clip();
+
+                    last_color = None; // reset last color to avoid clipping
+                    let color = get_canvas_color(color, Color::White);
+                    canvas.buffer.set_fill_style_str(&color);
+                } else if last_color != Some(color) {
+                    canvas.buffer.restore();
+                    canvas.buffer.save();
+
+                    last_color = Some(color);
+
+                    let color = get_canvas_color(color, Color::White);
+                    canvas.buffer.set_fill_style_str(&color);
+                }
+
+                canvas.buffer.fill_text(
+                    cell.symbol(),
+                    (x as f64 * canvas.cell_width) as _,
+                    (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
+                );
+                if cell.modifier.contains(Modifier::UNDERLINED) {
+                    canvas.buffer.fill_text(
+                        "_",
+                        (x as f64 * canvas.cell_width) as _,
+                        (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
+                    );
+                }
+                if cell.modifier.contains(Modifier::CROSSED_OUT) {
+                    canvas.buffer.fill_text(
+                        "—",
+                        (x as f64 * canvas.cell_width) as _,
+                        (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
+                    );
                 }
             }
+            canvas.buffer.restore();
+        };
+
+        let mut row_renderer = RowColorOptimizer::new();
+        let mut cell_buffer = Vec::new();
+        for (x, y, cell) in content {
+            // Draws the background of the cells.
+            //
+            // This function uses [`RowColorOptimizer`] to optimize the drawing of the background
+            // colors by batching adjacent cells with the same color into a single rectangle.
+            //
+            // In other words, it accumulates "what to draw" until it finds a different
+            // color, and then it draws the accumulated rectangle.
+            //
+            // Only calls `draw_region` if the color is different from the
+            // previous one, or if we have advanced past the last y position,
+            // or if we have advanced more than one x position
+            row_renderer
+                .process_color((x, y), actual_bg_color(cell))
+                .map(|(rect, color)| {
+                    draw_region((rect, color, &mut self.canvas, &mut cell_buffer))
+                });
+
+            cell_buffer.push((x, y, cell));
         }
+
+        // Flush the remaining region after traversing the changed cells
+        row_renderer
+            .flush()
+            .map(|(rect, color)| draw_region((rect, color, &mut self.canvas, &mut cell_buffer)));
+
+        self.canvas.buffer.restore();
 
         Ok(())
     }
@@ -599,15 +501,11 @@ impl Backend for CanvasBackend {
     /// This function is called after the [`CanvasBackend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
-        if self.changed_cells.any() {
-            self.update_grid()?;
+        if self.debug_mode.is_some() {
+            self.draw_debug()?;
         }
 
-        let initialized = self.canvas.initialized.swap(true, Ordering::Relaxed);
-
-        if !initialized {
-            self.initialize()?;
-        }
+        self.canvas.buffer.flush();
 
         Ok(())
     }
@@ -616,11 +514,11 @@ impl Backend for CanvasBackend {
         if let Some(pos) = self.cursor_position {
             let y = pos.y as usize;
             let x = pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() {
-                let style = self.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
-            }
+            // let line = &mut self.buffer[y];
+            // if x < line.len() {
+            //     let style = self.cursor_shape.hide(line[x].style());
+            //     line[x].set_style(style);
+            // }
         }
         self.cursor_position = None;
         Ok(())
@@ -639,15 +537,21 @@ impl Backend for CanvasBackend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        self.buffer
-            .iter_mut()
-            .flatten()
-            .for_each(|c| *c = Cell::default());
+        self.canvas.buffer.clear_rect();
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
-        Ok(self.buffer_size())
+        if self.canvas.initialized.load(Ordering::Relaxed) {
+            Ok(self.buffer_size)
+        } else {
+            let new_buffer_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
+            let new_buffer_size = Size {
+                width: new_buffer_size.get_index(0),
+                height: new_buffer_size.get_index(1),
+            };
+            Ok(new_buffer_size)
+        }
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
@@ -666,11 +570,11 @@ impl Backend for CanvasBackend {
         if let Some(old_pos) = self.cursor_position {
             let y = old_pos.y as usize;
             let x = old_pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() && old_pos != new_pos {
-                let style = self.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
-            }
+            // let line = &mut self.buffer[y];
+            // if x < line.len() && old_pos != new_pos {
+            //     let style = self.cursor_shape.hide(line[x].style());
+            //     line[x].set_style(style);
+            // }
         }
         self.cursor_position = Some(new_pos);
         Ok(())
@@ -702,22 +606,22 @@ impl RowColorOptimizer {
     }
 
     /// Processes a cell with the given position and color.
-    fn process_color(&mut self, pos: (usize, usize), color: Color) -> Option<(Rect, Color)> {
+    fn process_color(&mut self, pos: (u16, u16), color: Color) -> Option<(Rect, Color)> {
         if let Some((active_rect, active_color)) = self.pending_region.as_mut() {
-            if active_color == &color {
+            if active_color == &color && pos.0 == active_rect.right() && pos.1 == active_rect.y {
                 // Same color: extend the rectangle
                 active_rect.width += 1;
             } else {
                 // Different color: flush the previous region and start a new one
                 let region = *active_rect;
                 let region_color = *active_color;
-                *active_rect = Rect::new(pos.0 as _, pos.1 as _, 1, 1);
+                *active_rect = Rect::new(pos.0, pos.1, 1, 1);
                 *active_color = color;
                 return Some((region, region_color));
             }
         } else {
             // First color: create a new rectangle
-            let rect = Rect::new(pos.0 as _, pos.1 as _, 1, 1);
+            let rect = Rect::new(pos.0, pos.1, 1, 1);
             self.pending_region = Some((rect, color));
         }
 

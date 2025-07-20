@@ -1,5 +1,7 @@
 export class RatzillaCanvas {
-    constructor() {}
+    constructor() {
+        this.logging = true;
+    }
 
     create_canvas_in_element(parent, font_str) {
         this.parent = document.getElementById(parent);
