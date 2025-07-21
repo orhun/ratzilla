@@ -1,0 +1,18 @@
+[package]
+name = "examples-shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratzilla = { path = "../.." }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "Location",
+    "Url",
+    "UrlSearchParams",
+] }
+wasm-bindgen = "0.2"
+web-time = "1.1" 

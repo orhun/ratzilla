@@ -9,13 +9,14 @@ use ratatui::{
 
 use ratzilla::{
     event::{KeyCode, KeyEvent},
-    DomBackend, WebRenderer,
+    WebRenderer,
 };
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .build_terminal()?;
 
     let state = Rc::new(App::default());
     let event_state = Rc::clone(&state);

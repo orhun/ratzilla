@@ -10,3 +10,4 @@ ratzilla = { path = "../../" }
 console_error_panic_hook = "0.1.7"
 web-time = "1.1.0"
 compact_str = "0.9.0"
+examples-shared = { path = "../shared" }

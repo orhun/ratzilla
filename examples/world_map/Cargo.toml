@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 ratzilla = { path = "../../" }
+examples-shared = { path = "../shared" }

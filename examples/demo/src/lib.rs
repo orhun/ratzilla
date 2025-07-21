@@ -10,12 +10,12 @@ use std::{cell::RefCell, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use ratzilla::backend::canvas::{CanvasBackend, CanvasBackendOptions};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use ratzilla::event::KeyCode;
-use ratzilla::ratatui::style::{Color, Modifier};
-use ratzilla::ratatui::Terminal;
+use ratzilla::ratatui::style::Modifier;
+use ratzilla::web_sys::wasm_bindgen::{self, prelude::*};
 use ratzilla::WebRenderer;
-use wasm_bindgen::prelude::*;
+use ratzilla::{backend::canvas::CanvasBackendOptions, backend::webgl2::WebGl2BackendOptions};
 
 mod app;
 
@@ -39,17 +39,23 @@ pub fn main() {
     console_error_panic_hook::set_once();
 
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    // let mut backend = CanvasBackend::new_with_size(1600, 900).unwrap();
-    let mut backend = CanvasBackend::new_with_options(
-        CanvasBackendOptions::new()
-            .font(String::from("16px Fira Code"))
-            // Fira Code does not have an italic variation
-            .disable_modifiers(Modifier::ITALIC),
-    )
-    .unwrap();
-    // backend.set_debug_mode(Some("red"));
-    backend.set_background_color(Color::Rgb(18, 18, 18));
-    let terminal = Terminal::new(backend).unwrap();
+
+    // Create backend with explicit size like main branch (1600x900)
+    let canvas_options = CanvasBackendOptions::new()
+        .font(String::from("16px Fira Code"))
+        // Fira Code does not have an italic variation
+        .disable_modifiers(Modifier::ITALIC);
+
+    let webgl2_options = WebGl2BackendOptions::new()
+        .measure_performance(true)
+        .size((1600, 900));
+
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
+        .canvas_options(canvas_options)
+        .webgl2_options(webgl2_options)
+        .build_terminal()
+        .unwrap();
+
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {

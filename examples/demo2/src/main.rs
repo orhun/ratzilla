@@ -29,9 +29,11 @@ use std::{cell::RefCell, rc::Rc};
 
 use app::App;
 use ratzilla::{
-    ratatui::{layout::Rect, Terminal, TerminalOptions, Viewport},
-    CanvasBackend, WebRenderer,
+    backend::webgl2::WebGl2BackendOptions,
+    ratatui::{layout::Rect, TerminalOptions, Viewport},
+    WebRenderer,
 };
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 pub use self::{
     colors::{color_from_oklab, RgbSwatch},
@@ -40,11 +42,16 @@ pub use self::{
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = CanvasBackend::new().unwrap();
+    
     // this size is to match the size of the terminal when running the demo
     // using vhs in a 1280x640 sized window (github social preview size)
     let viewport = Viewport::Fixed(Rect::new(0, 0, 81, 18));
-    let terminal = Terminal::with_options(backend, TerminalOptions { viewport })?;
+    
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Canvas)
+        .webgl2_options(WebGl2BackendOptions::new().measure_performance(true))
+        .terminal_options(TerminalOptions { viewport })
+        .build_terminal()?;
+    
     let app = Rc::new(RefCell::new(App::default()));
     terminal.on_key_event({
         let app = app.clone();

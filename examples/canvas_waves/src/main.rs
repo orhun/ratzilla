@@ -2,16 +2,17 @@
 
 mod wave_effect;
 
-use ratzilla::{ratatui::Terminal, WebGl2Backend, WebRenderer};
+use ratzilla::{WebRenderer};
 use tachyonfx::{EffectRenderer, IntoEffect};
 use ratzilla::backend::webgl2::WebGl2BackendOptions;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use wave_effect::WaveInterference;
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend =
-        WebGl2Backend::new_with_options(WebGl2BackendOptions::new().grid_id("container"))?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
+        .webgl2_options(WebGl2BackendOptions::new().measure_performance(true).grid_id("container"))
+        .build_terminal()?;
 
     let mut effect = WaveInterference::new().into_effect();
     let mut last_tick = web_time::Instant::now();
