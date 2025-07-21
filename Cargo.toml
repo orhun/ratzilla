@@ -45,3 +45,4 @@ bitvec = { version = "1.0.1", default-features = false, features = ["alloc", "st
 beamterm-renderer = "0.1.1"
 sledgehammer_bindgen = { version = "0.6.0", features = ["web"] }
 sledgehammer_utils = "0.3.1"
+unicode-width = "0.2.0"

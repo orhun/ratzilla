@@ -569,6 +569,7 @@ dependencies = [
  "sledgehammer_bindgen",
  "sledgehammer_utils",
  "thiserror",
+ "unicode-width 0.2.0",
  "web-sys",
 ]
 

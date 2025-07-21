@@ -5,6 +5,7 @@ use std::{
     rc::Rc,
     sync::atomic::{AtomicBool, Ordering},
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     backend::color::{actual_bg_color, actual_fg_color, to_rgb},
@@ -91,7 +92,7 @@ impl CanvasBackendOptions {
     /// italics to be disabled if your chosen font doesn't support
     /// them
     pub fn disable_modifiers(mut self, modifiers: Modifier) -> Self {
-        self.enabled_modifiers ^= modifiers;
+        self.enabled_modifiers &= !modifiers;
         self
     }
 }
@@ -561,13 +562,18 @@ impl Backend for CanvasBackend {
             canvas.buffer.save();
             let color = to_rgb(color, 0x000000);
 
+            let width: u16 = cell_buffer
+                .iter()
+                .map(|(_, _, c, _)| c.symbol().width() as u16)
+                .sum();
+
             canvas.buffer.set_fill_style(color);
             // canvas.buffer.set_stroke_style(0xFF0000);
             canvas.buffer.begin_path();
             canvas.buffer.rect(
                 rect.x * canvas.cell_width,
                 rect.y * canvas.cell_height,
-                rect.width * canvas.cell_width,
+                width * canvas.cell_width,
                 rect.height * canvas.cell_height,
             );
             canvas.buffer.clip();
@@ -597,11 +603,12 @@ impl Backend for CanvasBackend {
                     canvas.buffer.restore();
                     canvas.buffer.save();
 
+                    let symbol_width = cell.symbol().width() as u16;
                     canvas.buffer.begin_path();
                     canvas.buffer.rect(
                         x * canvas.cell_width,
                         y * canvas.cell_height,
-                        canvas.cell_width,
+                        symbol_width * canvas.cell_width,
                         canvas.cell_height,
                     );
                     canvas.buffer.clip();
