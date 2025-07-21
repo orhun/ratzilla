@@ -39,7 +39,7 @@ impl TryFrom<String> for BackendType {
             "dom" => Ok(BackendType::Dom),
             "canvas" => Ok(BackendType::Canvas),
             "webgl2" => Ok(BackendType::WebGl2),
-            _ => Err(format!("Invalid backend type: '{}'. Valid options are: dom, canvas, webgl2", s)),
+            _ => Err(format!("Invalid backend type: '{s}'. Valid options are: dom, canvas, webgl2")),
         }
     }
 }
