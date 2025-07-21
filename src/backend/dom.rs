@@ -249,8 +249,8 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let cursor_style = self.options.cursor_shape().show(line[x].style());
-                line[x].set_style(cursor_style);
+                let cursor_modifier = self.options.cursor_shape().show(line[x].modifier);
+                line[x].modifier = cursor_modifier;
             }
         }
 
@@ -285,8 +285,8 @@ impl Backend for DomBackend {
             let x = pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() {
-                let style = self.options.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
+                let modifier = self.options.cursor_shape.hide(line[x].modifier);
+                line[x].modifier = modifier;
             }
         }
         self.cursor_position = None;
@@ -335,8 +335,8 @@ impl Backend for DomBackend {
             let x = old_pos.x as usize;
             let line = &mut self.buffer[y];
             if x < line.len() && old_pos != new_pos {
-                let style = self.options.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
+                let modifier = self.options.cursor_shape.hide(line[x].modifier);
+                line[x].modifier = modifier;
             }
         }
         self.cursor_position = Some(new_pos);

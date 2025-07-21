@@ -6,7 +6,6 @@ use crate::{
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
-    layout::Size,
     style::{Color, Modifier},
 };
 use web_sys::{
@@ -89,8 +88,8 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 }
 
 /// Converts a Color to a CSS style.
-pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
-    let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
+pub(crate) fn get_canvas_color(color: Color) -> CompactString {
+    let color = ansi_to_rgb(color).unwrap();
 
     format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
 }
@@ -124,25 +123,6 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
     } else {
         get_window_size()
     };
-    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
-}
-
-pub(crate) fn size_to_buffer_size(size: Size, font_metrics: Size) -> Size {
-    Size {
-        width: size.width / font_metrics.width,
-        height: size.height / font_metrics.height,
-    }
-}
-
-/// Returns a buffer based on the canvas size.
-pub(crate) fn get_sized_buffer_from_canvas(
-    canvas: &HtmlCanvasElement,
-    font_metrics: Size,
-) -> Vec<Vec<Cell>> {
-    let width = canvas.client_width() as u16;
-    let height = canvas.client_height() as u16;
-
-    let size = size_to_buffer_size(Size { width, height }, font_metrics);
     vec![vec![Cell::default(); size.width as usize]; size.height as usize]
 }
 

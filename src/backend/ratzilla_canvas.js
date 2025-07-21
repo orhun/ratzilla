@@ -24,7 +24,7 @@ export class RatzillaCanvas {
         this.cellHeight = Math.floor(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
         this.cellBaseline = Math.floor(metrics.actualBoundingBoxDescent);
         this.underlinePos = Math.floor(this.cellHeight - 1.0);
-        return new Float64Array([this.cellWidth, this.cellHeight, this.cellBaseline, this.underlinePos]);
+        return new Uint16Array([this.cellWidth, this.cellHeight, this.cellBaseline, this.underlinePos]);
     }
 
     init_ctx() {

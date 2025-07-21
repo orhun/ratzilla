@@ -23,7 +23,7 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use web_sys::{
-    js_sys::{Float64Array, Uint16Array},
+    js_sys::Uint16Array,
     wasm_bindgen::{
         self,
         prelude::{wasm_bindgen, Closure},
@@ -116,7 +116,7 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     /// Returns the cell width, cell height, and cell baseline in that order
-    fn measure_text(this: &RatzillaCanvas) -> Float64Array;
+    fn measure_text(this: &RatzillaCanvas) -> Uint16Array;
 
     #[wasm_bindgen(method)]
     fn get_canvas(this: &RatzillaCanvas) -> web_sys::HtmlCanvasElement;
@@ -187,12 +187,6 @@ mod js {
         "#
     }
 
-    fn reset_font() {
-        r#"
-            this.ctx.font = this.font_str;
-        "#
-    }
-
     fn rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
             this.ctx.rect($x$, $y$, $w$, $h$);
@@ -250,16 +244,16 @@ struct Canvas {
     ///
     /// This will be used for multiplying the cell's x position to get the actual pixel
     /// position on the canvas.
-    cell_width: f64,
+    cell_width: u16,
     /// Height of a single cell.
     ///
     /// This will be used for multiplying the cell's y position to get the actual pixel
     /// position on the canvas.
-    cell_height: f64,
+    cell_height: u16,
     /// The font descent as measured by the canvas
-    cell_baseline: f64,
+    cell_baseline: u16,
     /// The font descent as measured by the canvas
-    underline_pos: f64,
+    underline_pos: u16,
 }
 
 impl Canvas {
@@ -294,10 +288,10 @@ impl Canvas {
             initialized,
             enabled_modifiers,
             background_color,
-            cell_width: 0.0,
-            cell_height: 0.0,
-            cell_baseline: 0.0,
-            underline_pos: 0.0,
+            cell_width: 0,
+            cell_height: 0,
+            cell_baseline: 0,
+            underline_pos: 0,
         };
 
         let font_measurement = canvas.buffer.ratzilla_canvas().measure_text();
@@ -320,7 +314,7 @@ pub struct CanvasBackend {
     /// numbers of simultaneous changes.
     always_clip_cells: bool,
     /// The size of the current screen in cells
-    buffer_size: Size,
+    buffer: Vec<Vec<Cell>>,
     /// Canvas.
     canvas: Canvas,
     /// Cursor position.
@@ -351,21 +345,40 @@ impl CanvasBackend {
         Ok(Self {
             always_clip_cells: options.always_clip_cells,
             canvas,
-            buffer_size: Size::ZERO,
+            buffer: Vec::new(),
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
         })
     }
 
+    fn buffer_size(&self) -> Size {
+        Size {
+            width: self.buffer.get(0).map(|b| b.len()).unwrap_or(0) as u16,
+            height: self.buffer.len() as u16,
+        }
+    }
+
     fn initialize(&mut self) -> Result<(), Error> {
         // TODO: Find a way to not use a Javascript array
         let new_buffer_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
 
-        self.buffer_size = Size {
+        let new_buffer_size = Size {
             width: new_buffer_size.get_index(0),
             height: new_buffer_size.get_index(1),
         };
+
+        if self.buffer_size() != new_buffer_size {
+            let new_buffer_width = new_buffer_size.width as usize;
+            let new_buffer_height = new_buffer_size.height as usize;
+
+            for line in &mut self.buffer {
+                line.resize_with(new_buffer_width, || Cell::default());
+            }
+            self.buffer.resize_with(new_buffer_height, || {
+                vec![Cell::default(); new_buffer_width]
+            });
+        }
 
         Ok(())
     }
@@ -411,14 +424,15 @@ impl CanvasBackend {
         self.canvas.buffer.save();
 
         let color = self.debug_mode.as_ref().unwrap();
-        for y in 0..self.buffer_size.height {
-            for x in 0..self.buffer_size.width {
+        let buffer_size = self.buffer_size();
+        for y in 0..buffer_size.height {
+            for x in 0..buffer_size.width {
                 self.canvas.buffer.set_stroke_style_str(color);
                 self.canvas.buffer.stroke_rect(
-                    (x as f64 * self.canvas.cell_width) as _,
-                    (y as f64 * self.canvas.cell_height) as _,
-                    self.canvas.cell_width as _,
-                    self.canvas.cell_height as _,
+                    x * self.canvas.cell_width,
+                    y * self.canvas.cell_height,
+                    self.canvas.cell_width,
+                    self.canvas.cell_height,
                 );
             }
         }
@@ -447,16 +461,16 @@ impl Backend for CanvasBackend {
             Rect,
             Color,
             &mut Canvas,
-            &mut Vec<(u16, u16, &Cell)>,
+            &mut Vec<(u16, u16, &Cell, Modifier)>,
         )| {
-            let color = get_canvas_color(color, canvas.background_color);
+            let color = get_canvas_color(color);
 
             canvas.buffer.set_fill_style_str(&color);
             canvas.buffer.fill_rect(
-                (rect.x as f64 * canvas.cell_width) as _,
-                (rect.y as f64 * canvas.cell_height) as _,
-                (rect.width as f64 * canvas.cell_width) as _,
-                (rect.height as f64 * canvas.cell_height) as _,
+                rect.x * canvas.cell_width,
+                rect.y * canvas.cell_height,
+                rect.width * canvas.cell_width,
+                rect.height * canvas.cell_height,
             );
 
             // Draws the text symbols on the canvas.
@@ -475,8 +489,8 @@ impl Backend for CanvasBackend {
             // or when `always_clip_cells` is enabled
             let mut last_color = None;
             canvas.buffer.save();
-            for (x, y, cell) in cell_buffer.drain(..) {
-                let color = actual_fg_color(cell);
+            for (x, y, cell, modifiers) in cell_buffer.drain(..) {
+                let color = actual_fg_color(cell, modifiers, Color::White, canvas.background_color);
 
                 // We need to reset the canvas context state in two scenarios:
                 // 1. When we need to create a clipping path (for potentially problematic glyphs)
@@ -487,15 +501,15 @@ impl Backend for CanvasBackend {
 
                     canvas.buffer.begin_path();
                     canvas.buffer.rect(
-                        (x as f64 * canvas.cell_width) as _,
-                        (y as f64 * canvas.cell_height) as _,
-                        canvas.cell_width as _,
-                        canvas.cell_height as _,
+                        x * canvas.cell_width,
+                        y * canvas.cell_height,
+                        canvas.cell_width,
+                        canvas.cell_height,
                     );
                     canvas.buffer.clip();
 
                     last_color = None; // reset last color to avoid clipping
-                    let color = get_canvas_color(color, Color::White);
+                    let color = get_canvas_color(color);
                     canvas.buffer.set_fill_style_str(&color);
                 } else if last_color != Some(color) {
                     canvas.buffer.restore();
@@ -503,28 +517,27 @@ impl Backend for CanvasBackend {
 
                     last_color = Some(color);
 
-                    let color = get_canvas_color(color, Color::White);
+                    let color = get_canvas_color(color);
                     canvas.buffer.set_fill_style_str(&color);
                 }
 
-                for modifier in cell.modifier & canvas.enabled_modifiers {
+                for modifier in modifiers {
                     match modifier {
                         Modifier::BOLD => canvas.buffer.bold(),
                         Modifier::ITALIC => canvas.buffer.italic(),
                         Modifier::UNDERLINED => {
                             canvas.buffer.fill_rect(
-                                (x as f64 * canvas.cell_width) as _,
-                                (y as f64 * canvas.cell_height + canvas.underline_pos) as _,
-                                canvas.cell_width as _,
+                                x * canvas.cell_width,
+                                y * canvas.cell_height + canvas.underline_pos,
+                                canvas.cell_width,
                                 1,
                             );
                         }
                         Modifier::CROSSED_OUT => {
                             canvas.buffer.fill_text(
                                 "─",
-                                (x as f64 * canvas.cell_width) as _,
-                                (y as f64 * canvas.cell_height + canvas.cell_height
-                                    - canvas.cell_baseline) as _,
+                                x * canvas.cell_width,
+                                y * canvas.cell_height + canvas.cell_height - canvas.cell_baseline,
                             );
                         }
                         _ => {}
@@ -535,12 +548,9 @@ impl Backend for CanvasBackend {
                 // https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/Surface.zig#L1589C5-L1589C10
                 canvas.buffer.fill_text(
                     cell.symbol(),
-                    (x as f64 * canvas.cell_width) as _,
-                    (y as f64 * canvas.cell_height + canvas.cell_height - canvas.cell_baseline)
-                        as _,
+                    x * canvas.cell_width,
+                    y * canvas.cell_height + canvas.cell_height - canvas.cell_baseline,
                 );
-
-                canvas.buffer.reset_font();
             }
             canvas.buffer.restore();
         };
@@ -548,6 +558,26 @@ impl Backend for CanvasBackend {
         let mut row_renderer = RowColorOptimizer::new();
         let mut cell_buffer = Vec::new();
         for (x, y, cell) in content {
+            let mut modifiers = cell.modifier;
+            {
+                let x = x as usize;
+                let y = y as usize;
+                if let Some(line) = self.buffer.get_mut(y) {
+                    line.get_mut(x).map(|c| *c = cell.clone());
+                }
+            }
+
+            if self
+                .cursor_position
+                .map(|pos| pos.x == x && pos.y == y)
+                .unwrap_or_default()
+            {
+                let cursor_modifiers = self.cursor_shape.show(modifiers);
+                modifiers = cursor_modifiers;
+            }
+
+            modifiers &= self.canvas.enabled_modifiers;
+
             // Draws the background of the cells.
             //
             // This function uses [`RowColorOptimizer`] to optimize the drawing of the background
@@ -560,12 +590,15 @@ impl Backend for CanvasBackend {
             // previous one, or if we have advanced past the last y position,
             // or if we have advanced more than one x position
             row_renderer
-                .process_color((x, y), actual_bg_color(cell))
+                .process_color(
+                    (x, y),
+                    actual_bg_color(cell, modifiers, Color::White, self.canvas.background_color),
+                )
                 .map(|(rect, color)| {
                     draw_region((rect, color, &mut self.canvas, &mut cell_buffer))
                 });
 
-            cell_buffer.push((x, y, cell));
+            cell_buffer.push((x, y, cell, modifiers));
         }
 
         // Flush the remaining region after traversing the changed cells
@@ -593,39 +626,61 @@ impl Backend for CanvasBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
+        // Redraw the cell under the cursor, but without
+        // the cursor style
+        if let Some(pos) = self.cursor_position.take() {
             let x = pos.x as usize;
-            // let line = &mut self.buffer[y];
-            // if x < line.len() {
-            //     let style = self.cursor_shape.hide(line[x].style());
-            //     line[x].set_style(style);
-            // }
+            let y = pos.y as usize;
+            if let Some(line) = self.buffer.get(y) {
+                if let Some(cell) = line.get(x).cloned() {
+                    self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+                }
+            }
         }
-        self.cursor_position = None;
         Ok(())
     }
 
     fn show_cursor(&mut self) -> IoResult<()> {
+        // Redraw the new cell under the cursor, but with
+        // the cursor style
+        if let Some(pos) = self.cursor_position {
+            let x = pos.x as usize;
+            let y = pos.y as usize;
+            if let Some(line) = self.buffer.get(y) {
+                if let Some(cell) = line.get(x).cloned() {
+                    self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+                }
+            }
+        }
         Ok(())
     }
 
-    fn get_cursor(&mut self) -> IoResult<(u16, u16)> {
-        Ok((0, 0))
+    fn get_cursor_position(&mut self) -> IoResult<Position> {
+        match self.cursor_position {
+            None => Ok((0, 0).into()),
+            Some(position) => Ok(position),
+        }
     }
 
-    fn set_cursor(&mut self, _x: u16, _y: u16) -> IoResult<()> {
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
+        self.hide_cursor()?;
+        self.cursor_position = Some(position.into());
+        self.show_cursor()?;
         Ok(())
     }
 
     fn clear(&mut self) -> IoResult<()> {
         self.canvas.buffer.clear_rect();
+        self.buffer
+            .iter_mut()
+            .flatten()
+            .for_each(|c| *c = Cell::default());
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
         if self.canvas.initialized.load(Ordering::Relaxed) {
-            Ok(self.buffer_size)
+            Ok(self.buffer_size())
         } else {
             let new_buffer_size = self.canvas.buffer.ratzilla_canvas().reinit_canvas();
             let new_buffer_size = Size {
@@ -638,28 +693,6 @@ impl Backend for CanvasBackend {
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
         unimplemented!()
-    }
-
-    fn get_cursor_position(&mut self) -> IoResult<Position> {
-        match self.cursor_position {
-            None => Ok((0, 0).into()),
-            Some(position) => Ok(position),
-        }
-    }
-
-    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        let new_pos = position.into();
-        if let Some(old_pos) = self.cursor_position {
-            let y = old_pos.y as usize;
-            let x = old_pos.x as usize;
-            // let line = &mut self.buffer[y];
-            // if x < line.len() && old_pos != new_pos {
-            //     let style = self.cursor_shape.hide(line[x].style());
-            //     line[x].set_style(style);
-            // }
-        }
-        self.cursor_position = Some(new_pos);
-        Ok(())
     }
 }
 

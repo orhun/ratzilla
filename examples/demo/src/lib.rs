@@ -43,6 +43,7 @@ pub fn main() {
     let mut backend = CanvasBackend::new_with_options(
         CanvasBackendOptions::new()
             .font(String::from("16px Fira Code"))
+            // Fira Code does not have an italic variation
             .disable_modifiers(Modifier::ITALIC),
     )
     .unwrap();
