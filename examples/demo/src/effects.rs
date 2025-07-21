@@ -10,6 +10,7 @@ pub fn startup() -> Effect {
 
     parallel(&[
         parallel(&[
+            style_all_cells(),
             sweep_in(Motion::LeftToRight, 100, 20, Color::Black, timer),
             sweep_in(Motion::UpToDown, 100, 20, Color::Black, timer),
         ]),

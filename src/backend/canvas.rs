@@ -363,6 +363,42 @@ impl Canvas {
 
         Ok(canvas)
     }
+
+    fn draw_rect_modifiers(&mut self, region: Rect, modifiers: Modifier) {
+        for modifier in modifiers {
+            match modifier {
+                Modifier::UNDERLINED => {
+                    // self.buffer.stroke_rect(
+                    //     region.x * self.cell_width,
+                    //     region.y * self.cell_height,
+                    //     region.width * self.cell_width,
+                    //     self.cell_height,
+                    // );
+                    self.buffer.fill_rect(
+                        region.x * self.cell_width,
+                        region.y * self.cell_height + self.underline_pos,
+                        region.width * self.cell_width,
+                        1,
+                    );
+                }
+                Modifier::CROSSED_OUT => {
+                    // self.buffer.stroke_rect(
+                    //     region.x * self.cell_width,
+                    //     region.y * self.cell_height,
+                    //     region.width * self.cell_width,
+                    //     self.cell_height,
+                    // );
+                    self.buffer.fill_rect(
+                        region.x * self.cell_width,
+                        region.y * self.cell_height + self.cell_height / 2,
+                        region.width * self.cell_width,
+                        1,
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Canvas backend.
@@ -553,6 +589,7 @@ impl Backend for CanvasBackend {
             // 3. Only creates cell-level clipping paths when `always_clip_cells` is enabled
             let mut last_color = None;
             let mut last_modifier = Modifier::empty();
+            let mut underline_optimizer = RowOptimizer::new();
             for (x, y, cell, modifiers) in cell_buffer.drain(..) {
                 let color = actual_fg_color(cell, modifiers, Color::White, canvas.background_color);
 
@@ -576,30 +613,18 @@ impl Backend for CanvasBackend {
                 if last_color != Some(color) {
                     last_color = Some(color);
 
+                    if let Some((region, modifiers)) = underline_optimizer.flush() {
+                        canvas.draw_rect_modifiers(region, modifiers);
+                    }
                     let color = to_rgb(color, 0xFFFFFF);
                     canvas.buffer.set_fill_style(color);
                 }
 
-                for modifier in modifiers {
-                    match modifier {
-                        Modifier::UNDERLINED => {
-                            canvas.buffer.fill_rect(
-                                x * canvas.cell_width,
-                                y * canvas.cell_height + canvas.underline_pos,
-                                canvas.cell_width,
-                                1,
-                            );
-                        }
-                        Modifier::CROSSED_OUT => {
-                            canvas.buffer.fill_rect(
-                                x * canvas.cell_width,
-                                y * canvas.cell_height + canvas.cell_height / 2,
-                                canvas.cell_width,
-                                1,
-                            );
-                        }
-                        _ => {}
-                    }
+                if let Some((region, modifiers)) = underline_optimizer.process(
+                    (x, y),
+                    modifiers & (Modifier::UNDERLINED | Modifier::CROSSED_OUT),
+                ) {
+                    canvas.draw_rect_modifiers(region, modifiers);
                 }
 
                 let removed_modifiers = last_modifier - modifiers;
@@ -632,10 +657,14 @@ impl Backend for CanvasBackend {
                     );
                 }
             }
+
+            if let Some((region, modifiers)) = underline_optimizer.flush() {
+                canvas.draw_rect_modifiers(region, modifiers);
+            }
             canvas.buffer.restore();
         };
 
-        let mut row_renderer = RowColorOptimizer::new();
+        let mut bg_optimizer = RowOptimizer::new();
         let mut cell_buffer = Vec::new();
         for (x, y, cell) in content {
             let mut modifiers = cell.modifier;
@@ -669,8 +698,8 @@ impl Backend for CanvasBackend {
             // Only calls `draw_region` if the color is different from the
             // previous one, or if we have advanced past the last y position,
             // or if we have advanced more than one x position
-            row_renderer
-                .process_color(
+            bg_optimizer
+                .process(
                     (x, y),
                     actual_bg_color(cell, modifiers, Color::White, self.canvas.background_color),
                 )
@@ -682,7 +711,7 @@ impl Backend for CanvasBackend {
         }
 
         // Flush the remaining region after traversing the changed cells
-        row_renderer
+        bg_optimizer
             .flush()
             .map(|(rect, color)| draw_region((rect, color, &mut self.canvas, &mut cell_buffer)));
 
@@ -780,17 +809,17 @@ impl WebBackend for CanvasBackend {
     }
 }
 
-/// Optimizes canvas rendering by batching adjacent cells with the same color into a single rectangle.
+/// Optimizes canvas rendering by batching adjacent cells with the same data into a single rectangle.
 ///
 /// This reduces the number of draw calls to the canvas API by coalescing adjacent cells
-/// with identical colors into larger rectangles, which is particularly beneficial for
+/// with identical data into larger rectangles, which is particularly beneficial for
 /// WASM where calls are quiteexpensive.
-struct RowColorOptimizer {
-    /// The currently accumulating region and its color
-    pending_region: Option<(Rect, Color)>,
+struct RowOptimizer<T> {
+    /// The currently accumulating region and its data
+    pending_region: Option<(Rect, T)>,
 }
 
-impl RowColorOptimizer {
+impl<T> RowOptimizer<T> {
     /// Creates a new empty optimizer with no pending region.
     fn new() -> Self {
         Self {
@@ -798,31 +827,33 @@ impl RowColorOptimizer {
         }
     }
 
-    /// Processes a cell with the given position and color.
-    fn process_color(&mut self, pos: (u16, u16), color: Color) -> Option<(Rect, Color)> {
-        if let Some((active_rect, active_color)) = self.pending_region.as_mut() {
-            if active_color == &color && pos.0 == active_rect.right() && pos.1 == active_rect.y {
-                // Same color: extend the rectangle
+    /// Finalizes and returns the current pending region, if any.
+    fn flush(&mut self) -> Option<(Rect, T)> {
+        self.pending_region.take()
+    }
+}
+
+impl<T: PartialEq + Eq + Copy> RowOptimizer<T> {
+    /// Processes a cell with the given position and data.
+    fn process(&mut self, pos: (u16, u16), data: T) -> Option<(Rect, T)> {
+        if let Some((active_rect, active_data)) = self.pending_region.as_mut() {
+            if active_data == &data && pos.0 == active_rect.right() && pos.1 == active_rect.y {
+                // Same data: extend the rectangle
                 active_rect.width += 1;
             } else {
-                // Different color: flush the previous region and start a new one
+                // Different data: flush the previous region and start a new one
                 let region = *active_rect;
-                let region_color = *active_color;
+                let region_data = *active_data;
                 *active_rect = Rect::new(pos.0, pos.1, 1, 1);
-                *active_color = color;
-                return Some((region, region_color));
+                *active_data = data;
+                return Some((region, region_data));
             }
         } else {
-            // First color: create a new rectangle
+            // First data: create a new rectangle
             let rect = Rect::new(pos.0, pos.1, 1, 1);
-            self.pending_region = Some((rect, color));
+            self.pending_region = Some((rect, data));
         }
 
         None
-    }
-
-    /// Finalizes and returns the current pending region, if any.
-    fn flush(&mut self) -> Option<(Rect, Color)> {
-        self.pending_region.take()
     }
 }
