@@ -7,31 +7,24 @@
 //!
 //! There are four different text rendering strategies, declared in descending
 //! order of performance.
-mod fps;
 
-use crate::fps::{FpsRecorder, FpsStats};
 use ratzilla::{ratatui::{
     layout::Size,
-    style::{Color, Modifier, Style, Styled},
+    style::{Color, Styled},
     text::{Line, Span},
-    widgets::{Paragraph, Widget, Wrap},
-    Terminal,
-}, WebGl2Backend, WebRenderer};
+    widgets::{Paragraph, Wrap},
+}, WebRenderer};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use std::{cell::RefCell, rc::Rc};
 
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let backend = WebGl2Backend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
+        .webgl2_options(WebGl2BackendOptions::new().measure_performance(true))
+        .build_terminal()?;
 
-    let mut fps_recorder = FpsRecorder::new();
     let mut rendered_frames = 0; // used for screen cycling
-
-    // style for the FPS display (upper-left corner)
-    let fps_style = Style::default()
-        .bg(Color::White)
-        .fg(Color::Black)
-        .add_modifier(Modifier::BOLD);
 
     // style index for the text
     let text_stye = Rc::new(RefCell::new(0usize));
@@ -53,13 +46,6 @@ fn main() -> std::io::Result<()> {
         let p = widget_cache.get(*text_stye.as_ref().borrow(), rendered_frames);
         frame.render_widget(p, frame.area());
         rendered_frames += 1;
-
-        // record and display FPS
-        fps_recorder.record();
-        FpsStats::new(&fps_recorder)
-            .main_style(fps_style)
-            .fps_value_style(fps_style)
-            .render(frame.area(), frame.buffer_mut())
     });
 
     Ok(())

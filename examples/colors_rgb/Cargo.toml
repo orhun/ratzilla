@@ -8,3 +8,4 @@ publish = false
 palette = "0.7.6"
 ratzilla = { path = "../../" }
 console_error_panic_hook = "0.1.7"
+examples-shared = { path = "../shared" }

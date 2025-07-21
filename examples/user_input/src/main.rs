@@ -10,13 +10,14 @@ use ratzilla::ratatui::Frame;
 use ratzilla::ratatui::{
     style::Color,
     widgets::{Block, Paragraph},
-    Terminal,
 };
-use ratzilla::{event::KeyCode, DomBackend, WebRenderer};
+use ratzilla::{event::KeyCode, WebRenderer};
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
-    let backend = DomBackend::new()?.set_cursor_shape(CursorShape::SteadyUnderScore);
-    let terminal = Terminal::new(backend)?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .dom_options(ratzilla::backend::dom::DomBackendOptions::new(None, CursorShape::SteadyUnderScore))
+        .build_terminal()?;
 
     let app = Rc::new(RefCell::new(App::new()));
 

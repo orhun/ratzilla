@@ -4,12 +4,13 @@ use ratzilla::ratatui::{
     layout::Alignment,
     style::Color,
     widgets::{Block, Paragraph},
-    Terminal,
 };
 
 use ratzilla::{
-    event::KeyCode, event::MouseButton, event::MouseEventKind, DomBackend, WebRenderer,
+    event::KeyCode, event::MouseButton, event::MouseEventKind, WebRenderer,
 };
+
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
@@ -17,8 +18,8 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    let backend = DomBackend::new()?;
-    let terminal = Terminal::new(backend)?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .build_terminal()?;
 
     terminal.on_key_event({
         let counter_cloned = counter.clone();

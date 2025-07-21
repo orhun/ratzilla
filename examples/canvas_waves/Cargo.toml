@@ -9,3 +9,4 @@ ratzilla = { path = "../../" }
 console_error_panic_hook = "0.1.7"
 tachyonfx = { version = "0.15.0", default-features = false, features = ["web-time"] }
 web-time = "1.1.0"
+examples-shared = { path = "../shared" }
