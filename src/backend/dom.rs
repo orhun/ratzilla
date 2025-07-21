@@ -12,9 +12,10 @@ use web_sys::{
 };
 
 use crate::{
-    backend::utils::{MouseEventHandler, *},
+    backend::utils::*,
     error::Error,
-    event::MouseEvent,
+    event::{KeyEvent, MouseEvent},
+    render::WebEventHandler,
     widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
@@ -26,8 +27,6 @@ pub struct DomBackendOptions {
     grid_id: Option<String>,
     /// The cursor shape.
     cursor_shape: CursorShape,
-    /// Mouse event handler for the canvas.
-    mouse_event_handler: Option<MouseEventHandler>,
 }
 
 impl DomBackendOptions {
@@ -36,7 +35,6 @@ impl DomBackendOptions {
         Self {
             grid_id,
             cursor_shape,
-            mouse_event_handler: None,
         }
     }
 
@@ -57,14 +55,6 @@ impl DomBackendOptions {
         &self.cursor_shape
     }
 
-    /// Configures a mouse event handler for the canvas.
-    pub fn mouse_event_handler<F>(mut self, handler: F) -> Self
-    where
-        F: FnMut(MouseEvent) + 'static,
-    {
-        self.mouse_event_handler = Some(MouseEventHandler::new(handler));
-        self
-    }
 }
 
 /// DOM backend.
@@ -96,8 +86,10 @@ pub struct DomBackend {
     cursor_position: Option<Position>,
     /// Cached cell size in pixels (width, height).
     cell_size_px: Option<(u32, u32)>,
-    /// Mouse event handler if configured.
-    mouse_event_handler: Option<MouseEventHandler>,
+    /// Active mouse event closure for cleanup.
+    mouse_closure: Option<web_sys::wasm_bindgen::closure::Closure<dyn FnMut(web_sys::MouseEvent)>>,
+    /// Active key event closure for cleanup.
+    key_closure: Option<web_sys::wasm_bindgen::closure::Closure<dyn FnMut(web_sys::KeyboardEvent)>>,
 }
 
 impl DomBackend {
@@ -121,11 +113,9 @@ impl DomBackend {
     }
 
     /// Constructs a new [`DomBackend`] with the given options.
-    pub fn new_with_options(mut options: DomBackendOptions) -> Result<Self, Error> {
+    pub fn new_with_options(options: DomBackendOptions) -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-
-        let mouse_event_handler = options.mouse_event_handler.take();
 
         let mut backend = Self {
             initialized: Rc::new(RefCell::new(false)),
@@ -139,7 +129,8 @@ impl DomBackend {
             document,
             cursor_position: None,
             cell_size_px: None,
-            mouse_event_handler,
+            mouse_closure: None,
+            key_closure: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -181,43 +172,6 @@ impl DomBackend {
         Ok(cell_size)
     }
 
-    /// Sets up mouse event handling for the DOM grid.
-    fn setup_mouse_event_handler(&mut self) -> Result<(), Error> {
-        if self.mouse_event_handler.is_none() {
-            return Ok(());
-        }
-
-        let cell_size_px = self.measure_cell_size()?;
-        let mut handler = self.mouse_event_handler.take().unwrap();
-
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            // Get the grid element's bounding rectangle for proper coordinate calculation
-            if let Some(target) = event.current_target() {
-                if let Ok(element) = target.dyn_into::<web_sys::Element>() {
-                    let rect = element.get_bounding_client_rect();
-                    let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
-                    handler.call(MouseEvent::new_relative(event, cell_size_px, grid_rect));
-                } else {
-                    // this will maybe not happen, but if it does, we panic in dev
-                    // but ignore it in release builds. to be fixed if it happens.
-                    debug_assert!(false, "target is no longer a valid element");
-                }
-            } else {
-                // same as above, this will maybe not happen, but if it does, we should fix it
-                debug_assert!(false, "no current target for mouse event");
-            }
-        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
-
-        self.grid
-            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
-        self.grid
-            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
-        self.grid
-            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
-
-        closure.forget();
-        Ok(())
-    }
 
     /// Pre-render the content to the screen.
     ///
@@ -346,8 +300,6 @@ impl Backend for DomBackend {
             // Set the previous buffer to the current buffer for the first render
             self.prev_buffer = self.buffer.clone();
 
-            // Set up mouse event handler after the grid is rendered
-            self.setup_mouse_event_handler()?;
         }
         // Check if the buffer has changed since the last render and update the grid
         if self.buffer != self.prev_buffer {
@@ -446,7 +398,88 @@ impl std::fmt::Debug for DomBackend {
             .field("options", &self.options)
             .field("cursor_position", &self.cursor_position)
             .field("cell_size_px", &self.cell_size_px)
-            .field("mouse_event_handler", &self.mouse_event_handler.is_some())
+            .field("mouse_closure", &self.mouse_closure.is_some())
+            .field("key_closure", &self.key_closure.is_some())
             .finish()
+    }
+}
+
+impl WebEventHandler for DomBackend {
+    fn setup_mouse_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        // Clear existing mouse events first
+        self.clear_mouse_events()?;
+
+        let cell_size_px = self.measure_cell_size()?;
+        
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            // Get the grid element's bounding rectangle for proper coordinate calculation
+            if let Some(target) = event.current_target() {
+                if let Ok(element) = target.dyn_into::<web_sys::Element>() {
+                    let rect = element.get_bounding_client_rect();
+                    let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
+                    callback(MouseEvent::new_relative(event, cell_size_px, grid_rect));
+                } else {
+                    debug_assert!(false, "target is no longer a valid element");
+                }
+            } else {
+                debug_assert!(false, "no current target for mouse event");
+            }
+        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
+
+        self.grid
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        self.grid
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        self.grid
+            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
+
+        self.mouse_closure = Some(closure);
+        Ok(())
+    }
+
+    fn clear_mouse_events(&mut self) -> Result<(), Error> {
+        if let Some(closure) = self.mouse_closure.take() {
+            self.grid
+                .remove_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
+                .map_err(Error::from)?;
+            self.grid
+                .remove_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
+                .map_err(Error::from)?;
+            self.grid
+                .remove_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
+                .map_err(Error::from)?;
+        }
+        Ok(())
+    }
+
+    fn setup_key_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    where
+        F: FnMut(KeyEvent) + 'static,
+    {
+        // Clear existing key events first
+        self.clear_key_events()?;
+
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
+            callback(event.into());
+        });
+        
+        self.document
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+            .map_err(Error::from)?;
+            
+        self.key_closure = Some(closure);
+        Ok(())
+    }
+
+    fn clear_key_events(&mut self) -> Result<(), Error> {
+        if let Some(closure) = self.key_closure.take() {
+            self.document
+                .remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+                .map_err(Error::from)?;
+        }
+        Ok(())
     }
 }

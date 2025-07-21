@@ -25,8 +25,14 @@ fn main() -> io::Result<()> {
     let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
-    // Create a shared mouse event handler closure
-    let create_mouse_handler = || {
+    let mut terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .dom_options(DomBackendOptions::default())
+        .canvas_options(CanvasBackendOptions::new())
+        .webgl2_options(WebGl2BackendOptions::new())
+        .build_terminal()?;
+
+    // Set up mouse event handling using the new WebRenderer API
+    terminal.on_mouse_event({
         let mouse_position_cloned = mouse_position.clone();
         let mouse_button_cloned = mouse_button.clone();
         let mouse_event_kind_cloned = mouse_event_kind.clone();
@@ -38,19 +44,7 @@ fn main() -> io::Result<()> {
             let mut mouse_event_kind = mouse_event_kind_cloned.borrow_mut();
             *mouse_event_kind = Some(mouse_event.event);
         }
-    };
-
-    let dom_options = DomBackendOptions::default().mouse_event_handler(create_mouse_handler());
-
-    let canvas_options = CanvasBackendOptions::new().mouse_event_handler(create_mouse_handler());
-
-    let webgl2_options = WebGl2BackendOptions::new();
-
-    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
-        .dom_options(dom_options)
-        .canvas_options(canvas_options)
-        .webgl2_options(webgl2_options)
-        .build_terminal()?;
+    }).ok(); // WebGL2 backend doesn't support mouse events, so we ignore the error
 
     terminal.on_key_event({
         let counter_cloned = counter.clone();
@@ -60,7 +54,7 @@ fn main() -> io::Result<()> {
                 *counter += 1;
             }
         }
-    });
+    }).ok(); // Ignore errors for consistency
 
     terminal.draw_web(move |f| {
         let counter = counter.borrow();

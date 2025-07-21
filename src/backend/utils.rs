@@ -16,6 +16,9 @@ use web_sys::{
 };
 
 /// A handler for mouse events.
+///
+/// This wrapper allows structs containing mouse event callbacks to derive Debug
+/// by providing a Debug implementation that doesn't expose the closure internals.
 pub(super) struct MouseEventHandler {
     callback: Box<dyn FnMut(MouseEvent) + 'static>,
 }

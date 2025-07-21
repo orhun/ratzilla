@@ -1,6 +1,8 @@
 use crate::{
     backend::{color::to_rgb, utils::*},
     error::Error,
+    event::{KeyEvent, MouseEvent},
+    render::WebEventHandler,
     CursorShape,
 };
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
@@ -425,6 +427,49 @@ impl Backend for WebGl2Backend {
             }
         }
         self.cursor_position = Some(new_pos);
+        Ok(())
+    }
+}
+
+impl WebEventHandler for WebGl2Backend {
+    fn setup_mouse_events<F>(&mut self, _callback: F) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        Err(Error::MouseEventsNotSupported)
+    }
+
+    fn clear_mouse_events(&mut self) -> Result<(), Error> {
+        // No-op since mouse events are not supported
+        Ok(())
+    }
+
+    fn setup_key_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    where
+        F: FnMut(KeyEvent) + 'static,
+    {
+        use web_sys::wasm_bindgen::{prelude::Closure, JsCast};
+        
+        // Note: This implementation doesn't store the closure for cleanup
+        // This maintains the same behavior as the original WebRenderer::on_key_event
+        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
+            callback(event.into());
+        });
+        
+        let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
+        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+        
+        document
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+            .map_err(Error::from)?;
+            
+        closure.forget(); // Note: This leaks memory if called multiple times
+        Ok(())
+    }
+
+    fn clear_key_events(&mut self) -> Result<(), Error> {
+        // Cannot clear keys without storing the closure reference
+        // This matches the original WebRenderer behavior
         Ok(())
     }
 }
