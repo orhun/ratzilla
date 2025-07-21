@@ -3,11 +3,7 @@ use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
-use compact_str::{format_compact, CompactString};
-use ratatui::{
-    buffer::Cell,
-    style::{Color, Modifier},
-};
+use ratatui::{buffer::Cell, style::Modifier};
 use web_sys::{
     wasm_bindgen::{JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
@@ -85,13 +81,6 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     }
 
     format!("{fg_style} {bg_style} {modifier_style}")
-}
-
-/// Converts a Color to a CSS style.
-pub(crate) fn get_canvas_color(color: Color) -> CompactString {
-    let color = ansi_to_rgb(color).unwrap();
-
-    format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
 }
 
 /// Calculates the number of pixels that can fit in the window.

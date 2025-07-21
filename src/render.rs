@@ -4,6 +4,8 @@ use web_sys::{wasm_bindgen::prelude::*, window, Element};
 
 use crate::event::{KeyEvent, MouseEvent};
 
+/// Trait for providing backend-specific shared functionality
+/// for each backend
 pub trait WebBackend {
     /// This is the element that event listeners will be added
     /// to to capture mouse and keyboard events

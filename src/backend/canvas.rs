@@ -7,10 +7,7 @@ use std::{
 };
 
 use crate::{
-    backend::{
-        color::{actual_bg_color, actual_fg_color},
-        utils::*,
-    },
+    backend::color::{actual_bg_color, actual_fg_color, to_rgb},
     error::Error,
     render::WebBackend,
     CursorShape,
@@ -159,6 +156,8 @@ mod js {
 
     fn restore() {
         r#"
+            this.bold = false;
+            this.italic = false;
             this.ctx.restore();
         "#
     }
@@ -177,19 +176,69 @@ mod js {
 
     fn bold() {
         r#"
-            this.ctx.font = "bold " + this.ctx.font;
+            this.bold = true;
+            this.init_font();
         "#
     }
 
     fn italic() {
         r#"
-            this.ctx.font = "italic " + this.ctx.font;
+            this.italic = true;
+            this.init_font();
+        "#
+    }
+
+    fn bolditalic() {
+        r#"
+            this.bold = true;
+            this.italic = true;
+            this.init_font();
+        "#
+    }
+
+    fn unbold() {
+        r#"
+            this.bold = false;
+            this.init_font();
+        "#
+    }
+
+    fn unitalic() {
+        r#"
+            this.italic = false;
+            this.init_font();
+        "#
+    }
+
+    fn unbolditalic() {
+        r#"
+            this.bold = false;
+            this.italic = false;
+            this.init_font();
+        "#
+    }
+
+    fn reset_font() {
+        r#"
+            this.init_font();
         "#
     }
 
     fn rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
             this.ctx.rect($x$, $y$, $w$, $h$);
+        "#
+    }
+
+    fn fill() {
+        r#"
+            this.ctx.fill();
+        "#
+    }
+
+    fn stroke() {
+        r#"
+            this.ctx.stroke();
         "#
     }
 
@@ -217,9 +266,21 @@ mod js {
         "#
     }
 
+    fn set_fill_style(style: u32) {
+        r#"
+            this.ctx.fillStyle = `#\${$style$.toString(16).padStart(6, '0')}`;
+        "#
+    }
+
     fn set_stroke_style_str(style: &str) {
         r#"
             this.ctx.strokeStyle = $style$;
+        "#
+    }
+
+    fn set_stroke_style(style: u32) {
+        r#"
+            this.ctx.strokeStyle = `#\${$style$.toString(16).padStart(6, '0')}`;
         "#
     }
 }
@@ -455,23 +516,27 @@ impl Backend for CanvasBackend {
             self.initialize()?;
         }
 
-        self.canvas.buffer.save();
-
         let draw_region = |(rect, color, canvas, cell_buffer): (
             Rect,
             Color,
             &mut Canvas,
             &mut Vec<(u16, u16, &Cell, Modifier)>,
         )| {
-            let color = get_canvas_color(color);
+            canvas.buffer.save();
+            let color = to_rgb(color, 0x000000);
 
-            canvas.buffer.set_fill_style_str(&color);
-            canvas.buffer.fill_rect(
+            canvas.buffer.set_fill_style(color);
+            // canvas.buffer.set_stroke_style(0xFF0000);
+            canvas.buffer.begin_path();
+            canvas.buffer.rect(
                 rect.x * canvas.cell_width,
                 rect.y * canvas.cell_height,
                 rect.width * canvas.cell_width,
                 rect.height * canvas.cell_height,
             );
+            canvas.buffer.clip();
+            canvas.buffer.fill();
+            // canvas.buffer.stroke();
 
             // Draws the text symbols on the canvas.
             //
@@ -485,17 +550,13 @@ impl Backend for CanvasBackend {
             //
             // 1. Only processes cells that have changed since the last render.
             // 2. Tracks the last foreground color used to avoid unnecessary style changes
-            // 3. Only creates clipping paths for potentially problematic glyphs (non-ASCII)
-            // or when `always_clip_cells` is enabled
+            // 3. Only creates cell-level clipping paths when `always_clip_cells` is enabled
             let mut last_color = None;
-            canvas.buffer.save();
+            let mut last_modifier = Modifier::empty();
             for (x, y, cell, modifiers) in cell_buffer.drain(..) {
                 let color = actual_fg_color(cell, modifiers, Color::White, canvas.background_color);
 
-                // We need to reset the canvas context state in two scenarios:
-                // 1. When we need to create a clipping path (for potentially problematic glyphs)
-                // 2. When the text color changes
-                if self.always_clip_cells || !cell.symbol().is_ascii() {
+                if self.always_clip_cells {
                     canvas.buffer.restore();
                     canvas.buffer.save();
 
@@ -508,23 +569,19 @@ impl Backend for CanvasBackend {
                     );
                     canvas.buffer.clip();
 
-                    last_color = None; // reset last color to avoid clipping
-                    let color = get_canvas_color(color);
-                    canvas.buffer.set_fill_style_str(&color);
-                } else if last_color != Some(color) {
-                    canvas.buffer.restore();
-                    canvas.buffer.save();
+                    last_color = None;
+                    last_modifier = Modifier::empty();
+                }
 
+                if last_color != Some(color) {
                     last_color = Some(color);
 
-                    let color = get_canvas_color(color);
-                    canvas.buffer.set_fill_style_str(&color);
+                    let color = to_rgb(color, 0xFFFFFF);
+                    canvas.buffer.set_fill_style(color);
                 }
 
                 for modifier in modifiers {
                     match modifier {
-                        Modifier::BOLD => canvas.buffer.bold(),
-                        Modifier::ITALIC => canvas.buffer.italic(),
                         Modifier::UNDERLINED => {
                             canvas.buffer.fill_rect(
                                 x * canvas.cell_width,
@@ -534,23 +591,46 @@ impl Backend for CanvasBackend {
                             );
                         }
                         Modifier::CROSSED_OUT => {
-                            canvas.buffer.fill_text(
-                                "─",
+                            canvas.buffer.fill_rect(
                                 x * canvas.cell_width,
-                                y * canvas.cell_height + canvas.cell_height - canvas.cell_baseline,
+                                y * canvas.cell_height + canvas.cell_height / 2,
+                                canvas.cell_width,
+                                1,
                             );
                         }
                         _ => {}
                     }
                 }
 
-                // Very useful symbol positioning formulas from here
-                // https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/Surface.zig#L1589C5-L1589C10
-                canvas.buffer.fill_text(
-                    cell.symbol(),
-                    x * canvas.cell_width,
-                    y * canvas.cell_height + canvas.cell_height - canvas.cell_baseline,
-                );
+                let removed_modifiers = last_modifier - modifiers;
+
+                match removed_modifiers & (Modifier::BOLD | Modifier::ITALIC) {
+                    Modifier::BOLD => canvas.buffer.unbold(),
+                    Modifier::ITALIC => canvas.buffer.unitalic(),
+                    modifier if modifier.is_empty() => {}
+                    _ => canvas.buffer.unbolditalic(),
+                }
+
+                let added_modifiers = modifiers - last_modifier;
+
+                match added_modifiers & (Modifier::BOLD | Modifier::ITALIC) {
+                    Modifier::BOLD => canvas.buffer.bold(),
+                    Modifier::ITALIC => canvas.buffer.italic(),
+                    modifier if modifier.is_empty() => {}
+                    _ => canvas.buffer.bolditalic(),
+                }
+
+                last_modifier = modifiers;
+
+                if cell.symbol() != " " {
+                    // Very useful symbol positioning formulas from here
+                    // https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/Surface.zig#L1589C5-L1589C10
+                    canvas.buffer.fill_text(
+                        cell.symbol(),
+                        x * canvas.cell_width,
+                        y * canvas.cell_height + canvas.cell_height - canvas.cell_baseline,
+                    );
+                }
             }
             canvas.buffer.restore();
         };
@@ -605,8 +685,6 @@ impl Backend for CanvasBackend {
         row_renderer
             .flush()
             .map(|(rect, color)| draw_region((rect, color, &mut self.canvas, &mut cell_buffer)));
-
-        self.canvas.buffer.restore();
 
         Ok(())
     }

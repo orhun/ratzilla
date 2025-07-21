@@ -1,5 +1,8 @@
 export class RatzillaCanvas {
-    constructor() {}
+    constructor() {
+        this.bold = false;
+        this.italic = false;
+    }
 
     create_canvas_in_element(parent, font_str) {
         this.parent = document.getElementById(parent);
@@ -32,7 +35,11 @@ export class RatzillaCanvas {
             alpha: true,
             desynchronized: true
         });
-        this.ctx.font = this.font_str;
+        this.init_font();
+    }
+
+    init_font() {
+        this.ctx.font = `${this.bold ? 'bold' : ''} ${this.italic ? 'italic' : ''} ${this.font_str}`;
     }
 
     get_canvas() {
