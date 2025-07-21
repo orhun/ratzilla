@@ -27,7 +27,6 @@ web-sys = { version = "0.3.77", features = [
     'Node',
     'Performance',
     'Screen',
-    'TextMetrics',
     'WebGl2RenderingContext',
     'WebGlBuffer',
     'WebGlProgram',

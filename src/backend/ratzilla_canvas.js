@@ -1,7 +1,5 @@
 export class RatzillaCanvas {
-    constructor() {
-        this.logging = true;
-    }
+    constructor() {}
 
     create_canvas_in_element(parent, font_str) {
         this.parent = document.getElementById(parent);
@@ -14,12 +12,19 @@ export class RatzillaCanvas {
         this.init_ctx();
     }
 
-    measure_text(text) {
-        let metrics = this.ctx.measureText(text);
-        this.cellWidth = Math.floor(metrics.width);
-        this.cellHeight = Math.floor(Math.abs(metrics.fontBoundingBoxAscent) + Math.abs(metrics.fontBoundingBoxDescent));
-        this.cellAscent = Math.floor(metrics.fontBoundingBoxAscent);
-        return new Float64Array([this.cellWidth, this.cellHeight, this.cellAscent]);
+    // Very useful code from here https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/font/face/web_canvas.zig#L242
+    measure_text() {
+        // A character with max width, max height, and max bottom
+        let metrics = this.ctx.measureText("█");
+        if (metrics.actualBoundingBoxRight > 0) {
+            this.cellWidth = Math.floor(metrics.actualBoundingBoxRight);
+        } else {
+            this.cellWidth = Math.floor(metrics.width);
+        }
+        this.cellHeight = Math.floor(metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent);
+        this.cellBaseline = Math.floor(metrics.actualBoundingBoxDescent);
+        this.underlinePos = Math.floor(this.cellHeight - 1.0);
+        return new Float64Array([this.cellWidth, this.cellHeight, this.cellBaseline, this.underlinePos]);
     }
 
     init_ctx() {
@@ -28,7 +33,6 @@ export class RatzillaCanvas {
             desynchronized: true
         });
         this.ctx.font = this.font_str;
-        this.ctx.textBaseline = "top";
     }
 
     get_canvas() {
@@ -36,8 +40,8 @@ export class RatzillaCanvas {
     }
 
     reinit_canvas() {
-        let sourceW = Math.floor(this.parent.clientWidth / this.cellWidth);
-        let sourceH = Math.floor(this.parent.clientHeight / this.cellHeight);
+        let sourceW = Math.ceil(this.parent.clientWidth / this.cellWidth);
+        let sourceH = Math.ceil(this.parent.clientHeight / this.cellHeight);
 
         let canvasW = sourceW * this.cellWidth;
         let canvasH = sourceH * this.cellHeight;

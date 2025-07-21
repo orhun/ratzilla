@@ -33,7 +33,7 @@ use web_sys::{
 };
 
 /// Options for the [`CanvasBackend`].
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CanvasBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -42,8 +42,27 @@ pub struct CanvasBackendOptions {
     /// this option may cause some performance issues when dealing with large
     /// numbers of simultaneous changes.
     always_clip_cells: bool,
+    /// Modifiers which may be used in rendering. Allows for the disabling
+    /// of things like italics, which my not be available in some fonts
+    /// like Fira Code
+    enabled_modifiers: Modifier,
     /// An optional string which sets a custom font for the canvas
     font_str: Option<String>,
+}
+
+impl Default for CanvasBackendOptions {
+    fn default() -> Self {
+        Self {
+            grid_id: None,
+            always_clip_cells: false,
+            enabled_modifiers: Modifier::BOLD
+                | Modifier::ITALIC
+                | Modifier::UNDERLINED
+                | Modifier::REVERSED
+                | Modifier::CROSSED_OUT,
+            font_str: None,
+        }
+    }
 }
 
 impl CanvasBackendOptions {
@@ -61,6 +80,21 @@ impl CanvasBackendOptions {
     /// Sets the font that the canvas will use
     pub fn font(mut self, font: String) -> Self {
         self.font_str = Some(font);
+        self
+    }
+
+    /// Enable modifiers for rendering, all modifiers that are supported
+    /// are enabled by default
+    pub fn enable_modifiers(mut self, modifiers: Modifier) -> Self {
+        self.enabled_modifiers |= modifiers;
+        self
+    }
+
+    /// Disable modifiers in rendering, allows for things like
+    /// italics to be disabled if your chosen font doesn't support
+    /// them
+    pub fn disable_modifiers(mut self, modifiers: Modifier) -> Self {
+        self.enabled_modifiers ^= modifiers;
         self
     }
 }
@@ -81,8 +115,8 @@ extern "C" {
     fn create_canvas_in_element(this: &RatzillaCanvas, parent: &str, font_str: &str);
 
     #[wasm_bindgen(method)]
-    /// Returns the cell width, cell height, and cell ascent in that order
-    fn measure_text(this: &RatzillaCanvas, text: &str) -> Float64Array;
+    /// Returns the cell width, cell height, and cell baseline in that order
+    fn measure_text(this: &RatzillaCanvas) -> Float64Array;
 
     #[wasm_bindgen(method)]
     fn get_canvas(this: &RatzillaCanvas) -> web_sys::HtmlCanvasElement;
@@ -141,6 +175,24 @@ mod js {
         "#
     }
 
+    fn bold() {
+        r#"
+            this.ctx.font = "bold " + this.ctx.font;
+        "#
+    }
+
+    fn italic() {
+        r#"
+            this.ctx.font = "italic " + this.ctx.font;
+        "#
+    }
+
+    fn reset_font() {
+        r#"
+            this.ctx.font = this.font_str;
+        "#
+    }
+
     fn rect(x: u16, y: u16, w: u16, h: u16) {
         r#"
             this.ctx.rect($x$, $y$, $w$, $h$);
@@ -184,6 +236,10 @@ struct Canvas {
     buffer: Buffer,
     /// Whether the canvas has been initialized.
     initialized: Rc<AtomicBool>,
+    /// Modifiers which may be used in rendering. Allows for the disabling
+    /// of things like italics, which my not be available in some fonts
+    /// like Fira Code
+    enabled_modifiers: Modifier,
     /// The inner HTML canvas element
     ///
     /// Use **only** for implementing `WebBackend`
@@ -200,8 +256,10 @@ struct Canvas {
     /// This will be used for multiplying the cell's y position to get the actual pixel
     /// position on the canvas.
     cell_height: f64,
-    /// The font ascent of the `|` character as measured by the canvas
-    cell_ascent: f64,
+    /// The font descent as measured by the canvas
+    cell_baseline: f64,
+    /// The font descent as measured by the canvas
+    underline_pos: f64,
 }
 
 impl Canvas {
@@ -210,6 +268,7 @@ impl Canvas {
         parent_element: &str,
         background_color: Color,
         font_str: Option<String>,
+        enabled_modifiers: Modifier,
     ) -> Result<Self, Error> {
         let initialized: Rc<AtomicBool> = Rc::new(false.into());
         let closure = Closure::<dyn FnMut(_)>::new({
@@ -233,16 +292,19 @@ impl Canvas {
             inner: buffer.ratzilla_canvas().get_canvas(),
             buffer,
             initialized,
+            enabled_modifiers,
             background_color,
             cell_width: 0.0,
             cell_height: 0.0,
-            cell_ascent: 0.0,
+            cell_baseline: 0.0,
+            underline_pos: 0.0,
         };
 
-        let font_measurement = canvas.buffer.ratzilla_canvas().measure_text("█");
+        let font_measurement = canvas.buffer.ratzilla_canvas().measure_text();
         canvas.cell_width = font_measurement.get_index(0);
         canvas.cell_height = font_measurement.get_index(1);
-        canvas.cell_ascent = font_measurement.get_index(2);
+        canvas.cell_baseline = font_measurement.get_index(2);
+        canvas.underline_pos = font_measurement.get_index(3);
 
         Ok(canvas)
     }
@@ -280,7 +342,12 @@ impl CanvasBackend {
         // Parent element of canvas (uses <body> unless specified)
         let parent = options.grid_id.as_deref().unwrap_or_default();
 
-        let canvas = Canvas::new(parent, Color::Black, options.font_str.take())?;
+        let canvas = Canvas::new(
+            parent,
+            Color::Black,
+            options.font_str.take(),
+            options.enabled_modifiers,
+        )?;
         Ok(Self {
             always_clip_cells: options.always_clip_cells,
             canvas,
@@ -440,25 +507,40 @@ impl Backend for CanvasBackend {
                     canvas.buffer.set_fill_style_str(&color);
                 }
 
+                for modifier in cell.modifier & canvas.enabled_modifiers {
+                    match modifier {
+                        Modifier::BOLD => canvas.buffer.bold(),
+                        Modifier::ITALIC => canvas.buffer.italic(),
+                        Modifier::UNDERLINED => {
+                            canvas.buffer.fill_rect(
+                                (x as f64 * canvas.cell_width) as _,
+                                (y as f64 * canvas.cell_height + canvas.underline_pos) as _,
+                                canvas.cell_width as _,
+                                1,
+                            );
+                        }
+                        Modifier::CROSSED_OUT => {
+                            canvas.buffer.fill_text(
+                                "─",
+                                (x as f64 * canvas.cell_width) as _,
+                                (y as f64 * canvas.cell_height + canvas.cell_height
+                                    - canvas.cell_baseline) as _,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Very useful symbol positioning formulas from here
+                // https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/Surface.zig#L1589C5-L1589C10
                 canvas.buffer.fill_text(
                     cell.symbol(),
                     (x as f64 * canvas.cell_width) as _,
-                    (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
+                    (y as f64 * canvas.cell_height + canvas.cell_height - canvas.cell_baseline)
+                        as _,
                 );
-                if cell.modifier.contains(Modifier::UNDERLINED) {
-                    canvas.buffer.fill_text(
-                        "_",
-                        (x as f64 * canvas.cell_width) as _,
-                        (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
-                    );
-                }
-                if cell.modifier.contains(Modifier::CROSSED_OUT) {
-                    canvas.buffer.fill_text(
-                        "—",
-                        (x as f64 * canvas.cell_width) as _,
-                        (y as f64 * canvas.cell_height + canvas.cell_ascent) as _,
-                    );
-                }
+
+                canvas.buffer.reset_font();
             }
             canvas.buffer.restore();
         };

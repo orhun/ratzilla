@@ -12,7 +12,7 @@ use app::App;
 use clap::Parser;
 use ratzilla::backend::canvas::{CanvasBackend, CanvasBackendOptions};
 use ratzilla::event::KeyCode;
-use ratzilla::ratatui::style::Color;
+use ratzilla::ratatui::style::{Color, Modifier};
 use ratzilla::ratatui::Terminal;
 use ratzilla::WebRenderer;
 use wasm_bindgen::prelude::*;
@@ -41,7 +41,9 @@ pub fn main() {
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
     // let mut backend = CanvasBackend::new_with_size(1600, 900).unwrap();
     let mut backend = CanvasBackend::new_with_options(
-        CanvasBackendOptions::new().font(String::from("16px Fira Code")),
+        CanvasBackendOptions::new()
+            .font(String::from("16px Fira Code"))
+            .disable_modifiers(Modifier::ITALIC),
     )
     .unwrap();
     // backend.set_debug_mode(Some("red"));
