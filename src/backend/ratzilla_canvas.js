@@ -4,7 +4,7 @@ export class RatzillaCanvas {
         this.italic = false;
     }
 
-    create_canvas_in_element(parent, font_str) {
+    create_canvas_in_element(parent, font_str, backgroundColor) {
         this.parent = document.getElementById(parent);
         if (this.parent == null) {
             this.parent = document.body;
@@ -12,6 +12,7 @@ export class RatzillaCanvas {
         this.canvas = document.createElement("canvas");
         this.parent.appendChild(this.canvas);
         this.font_str = font_str;
+        this.backgroundColor = `#${backgroundColor.toString(16).padStart(6, '0')}`;
         this.init_ctx();
     }
 
@@ -32,10 +33,11 @@ export class RatzillaCanvas {
 
     init_ctx() {
         this.ctx = this.canvas.getContext("2d", {
-            alpha: true,
             desynchronized: true
         });
         this.init_font();
+        this.ctx.fillStyle = this.backgroundColor;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
     init_font() {
@@ -55,9 +57,7 @@ export class RatzillaCanvas {
 
         if (this.canvas.width != canvasW || this.canvas.height != canvasH) {
             let dummyCanvas = new OffscreenCanvas(this.canvas.width, this.canvas.height);
-            let dummyCtx = dummyCanvas.getContext('2d', {
-                alpha: true
-            });
+            let dummyCtx = dummyCanvas.getContext('2d', {});
 
             dummyCtx.drawImage(this.canvas, 0, 0);
 

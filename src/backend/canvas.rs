@@ -110,7 +110,12 @@ extern "C" {
     ///
     /// `sledgehammer_bindgen` only lets you have an empty constructor,
     /// so we must initialize the class after construction
-    fn create_canvas_in_element(this: &RatzillaCanvas, parent: &str, font_str: &str);
+    fn create_canvas_in_element(
+        this: &RatzillaCanvas,
+        parent: &str,
+        font_str: &str,
+        background_color: u32,
+    );
 
     #[wasm_bindgen(method)]
     /// Returns the cell width, cell height, and cell baseline in that order
@@ -143,7 +148,8 @@ mod js {
 
     fn clear_rect() {
         r#"
-            this.ctx.clearRect(
+            this.ctx.fillStyle = this.backgroundColor;
+            this.ctx.fillRect(
                 0, 0, this.canvas.width, this.canvas.height
             );
         "#
@@ -316,6 +322,15 @@ struct Canvas {
     cell_baseline: u16,
     /// The font descent as measured by the canvas
     underline_pos: u16,
+    /// Whether an actual change has been committed to the canvas
+    /// aside from the background
+    begun_drawing: bool,
+    /// The fill style that the canvas should be set to, given drawing
+    /// has begun
+    fill_style: Color,
+    /// The font modifiers that the canvas should be set to, given drawing
+    /// has begun
+    modifier: Modifier,
 }
 
 impl Canvas {
@@ -342,6 +357,7 @@ impl Canvas {
         buffer.ratzilla_canvas().create_canvas_in_element(
             parent_element,
             font_str.as_deref().unwrap_or("16px monospace"),
+            to_rgb(background_color, 0x000000),
         );
 
         let mut canvas = Self {
@@ -354,6 +370,9 @@ impl Canvas {
             cell_height: 0,
             cell_baseline: 0,
             underline_pos: 0,
+            begun_drawing: false,
+            modifier: Modifier::empty(),
+            fill_style: Color::default(),
         };
 
         let font_measurement = canvas.buffer.ratzilla_canvas().measure_text();
@@ -398,6 +417,81 @@ impl Canvas {
                 }
                 _ => {}
             }
+        }
+    }
+
+    fn begin_drawing(&mut self) {
+        if !self.begun_drawing {
+            self.buffer.save();
+            self.buffer.clip();
+            self.begun_drawing = true;
+            let color = to_rgb(self.fill_style, 0xFFFFFF);
+            self.buffer.set_fill_style(color);
+            match self.modifier & (Modifier::BOLD | Modifier::ITALIC) {
+                Modifier::BOLD => self.buffer.bold(),
+                Modifier::ITALIC => self.buffer.italic(),
+                modifier if modifier.is_empty() => {}
+                _ => self.buffer.bolditalic(),
+            }
+        }
+    }
+
+    fn end_drawing(&mut self) {
+        if self.begun_drawing {
+            self.buffer.restore();
+            self.begun_drawing = false;
+            self.fill_style = Color::default();
+            self.modifier = Modifier::empty();
+        }
+    }
+
+    fn bold(&mut self) {
+        self.modifier |= Modifier::BOLD;
+        if self.begun_drawing {
+            self.buffer.bold();
+        }
+    }
+
+    fn italic(&mut self) {
+        self.modifier |= Modifier::ITALIC;
+        if self.begun_drawing {
+            self.buffer.italic();
+        }
+    }
+
+    fn bolditalic(&mut self) {
+        self.modifier |= Modifier::ITALIC | Modifier::BOLD;
+        if self.begun_drawing {
+            self.buffer.bolditalic();
+        }
+    }
+
+    fn unbold(&mut self) {
+        self.modifier &= !Modifier::BOLD;
+        if self.begun_drawing {
+            self.buffer.unbold();
+        }
+    }
+
+    fn unitalic(&mut self) {
+        self.modifier &= !Modifier::ITALIC;
+        if self.begun_drawing {
+            self.buffer.unitalic();
+        }
+    }
+
+    fn unbolditalic(&mut self) {
+        self.modifier &= !(Modifier::ITALIC | Modifier::BOLD);
+        if self.begun_drawing {
+            self.buffer.unbolditalic();
+        }
+    }
+
+    fn set_lazy_fill_style(&mut self, color: Color) {
+        self.fill_style = color;
+        if self.begun_drawing {
+            let color = to_rgb(self.fill_style, 0xFFFFFF);
+            self.buffer.set_fill_style(color);
         }
     }
 }
@@ -553,21 +647,20 @@ impl Backend for CanvasBackend {
             self.initialize()?;
         }
 
-        let draw_region = |(rect, color, canvas, cell_buffer): (
+        // self.canvas.buffer.clear_rect();
+
+        let draw_region = |(rect, bg_color, canvas, cell_buffer): (
             Rect,
             Color,
             &mut Canvas,
             &mut Vec<(u16, u16, &Cell, Modifier)>,
         )| {
-            canvas.buffer.save();
-            let color = to_rgb(color, 0x000000);
-
             let width: u16 = cell_buffer
                 .iter()
                 .map(|(_, _, c, _)| c.symbol().width() as u16)
                 .sum();
 
-            canvas.buffer.set_fill_style(color);
+            canvas.buffer.set_fill_style(to_rgb(bg_color, 0x000000));
             // canvas.buffer.set_stroke_style(0xFF0000);
             canvas.buffer.begin_path();
             canvas.buffer.rect(
@@ -576,7 +669,6 @@ impl Backend for CanvasBackend {
                 width * canvas.cell_width,
                 rect.height * canvas.cell_height,
             );
-            canvas.buffer.clip();
             canvas.buffer.fill();
             // canvas.buffer.stroke();
 
@@ -595,11 +687,13 @@ impl Backend for CanvasBackend {
             // 3. Only creates cell-level clipping paths when `always_clip_cells` is enabled
             let mut last_color = None;
             let mut last_modifier = Modifier::empty();
-            let mut underline_optimizer = RowOptimizer::new();
+            let mut underline_optimizer: RowOptimizer<Modifier> = RowOptimizer::new();
             for (x, y, cell, modifiers) in cell_buffer.drain(..) {
-                let color = actual_fg_color(cell, modifiers, Color::White, canvas.background_color);
+                let fg_color =
+                    actual_fg_color(cell, modifiers, Color::White, canvas.background_color);
 
                 if self.always_clip_cells {
+                    canvas.begin_drawing();
                     canvas.buffer.restore();
                     canvas.buffer.save();
 
@@ -617,46 +711,52 @@ impl Backend for CanvasBackend {
                     last_modifier = Modifier::empty();
                 }
 
-                if last_color != Some(color) {
-                    last_color = Some(color);
+                if last_color != Some(fg_color) {
+                    last_color = Some(fg_color);
 
                     if let Some((region, modifiers)) = underline_optimizer.flush() {
-                        canvas.draw_rect_modifiers(region, modifiers);
+                        if !modifiers.is_empty() {
+                            canvas.begin_drawing();
+                            canvas.draw_rect_modifiers(region, modifiers);
+                        }
                     }
-                    let color = to_rgb(color, 0xFFFFFF);
-                    canvas.buffer.set_fill_style(color);
+                    canvas.set_lazy_fill_style(fg_color);
                 }
 
                 if let Some((region, modifiers)) = underline_optimizer.process(
                     (x, y),
                     modifiers & (Modifier::UNDERLINED | Modifier::CROSSED_OUT),
                 ) {
-                    canvas.draw_rect_modifiers(region, modifiers);
+                    if !modifiers.is_empty() {
+                        canvas.begin_drawing();
+                        canvas.draw_rect_modifiers(region, modifiers);
+                    }
                 }
 
                 let removed_modifiers = last_modifier - modifiers;
 
                 match removed_modifiers & (Modifier::BOLD | Modifier::ITALIC) {
-                    Modifier::BOLD => canvas.buffer.unbold(),
-                    Modifier::ITALIC => canvas.buffer.unitalic(),
+                    Modifier::BOLD => canvas.unbold(),
+                    Modifier::ITALIC => canvas.unitalic(),
                     modifier if modifier.is_empty() => {}
-                    _ => canvas.buffer.unbolditalic(),
+                    _ => canvas.unbolditalic(),
                 }
 
                 let added_modifiers = modifiers - last_modifier;
 
                 match added_modifiers & (Modifier::BOLD | Modifier::ITALIC) {
-                    Modifier::BOLD => canvas.buffer.bold(),
-                    Modifier::ITALIC => canvas.buffer.italic(),
+                    Modifier::BOLD => canvas.bold(),
+                    Modifier::ITALIC => canvas.italic(),
                     modifier if modifier.is_empty() => {}
-                    _ => canvas.buffer.bolditalic(),
+                    _ => canvas.bolditalic(),
                 }
 
                 last_modifier = modifiers;
 
-                if cell.symbol() != " " {
+                if fg_color != bg_color && cell.symbol() != " " {
                     // Very useful symbol positioning formulas from here
                     // https://github.com/ghostty-org/ghostty/blob/a88689ca754a6eb7dce6015b85ccb1416b5363d8/src/Surface.zig#L1589C5-L1589C10
+                    canvas.begin_drawing();
                     canvas.buffer.fill_text(
                         cell.symbol(),
                         x * canvas.cell_width,
@@ -666,9 +766,12 @@ impl Backend for CanvasBackend {
             }
 
             if let Some((region, modifiers)) = underline_optimizer.flush() {
-                canvas.draw_rect_modifiers(region, modifiers);
+                if !modifiers.is_empty() {
+                    canvas.begin_drawing();
+                    canvas.draw_rect_modifiers(region, modifiers);
+                }
             }
-            canvas.buffer.restore();
+            canvas.end_drawing();
         };
 
         let mut bg_optimizer = RowOptimizer::new();
