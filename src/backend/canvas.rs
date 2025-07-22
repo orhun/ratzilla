@@ -464,6 +464,8 @@ pub struct CanvasBackend {
     canvas: Canvas,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Whether the cursor has been drawn to the screen yet
+    cursor_shown: bool,
     /// The cursor shape.
     cursor_shape: CursorShape,
     /// Draw cell boundaries with specified color.
@@ -492,6 +494,7 @@ impl CanvasBackend {
             canvas,
             buffer: Vec::new(),
             cursor_position: None,
+            cursor_shown: false,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
         })
@@ -798,13 +801,16 @@ impl Backend for CanvasBackend {
     fn hide_cursor(&mut self) -> IoResult<()> {
         // Redraw the cell under the cursor, but without
         // the cursor style
-        if let Some(pos) = self.cursor_position.take() {
-            let x = pos.x as usize;
-            let y = pos.y as usize;
-            if let Some(line) = self.buffer.get(y) {
-                if let Some(cell) = line.get(x).cloned() {
-                    self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+        if self.cursor_shown {
+            if let Some(pos) = self.cursor_position.take() {
+                let x = pos.x as usize;
+                let y = pos.y as usize;
+                if let Some(line) = self.buffer.get(y) {
+                    if let Some(cell) = line.get(x).cloned() {
+                        self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+                    }
                 }
+                self.cursor_shown = false;
             }
         }
         Ok(())
@@ -813,14 +819,17 @@ impl Backend for CanvasBackend {
     fn show_cursor(&mut self) -> IoResult<()> {
         // Redraw the new cell under the cursor, but with
         // the cursor style
-        if let Some(pos) = self.cursor_position {
-            let x = pos.x as usize;
-            let y = pos.y as usize;
-            if let Some(line) = self.buffer.get(y) {
-                if let Some(cell) = line.get(x).cloned() {
-                    self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+        if !self.cursor_shown {
+            if let Some(pos) = self.cursor_position {
+                let x = pos.x as usize;
+                let y = pos.y as usize;
+                if let Some(line) = self.buffer.get(y) {
+                    if let Some(cell) = line.get(x).cloned() {
+                        self.draw([(pos.x, pos.y, &cell)].into_iter())?;
+                    }
                 }
             }
+            self.cursor_shown = true;
         }
         Ok(())
     }
@@ -833,9 +842,12 @@ impl Backend for CanvasBackend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        self.hide_cursor()?;
-        self.cursor_position = Some(position.into());
-        self.show_cursor()?;
+        let position = position.into();
+        if Some(position) != self.cursor_position {
+            self.hide_cursor()?;
+            self.cursor_position = Some(position.into());
+            self.show_cursor()?;
+        }
         Ok(())
     }
 
