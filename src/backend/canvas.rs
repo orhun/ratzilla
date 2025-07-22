@@ -181,52 +181,10 @@ mod js {
         "#
     }
 
-    fn bold() {
+    fn font_modifiers(modifiers: u16) {
         r#"
-            this.bold = true;
-            this.init_font();
-        "#
-    }
-
-    fn italic() {
-        r#"
-            this.italic = true;
-            this.init_font();
-        "#
-    }
-
-    fn bolditalic() {
-        r#"
-            this.bold = true;
-            this.italic = true;
-            this.init_font();
-        "#
-    }
-
-    fn unbold() {
-        r#"
-            this.bold = false;
-            this.init_font();
-        "#
-    }
-
-    fn unitalic() {
-        r#"
-            this.italic = false;
-            this.init_font();
-        "#
-    }
-
-    fn unbolditalic() {
-        r#"
-            this.bold = false;
-            this.italic = false;
-            this.init_font();
-        "#
-    }
-
-    fn reset_font() {
-        r#"
+            this.bold = (modifiers & 0b0000_0000_0001) != 0;
+            this.italic = (modifiers & 0b0000_0000_0100) != 0;
             this.init_font();
         "#
     }
@@ -427,67 +385,62 @@ impl Canvas {
             self.begun_drawing = true;
             let color = to_rgb(self.fill_style, 0xFFFFFF);
             self.buffer.set_fill_style(color);
-            match self.modifier & (Modifier::BOLD | Modifier::ITALIC) {
-                Modifier::BOLD => self.buffer.bold(),
-                Modifier::ITALIC => self.buffer.italic(),
-                modifier if modifier.is_empty() => {}
-                _ => self.buffer.bolditalic(),
-            }
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn end_drawing(&mut self) {
+        self.fill_style = Color::default();
+        self.modifier = Modifier::empty();
         if self.begun_drawing {
             self.buffer.restore();
             self.begun_drawing = false;
-            self.fill_style = Color::default();
-            self.modifier = Modifier::empty();
         }
     }
 
     fn bold(&mut self) {
         self.modifier |= Modifier::BOLD;
         if self.begun_drawing {
-            self.buffer.bold();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn italic(&mut self) {
         self.modifier |= Modifier::ITALIC;
         if self.begun_drawing {
-            self.buffer.italic();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn bolditalic(&mut self) {
         self.modifier |= Modifier::ITALIC | Modifier::BOLD;
         if self.begun_drawing {
-            self.buffer.bolditalic();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn unbold(&mut self) {
         self.modifier &= !Modifier::BOLD;
         if self.begun_drawing {
-            self.buffer.unbold();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn unitalic(&mut self) {
         self.modifier &= !Modifier::ITALIC;
         if self.begun_drawing {
-            self.buffer.unitalic();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
     fn unbolditalic(&mut self) {
         self.modifier &= !(Modifier::ITALIC | Modifier::BOLD);
         if self.begun_drawing {
-            self.buffer.unbolditalic();
+            self.buffer.font_modifiers(self.modifier.bits());
         }
     }
 
-    fn set_lazy_fill_style(&mut self, color: Color) {
+    fn set_fill_style_lazy(&mut self, color: Color) {
         self.fill_style = color;
         if self.begun_drawing {
             let color = to_rgb(self.fill_style, 0xFFFFFF);
@@ -720,7 +673,7 @@ impl Backend for CanvasBackend {
                             canvas.draw_rect_modifiers(region, modifiers);
                         }
                     }
-                    canvas.set_lazy_fill_style(fg_color);
+                    canvas.set_fill_style_lazy(fg_color);
                 }
 
                 if let Some((region, modifiers)) = underline_optimizer.process(

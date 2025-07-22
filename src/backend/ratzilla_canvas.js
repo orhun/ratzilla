@@ -32,10 +32,12 @@ export class RatzillaCanvas {
     }
 
     init_ctx() {
+        const ratio = window.devicePixelRatio;
         this.ctx = this.canvas.getContext("2d", {
             desynchronized: true
         });
         this.init_font();
+        this.ctx.scale(ratio, ratio);
         this.ctx.fillStyle = this.backgroundColor;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
@@ -49,28 +51,19 @@ export class RatzillaCanvas {
     }
 
     reinit_canvas() {
+        const ratio = window.devicePixelRatio;
         let sourceW = Math.ceil(this.parent.clientWidth / this.cellWidth);
         let sourceH = Math.ceil(this.parent.clientHeight / this.cellHeight);
 
         let canvasW = sourceW * this.cellWidth;
         let canvasH = sourceH * this.cellHeight;
 
-        if (this.canvas.width != canvasW || this.canvas.height != canvasH) {
-            let dummyCanvas = new OffscreenCanvas(this.canvas.width, this.canvas.height);
-            let dummyCtx = dummyCanvas.getContext('2d', {});
-
-            dummyCtx.drawImage(this.canvas, 0, 0);
-
-            this.canvas.width = canvasW;
-            this.canvas.height = canvasH;
+        if (this.canvas.width != canvasW * ratio || this.canvas.height != canvasH * ratio) {
+            this.canvas.width = canvasW * ratio;
+            this.canvas.height = canvasH * ratio;
+            this.canvas.style.width = canvasW + "px";
+            this.canvas.style.height = canvasH + "px";
             this.init_ctx();
-
-            this.ctx.drawImage(dummyCanvas,
-                0, 0,
-                canvasW, canvasH,
-                0, 0,
-                canvasW, canvasH,
-            );
         }
         
         return new Uint16Array([sourceW, sourceH]);
