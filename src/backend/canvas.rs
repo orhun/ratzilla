@@ -810,8 +810,8 @@ impl Backend for CanvasBackend {
                         self.draw([(pos.x, pos.y, &cell)].into_iter())?;
                     }
                 }
-                self.cursor_shown = false;
             }
+            self.cursor_shown = false;
         }
         Ok(())
     }
