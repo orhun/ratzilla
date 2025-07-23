@@ -391,7 +391,7 @@ impl std::fmt::Debug for DomBackend {
 }
 
 impl WebEventHandler for DomBackend {
-    fn setup_mouse_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    fn setup_mouse_events<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(MouseEvent) + 'static,
     {
@@ -400,22 +400,14 @@ impl WebEventHandler for DomBackend {
 
         let grid_width = self.buffer[0].len() as u16;
         let grid_height = self.buffer.len() as u16;
-        let grid_element = self.grid.clone();
 
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            if let Some(element) = grid_element.dyn_ref::<web_sys::HtmlElement>() {
-                let mouse_event = mouse_to_grid_coords(
-                    &event,
-                    element,
-                    grid_width,
-                    grid_height,
-                    None, // No offset for DOM backend
-                );
-                callback(mouse_event);
-            }
-        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
-
-        self.mouse_closure = Some(register_mouse_event_handler(&self.grid, closure)?);
+        self.mouse_closure = Some(register_mouse_event_handler_with_wheel_normalization(
+            &self.grid,
+            grid_width,
+            grid_height,
+            None, // No offset for DOM backend
+            callback,
+        )?);
 
         Ok(())
     }

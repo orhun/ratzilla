@@ -9,6 +9,7 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
+use std::{cell::RefCell, rc::Rc};
 use web_sys::{
     wasm_bindgen::{closure::Closure, JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, HtmlElement, Window,
@@ -260,4 +261,98 @@ pub(super) fn unregister_mouse_event_handler(
             .remove_event_listener_with_callback(event, closure.as_ref().unchecked_ref())
             .map_err(Error::from)
     })
+}
+
+/// Registers a mouse event handler that normalizes wheel deltas to sensible terminal scroll amounts.
+pub(super) fn register_mouse_event_handler_with_wheel_normalization<F>(
+    element: &Element,
+    grid_width: u16,
+    grid_height: u16,
+    offset: Option<f64>,
+    callback: F,
+) -> Result<Closure<dyn FnMut(web_sys::MouseEvent)>, Error>
+where
+    F: FnMut(MouseEvent) + 'static,
+{
+    let callback = Rc::new(RefCell::new(callback));
+    let element_clone = element.clone();
+
+    let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+        if let Some(html_element) = element_clone.dyn_ref::<web_sys::HtmlElement>() {
+            let mut mouse_event =
+                mouse_to_grid_coords(&event, html_element, grid_width, grid_height, offset);
+
+            // Normalize wheel deltas if it's a wheel event
+            if let MouseEventKind::Wheel {
+                delta_x,
+                delta_y,
+                delta_z,
+            } = mouse_event.kind
+            {
+                if let Ok(wheel_event) = event.dyn_into::<web_sys::WheelEvent>() {
+                    let normalized_deltas = normalize_wheel_deltas(
+                        wheel_event.delta_mode(),
+                        delta_x as f64,
+                        delta_y as f64,
+                        delta_z as f64,
+                    );
+
+                    mouse_event.kind = MouseEventKind::Wheel {
+                        delta_x: normalized_deltas.0 as i16,
+                        delta_y: normalized_deltas.1 as i16,
+                        delta_z: normalized_deltas.2 as i16,
+                    };
+                }
+            }
+
+            callback.borrow_mut()(mouse_event);
+        }
+    }) as Box<dyn FnMut(web_sys::MouseEvent)>);
+
+    register_mouse_event_handler(element, closure)
+}
+
+/// Normalizes wheel deltas to sensible terminal scroll amounts (max 3 lines per tick).
+fn normalize_wheel_deltas(
+    delta_mode: u32,
+    delta_x: f64,
+    delta_y: f64,
+    delta_z: f64,
+) -> (f64, f64, f64) {
+    fn normalize_single_delta(delta: f64, delta_mode: u32) -> f64 {
+        if delta == 0.0 {
+            return 0.0;
+        }
+
+        let abs_delta = delta.abs();
+        let sign = delta.signum();
+
+        match delta_mode {
+            0 => {
+                // DOM_DELTA_PIXEL - convert to 1-3 lines based on magnitude
+                if abs_delta < 50.0 {
+                    sign * 1.0
+                } else if abs_delta < 150.0 {
+                    sign * 2.0
+                } else {
+                    sign * 3.0
+                }
+            }
+            1 => {
+                // DOM_DELTA_LINE - clamp to max 3 lines
+                (delta).clamp(-3.0, 3.0)
+            }
+            2 => {
+                // DOM_DELTA_PAGE - treat as 3 lines
+                sign * 3.0
+            }
+            _ => 0.0,
+        }
+    }
+
+    (
+        normalize_single_delta(delta_x, delta_mode),
+        normalize_single_delta(delta_y, delta_mode),
+        normalize_single_delta(delta_z, delta_mode),
+    )
 }

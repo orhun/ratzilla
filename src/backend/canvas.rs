@@ -551,7 +551,7 @@ impl Backend for CanvasBackend {
 }
 
 impl WebEventHandler for CanvasBackend {
-    fn setup_mouse_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    fn setup_mouse_events<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(MouseEvent) + 'static,
     {
@@ -560,22 +560,14 @@ impl WebEventHandler for CanvasBackend {
 
         let grid_width = self.buffer[0].len() as u16;
         let grid_height = self.buffer.len() as u16;
-        let canvas_element = self.canvas.inner.clone();
 
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            if let Some(canvas_element) = canvas_element.dyn_ref::<web_sys::HtmlElement>() {
-                let mouse_event = mouse_to_grid_coords(
-                    &event,
-                    canvas_element,
-                    grid_width,
-                    grid_height,
-                    Some(5.0), // Canvas translation offset
-                );
-                callback(mouse_event);
-            }
-        }) as Box<dyn FnMut(web_sys::MouseEvent)>);
-
-        self.mouse_closure = Some(register_mouse_event_handler(&self.canvas.inner, closure)?);
+        self.mouse_closure = Some(register_mouse_event_handler_with_wheel_normalization(
+            &self.canvas.inner,
+            grid_width,
+            grid_height,
+            Some(5.0), // Canvas translation offset
+            callback,
+        )?);
         Ok(())
     }
 
