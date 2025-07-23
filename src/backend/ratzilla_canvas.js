@@ -29,7 +29,7 @@ export class RatzillaCanvas {
                 this.inputElement.focus();
             }
 
-            if (this.inputElement.value.length === 0 && !event.isComposing) {
+            if (!(this.inputElement.value.length === 0) && !event.isComposing) {
                 this.inputElement.value = ""
             }
         });
