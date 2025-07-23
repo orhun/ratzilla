@@ -248,6 +248,27 @@ mod js {
             this.ctx.strokeStyle = `#\${$style$.toString(16).padStart(6, '0')}`;
         "#
     }
+
+    fn set_cursor_pos(x: u16, y: u16) {
+        r#"
+            this.inputElement.style.left = ($x$) * this.cellWidth;
+            this.inputElement.style.top = ($y$) * this.cellHeight;
+        "#
+    }
+
+    fn show_cursor() {
+        r#"
+            this.cursorShown = true;
+            this.inputElement.focus();
+        "#
+    }
+
+    fn hide_cursor() {
+        r#"
+            this.cursorShown = false;
+            this.inputElement.blur();
+        "#
+    }
 }
 
 /// Canvas renderer.
@@ -809,6 +830,7 @@ impl Backend for CanvasBackend {
                     }
                 }
             }
+            self.canvas.buffer.hide_cursor();
             self.cursor_shown = false;
         }
         Ok(())
@@ -827,6 +849,7 @@ impl Backend for CanvasBackend {
                     }
                 }
             }
+            self.canvas.buffer.show_cursor();
             self.cursor_shown = true;
         }
         Ok(())
@@ -844,6 +867,7 @@ impl Backend for CanvasBackend {
         if Some(position) != self.cursor_position {
             self.hide_cursor()?;
             self.cursor_position = Some(position.into());
+            self.canvas.buffer.set_cursor_pos(position.x, position.y);
             self.show_cursor()?;
         }
         Ok(())

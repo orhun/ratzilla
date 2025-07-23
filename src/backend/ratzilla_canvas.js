@@ -2,6 +2,7 @@ export class RatzillaCanvas {
     constructor() {
         this.bold = false;
         this.italic = false;
+        this.cursorShown = false;
     }
 
     create_canvas_in_element(parent, font_str, backgroundColor) {
@@ -9,9 +10,10 @@ export class RatzillaCanvas {
         if (this.parent == null) {
             this.parent = document.body;
         }
+        this.parentDiv = document.createElement("div");
+        this.parentDiv.style.position = "relative";
         // Uses input hack from https://github.com/emilk/egui/blob/fdcaff8465eac8db8cc1ebbcbb9b97e0791a8363/crates/eframe/src/web/text_agent.rs#L18
         this.inputElement = document.createElement("input");
-        this.inputElement.autofocus = true;
         this.inputElement.type = "text";
         this.inputElement.autocapitalize = "off";
         this.inputElement.style.backgroundColor = "transparent";
@@ -20,7 +22,7 @@ export class RatzillaCanvas {
         this.inputElement.style.width = "1px";
         this.inputElement.style.height = "1px";
         this.inputElement.style.caretColor = "transparent";
-        this.inputElement.style.position= "absolute";
+        this.inputElement.style.position = "absolute";
         this.inputElement.style.top = "0";
         this.inputElement.style.left = "0";
         this.inputElement.addEventListener("input", (event) => {
@@ -36,11 +38,17 @@ export class RatzillaCanvas {
         this.canvas = document.createElement("canvas");
         this.canvas.tabIndex = 0;
         this.canvas.style.outline = "none";
+        this.canvas.style.position = "absolute";
+        this.canvas.style.top = "0";
+        this.canvas.style.left = "0";
         this.canvas.addEventListener("focus", () => {
-            this.inputElement.focus();
+            if (this.cursorShown) {
+                this.inputElement.focus();
+            }
         });
-        this.parent.appendChild(this.inputElement);
-        this.parent.appendChild(this.canvas);
+        this.parentDiv.appendChild(this.canvas);
+        this.parentDiv.appendChild(this.inputElement);
+        this.parent.appendChild(this.parentDiv);
         this.font_str = font_str;
         this.backgroundColor = `#${backgroundColor.toString(16).padStart(6, '0')}`;
         this.init_ctx();
@@ -93,6 +101,8 @@ export class RatzillaCanvas {
             this.canvas.height = canvasH * ratio;
             this.canvas.style.width = canvasW + "px";
             this.canvas.style.height = canvasH + "px";
+            this.parentDiv.style.width = canvasW + "px";
+            this.parentDiv.style.height = canvasH + "px";
             this.init_ctx();
         }
         
