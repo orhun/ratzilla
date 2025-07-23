@@ -2,7 +2,10 @@ use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, rc::Rc};
 use web_sys::{wasm_bindgen::prelude::*, window};
 
-use crate::{error::Error, event::{KeyEvent, MouseEvent}};
+use crate::{
+    error::Error,
+    event::{KeyEvent, MouseEvent},
+};
 
 /// Trait for rendering on the web.
 ///

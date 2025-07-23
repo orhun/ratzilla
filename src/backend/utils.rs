@@ -11,7 +11,7 @@ use ratatui::{
 };
 use std::fmt::Debug;
 use web_sys::{
-    wasm_bindgen::{JsCast, JsValue},
+    wasm_bindgen::{closure::Closure, JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
 };
 
@@ -256,4 +256,37 @@ pub(super) fn measure_dom_cell_size(
     let height = if height > 0 { height } else { 19 };
 
     Ok((width, height))
+}
+
+/// Registers a mouse event handler for the specified element.
+pub(super) fn register_mouse_event_handler(
+    element: &Element,
+    closure: Closure<dyn FnMut(web_sys::MouseEvent)>,
+) -> Result<Closure<dyn FnMut(web_sys::MouseEvent)>, Error> {
+    let closure_ref = closure.as_ref();
+
+    ["mousemove", "mousedown", "mouseup"]
+        .iter()
+        .try_for_each(|event| {
+            element
+                .add_event_listener_with_callback(event, closure_ref.unchecked_ref())
+                .map_err(Error::from)
+        })?;
+
+    Ok(closure)
+}
+
+/// Unregisters a mouse event handler from the specified element.
+/// The closure is consumed as its lifecycle ends with deregistration.
+pub(super) fn unregister_mouse_event_handler(
+    element: &Element,
+    closure: Closure<dyn FnMut(web_sys::MouseEvent)>,
+) -> Result<(), Error> {
+    ["mousemove", "mousedown", "mouseup"]
+        .iter()
+        .try_for_each(|event| {
+            element
+                .remove_event_listener_with_callback(event, closure.as_ref().unchecked_ref())
+                .map_err(Error::from)
+        })
 }

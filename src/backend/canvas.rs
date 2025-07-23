@@ -67,7 +67,6 @@ impl CanvasBackendOptions {
         self.size = Some(size);
         self
     }
-
 }
 
 /// Canvas renderer.
@@ -111,7 +110,6 @@ impl Canvas {
             background_color,
         })
     }
-
 }
 
 /// Canvas backend.
@@ -559,36 +557,18 @@ impl WebEventHandler for CanvasBackend {
         self.clear_mouse_events()?;
 
         let cell_size_px = (CELL_WIDTH as u32, CELL_HEIGHT as u32);
-        
+
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
             callback(MouseEvent::new(event, cell_size_px));
         }) as Box<dyn FnMut(web_sys::MouseEvent)>);
 
-        self.canvas.inner
-            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-        self.canvas.inner
-            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-        self.canvas.inner
-            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-
-        self.mouse_closure = Some(closure);
+        self.mouse_closure = Some(register_mouse_event_handler(&self.canvas.inner, closure)?);
         Ok(())
     }
 
     fn clear_mouse_events(&mut self) -> Result<(), Error> {
         if let Some(closure) = self.mouse_closure.take() {
-            self.canvas.inner
-                .remove_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
-                .map_err(Error::from)?;
-            self.canvas.inner
-                .remove_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
-                .map_err(Error::from)?;
-            self.canvas.inner
-                .remove_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())
-                .map_err(Error::from)?;
+            unregister_mouse_event_handler(&self.canvas.inner, closure)?;
         }
         Ok(())
     }
@@ -603,14 +583,11 @@ impl WebEventHandler for CanvasBackend {
         let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
             callback(event.into());
         });
-        
-        let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
-        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-        
-        document
+
+        get_document()?
             .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
             .map_err(Error::from)?;
-            
+
         self.key_closure = Some(closure);
         Ok(())
     }
@@ -619,7 +596,7 @@ impl WebEventHandler for CanvasBackend {
         if let Some(closure) = self.key_closure.take() {
             let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
             let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-            
+
             document
                 .remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
                 .map_err(Error::from)?;
