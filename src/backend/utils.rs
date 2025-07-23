@@ -284,23 +284,20 @@ where
 
             // Normalize wheel deltas if it's a wheel event
             if let MouseEventKind::Wheel {
-                delta_x,
-                delta_y,
-                delta_z,
+                delta_col,
+                delta_row,
             } = mouse_event.kind
             {
                 if let Ok(wheel_event) = event.dyn_into::<web_sys::WheelEvent>() {
                     let normalized_deltas = normalize_wheel_deltas(
                         wheel_event.delta_mode(),
-                        delta_x as f64,
-                        delta_y as f64,
-                        delta_z as f64,
+                        delta_col as f64,
+                        delta_row as f64,
                     );
 
                     mouse_event.kind = MouseEventKind::Wheel {
-                        delta_x: normalized_deltas.0 as i16,
-                        delta_y: normalized_deltas.1 as i16,
-                        delta_z: normalized_deltas.2 as i16,
+                        delta_col: normalized_deltas.0 as i16,
+                        delta_row: normalized_deltas.1 as i16,
                     };
                 }
             }
@@ -313,12 +310,7 @@ where
 }
 
 /// Normalizes wheel deltas to sensible terminal scroll amounts (max 3 lines per tick).
-fn normalize_wheel_deltas(
-    delta_mode: u32,
-    delta_x: f64,
-    delta_y: f64,
-    delta_z: f64,
-) -> (f64, f64, f64) {
+fn normalize_wheel_deltas(delta_mode: u32, delta_col: f64, delta_row: f64) -> (f64, f64) {
     fn normalize_single_delta(delta: f64, delta_mode: u32) -> f64 {
         if delta == 0.0 {
             return 0.0;
@@ -351,8 +343,7 @@ fn normalize_wheel_deltas(
     }
 
     (
-        normalize_single_delta(delta_x, delta_mode),
-        normalize_single_delta(delta_y, delta_mode),
-        normalize_single_delta(delta_z, delta_mode),
+        normalize_single_delta(delta_col, delta_mode),
+        normalize_single_delta(delta_row, delta_mode),
     )
 }

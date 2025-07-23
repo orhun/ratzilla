@@ -161,12 +161,10 @@ pub enum MouseEventKind {
     DoubleClick(MouseButton),
     /// Mouse wheel scrolled
     Wheel {
-        /// Horizontal scroll delta
-        delta_x: i16,
-        /// Vertical scroll delta
-        delta_y: i16,
-        /// Z-axis scroll delta
-        delta_z: i16,
+        /// Horizontal scroll delta (columns)
+        delta_col: i16,
+        /// Vertical scroll delta (rows)
+        delta_row: i16,
     },
     /// Unidentified mouse event
     Unidentified,
@@ -280,15 +278,13 @@ impl From<&web_sys::MouseEvent> for MouseEventKind {
             "wheel" => {
                 if let Ok(wheel_event) = event.clone().dyn_into::<web_sys::WheelEvent>() {
                     MouseEventKind::Wheel {
-                        delta_x: wheel_event.delta_x() as i16,
-                        delta_y: wheel_event.delta_y() as i16,
-                        delta_z: wheel_event.delta_z() as i16,
+                        delta_col: wheel_event.delta_x() as i16,
+                        delta_row: wheel_event.delta_y() as i16,
                     }
                 } else {
                     MouseEventKind::Wheel {
-                        delta_x: 0,
-                        delta_y: 0,
-                        delta_z: 0,
+                        delta_col: 0,
+                        delta_row: 0,
                     }
                 }
             }
