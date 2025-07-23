@@ -90,22 +90,25 @@ export class RatzillaCanvas {
 
     reinit_canvas() {
         const ratio = window.devicePixelRatio;
-        let sourceW = Math.ceil(this.parent.clientWidth / this.cellWidth);
-        let sourceH = Math.ceil(this.parent.clientHeight / this.cellHeight);
 
-        let canvasW = sourceW * this.cellWidth;
-        let canvasH = sourceH * this.cellHeight;
+        if (ratio != 0) {
+            let sourceW = Math.ceil(this.parent.clientWidth / this.cellWidth);
+            let sourceH = Math.ceil(this.parent.clientHeight / this.cellHeight);
 
-        if (this.canvas.width != canvasW * ratio || this.canvas.height != canvasH * ratio) {
-            this.canvas.width = canvasW * ratio;
-            this.canvas.height = canvasH * ratio;
-            this.canvas.style.width = canvasW + "px";
-            this.canvas.style.height = canvasH + "px";
-            this.parentDiv.style.width = canvasW + "px";
-            this.parentDiv.style.height = canvasH + "px";
-            this.init_ctx();
-        }
+            let canvasW = sourceW * this.cellWidth;
+            let canvasH = sourceH * this.cellHeight;
+
+            if (this.canvas.width != canvasW * ratio || this.canvas.height != canvasH * ratio) {
+                this.canvas.width = canvasW * ratio;
+                this.canvas.height = canvasH * ratio;
+                this.canvas.style.width = canvasW + "px";
+                this.canvas.style.height = canvasH + "px";
+                this.parentDiv.style.width = canvasW + "px";
+                this.parentDiv.style.height = canvasH + "px";
+                this.init_ctx();
+            }
         
-        return new Uint16Array([sourceW, sourceH]);
+            return new Uint16Array([sourceW, sourceH]);
+        }
     }
 }
