@@ -251,8 +251,8 @@ mod js {
 
     fn set_cursor_pos(x: u16, y: u16) {
         r#"
-            this.inputElement.style.left = ($x$) * this.cellWidth;
-            this.inputElement.style.top = ($y$) * this.cellHeight;
+            this.inputElement.style.left = (x * this.cellWidth) + "px";
+            this.inputElement.style.top = (y * this.cellHeight) + "px";
         "#
     }
 
@@ -265,7 +265,14 @@ mod js {
     fn hide_cursor() {
         r#"
             this.cursorShown = false;
-            this.inputElement.blur();
+        "#
+    }
+
+    fn resolve_cursor() {
+        r#"
+            if (!this.cursorShown) {
+                this.inputElement.blur();
+            }
         "#
     }
 }
@@ -811,6 +818,7 @@ impl Backend for CanvasBackend {
             self.draw_debug()?;
         }
 
+        self.canvas.buffer.resolve_cursor();
         self.canvas.buffer.flush();
 
         Ok(())
@@ -863,10 +871,10 @@ impl Backend for CanvasBackend {
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
         let position = position.into();
+        self.canvas.buffer.set_cursor_pos(position.x, position.y);
         if Some(position) != self.cursor_position {
             self.hide_cursor()?;
             self.cursor_position = Some(position.into());
-            self.canvas.buffer.set_cursor_pos(position.x, position.y);
             self.show_cursor()?;
         }
         Ok(())
