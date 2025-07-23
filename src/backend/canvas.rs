@@ -259,7 +259,6 @@ mod js {
     fn show_cursor() {
         r#"
             this.cursorShown = true;
-            this.inputElement.focus();
         "#
     }
 
