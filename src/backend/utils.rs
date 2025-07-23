@@ -8,10 +8,8 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use web_sys::{
-    wasm_bindgen::{closure::Closure, JsCast, JsValue},
-    window, Document, Element, HtmlCanvasElement, Window,
-};
+use web_sys::{wasm_bindgen::{closure::Closure, JsCast, JsValue}, window, Document, Element, HtmlCanvasElement, HtmlElement, Window};
+use crate::event::{MouseEvent, MouseEventKind};
 
 /// Mouse events that are handled by the mouse event handlers.
 const MOUSE_EVENTS: &[&str] = &[
@@ -199,42 +197,37 @@ pub(crate) fn create_canvas_in_element(
     Ok(canvas)
 }
 
-/// Measures the actual pixel size of a DOM cell by creating a temporary test element.
-///
-/// This function creates a span with the same styling as terminal cells,
-/// measures its dimensions, and then removes it from the DOM.
-pub(super) fn measure_dom_cell_size(
-    document: &Document,
-    grid_parent: &Element,
-) -> Result<(u32, u32), Error> {
-    // Create a temporary test span with a single character
-    let test_span = document.create_element("span")?;
-    test_span.set_inner_html("W"); // Use a wide character for consistent measurement
-    test_span.set_attribute("style", "display: inline-block; visibility: hidden; position: absolute; white-space: pre; font-family: monospace;")?;
+/// Converts mouse coordinates to grid coordinates using element dimensions
+/// This is the core function both backends use for accurate coordinate calculation
+pub(super) fn mouse_to_grid_coords(
+    event: &web_sys::MouseEvent,
+    element: &HtmlElement,
+    grid_width: u16,
+    grid_height: u16,
+    offset: Option<f64>,
+) -> MouseEvent {
+    let rect = element.get_bounding_client_rect();
 
-    // Create a temporary container to ensure consistent measurement
-    let test_container = document.create_element("pre")?;
-    test_container.set_attribute(
-        "style",
-        "visibility: hidden; position: absolute; margin: 0; padding: 0; line-height: normal;",
-    )?;
-    test_container.append_child(&test_span)?;
+    // Calculate relative position within the element
+    let relative_x = (event.client_x() as f64 - rect.left() - offset.unwrap_or(0.0)).max(0.0);
+    let relative_y = (event.client_y() as f64 - rect.top() - offset.unwrap_or(0.0)).max(0.0);
 
-    // Add to DOM for measurement
-    grid_parent.append_child(&test_container)?;
+    // Map coordinates as fractions of element dimensions to grid coordinates
+    let col = ((relative_x / rect.width()) * grid_width as f64) as u16;
+    let row = ((relative_y / rect.height()) * grid_height as f64) as u16;
 
-    // Use client dimensions for measurement
-    let width = test_span.client_width() as u32;
-    let height = test_span.client_height() as u32;
+    // Clamp to grid bounds
+    let col = col.min(grid_width.saturating_sub(1));
+    let row = row.min(grid_height.saturating_sub(1));
 
-    // Clean up
-    grid_parent.remove_child(&test_container)?;
-
-    // Ensure we have reasonable dimensions (fallback to canvas constants if measurement fails)
-    let width = if width > 0 { width } else { 10 };
-    let height = if height > 0 { height } else { 19 };
-
-    Ok((width, height))
+    MouseEvent {
+        kind: MouseEventKind::from(event),
+        col,
+        row,
+        ctrl: event.ctrl_key(),
+        alt: event.alt_key(),
+        shift: event.shift_key(),
+    }
 }
 
 /// Registers a mouse event handler for the specified element.

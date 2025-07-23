@@ -160,17 +160,6 @@ impl DomBackend {
         Ok(())
     }
 
-    /// Measures and caches the actual cell size in pixels.
-    fn measure_cell_size(&mut self) -> Result<(u32, u32), Error> {
-        if let Some(cached_size) = self.cell_size_px {
-            return Ok(cached_size);
-        }
-
-        let cell_size = measure_dom_cell_size(&self.document, &self.grid_parent)?;
-        self.cell_size_px = Some(cell_size);
-        Ok(cell_size)
-    }
-
     /// Pre-render the content to the screen.
     ///
     /// This function is called from [`flush`] once to render the initial
@@ -409,20 +398,20 @@ impl WebEventHandler for DomBackend {
         // Clear existing mouse events first
         self.clear_mouse_events()?;
 
-        let cell_size_px = self.measure_cell_size()?;
-
+        let grid_width = self.buffer[0].len() as u16;
+        let grid_height = self.buffer.len() as u16;
+        let grid_element = self.grid.clone();
+        
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            // Get the grid element's bounding rectangle for proper coordinate calculation
-            if let Some(target) = event.current_target() {
-                if let Ok(element) = target.dyn_into::<web_sys::Element>() {
-                    let rect = element.get_bounding_client_rect();
-                    let grid_rect = (rect.left(), rect.top(), rect.width(), rect.height());
-                    callback(MouseEvent::new_relative(event, cell_size_px, grid_rect));
-                } else {
-                    debug_assert!(false, "target is no longer a valid element");
-                }
-            } else {
-                debug_assert!(false, "no current target for mouse event");
+            if let Some(element) = grid_element.dyn_ref::<web_sys::HtmlElement>() {
+                let mouse_event = mouse_to_grid_coords(
+                    &event,
+                    element,
+                    grid_width,
+                    grid_height,
+                    None, // No offset for DOM backend
+                );
+                callback(mouse_event);
             }
         }) as Box<dyn FnMut(web_sys::MouseEvent)>);
 

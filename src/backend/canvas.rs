@@ -8,7 +8,7 @@ use crate::{
         utils::*,
     },
     error::Error,
-    event::{KeyEvent, MouseEvent, MouseEventKind},
+    event::{KeyEvent, MouseEvent},
     render::WebEventHandler,
     CursorShape,
 };
@@ -112,81 +112,6 @@ impl Canvas {
     }
 }
 
-/// Cached state for mouse coordinate calculations
-#[derive(Debug, Clone)]
-struct MouseCoordinateCache {
-    /// Cached cell dimensions (width, height) in pixels
-    cell_size: (f64, f64),
-    /// Cached canvas bounding rectangle (left, top, width, height)
-    canvas_rect: (f64, f64, f64, f64),
-    /// Grid dimensions for calculating cell size
-    pub grid_size: (u16, u16),
-}
-
-impl MouseCoordinateCache {
-    /// Creates a new cache with the given grid dimensions
-    fn new(width: u16, height: u16) -> Self {
-        Self {
-            cell_size: (CELL_WIDTH as f64, CELL_HEIGHT as f64),
-            canvas_rect: (0.0, 0.0, 0.0, 0.0),
-            grid_size: (width, height),
-        }
-    }
-
-    /// Updates the cache based on the current canvas element state
-    fn update(&mut self, canvas: &web_sys::HtmlCanvasElement) {
-        let rect = canvas.get_bounding_client_rect();
-        self.canvas_rect = (rect.left(), rect.top(), rect.width(), rect.height());
-
-        // Calculate actual cell size based on canvas dimensions and grid size
-        // Account for the 5px translation applied in update_grid
-        self.cell_size = (
-            (self.canvas_rect.2 - 10.0) / self.grid_size.0 as f64,
-            (self.canvas_rect.3 - 10.0) / self.grid_size.1 as f64,
-        );
-    }
-
-    /// Updates grid dimensions
-    fn set_grid_size(&mut self, width: u16, height: u16) {
-        self.grid_size = (width, height);
-    }
-
-    /// Gets the cell size as u32 tuple for MouseEvent
-    fn cell_size_u32(&self) -> (u32, u32) {
-        (self.cell_size.0 as u32, self.cell_size.1 as u32)
-    }
-
-    /// Gets the adjusted canvas rect accounting for the 5px translation
-    fn adjusted_rect(&self) -> (f64, f64, f64, f64) {
-        (
-            self.canvas_rect.0 + 5.0,
-            self.canvas_rect.1 + 5.0,
-            self.canvas_rect.2 - 10.0,
-            self.canvas_rect.3 - 10.0,
-        )
-    }
-
-    /// Converts client coordinates to grid coordinates
-    fn client_to_grid(&self, client_x: f64, client_y: f64) -> (u16, u16) {
-        let adjusted_rect = self.adjusted_rect();
-        let relative_x = client_x - adjusted_rect.0;
-        let relative_y = client_y - adjusted_rect.1;
-
-        // Calculate the actual terminal dimensions (grid size * cell size)
-        let terminal_width = self.grid_size.0 as f64 * CELL_WIDTH;
-        let terminal_height = self.grid_size.1 as f64 * CELL_HEIGHT;
-
-        let col = ((relative_x.max(0.0) / terminal_width) * self.grid_size.0 as f64) as u16;
-        let row = ((relative_y.max(0.0) / terminal_height) * self.grid_size.1 as f64) as u16;
-
-        // Clamp to grid bounds
-        let col = col.min(self.grid_size.0.saturating_sub(1));
-        let row = row.min(self.grid_size.1.saturating_sub(1));
-
-        (col, row)
-    }
-}
-
 /// Canvas backend.
 ///
 /// This backend renders the buffer onto a HTML canvas element.
@@ -217,8 +142,6 @@ pub struct CanvasBackend {
     mouse_closure: Option<Closure<dyn FnMut(web_sys::MouseEvent)>>,
     /// Active key event closure for cleanup.
     key_closure: Option<Closure<dyn FnMut(web_sys::KeyboardEvent)>>,
-    /// Mouse coordinate calculation cache
-    mouse_coord_cache: MouseCoordinateCache,
 }
 
 impl CanvasBackend {
@@ -249,9 +172,6 @@ impl CanvasBackend {
 
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
-        let mut mouse_coord_cache =
-            MouseCoordinateCache::new(buffer[0].len() as u16, buffer.len() as u16);
-        mouse_coord_cache.update(&canvas.inner);
 
         Ok(Self {
             prev_buffer: buffer.clone(),
@@ -265,8 +185,7 @@ impl CanvasBackend {
             debug_mode: None,
             mouse_closure: None,
             key_closure: None,
-            mouse_coord_cache,
-        })
+            })
     }
 
     /// Sets the background color of the canvas.
@@ -593,10 +512,7 @@ impl Backend for CanvasBackend {
 
     fn clear(&mut self) -> IoResult<()> {
         self.buffer = get_sized_buffer();
-        // Update cache with new grid dimensions
-        self.mouse_coord_cache
-            .set_grid_size(self.buffer[0].len() as u16, self.buffer.len() as u16);
-        self.mouse_coord_cache.update(&self.canvas.inner);
+        // Grid dimensions are updated automatically when buffer changes
         Ok(())
     }
 
@@ -642,54 +558,21 @@ impl WebEventHandler for CanvasBackend {
         // Clear existing mouse events first
         self.clear_mouse_events()?;
 
-        // Update cache with current canvas state
-        self.mouse_coord_cache.update(&self.canvas.inner);
-
-        // Clone cache data for the closure
-        let mut cached_cell_size = self.mouse_coord_cache.cell_size_u32();
-        let mut cached_rect = self.mouse_coord_cache.adjusted_rect();
-        let grid_size = self.mouse_coord_cache.grid_size;
+        let grid_width = self.buffer[0].len() as u16;
+        let grid_height = self.buffer.len() as u16;
         let canvas_element = self.canvas.inner.clone();
 
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            // Quick check: has the viewport changed? If so, recalculate
-            let current_rect = canvas_element.get_bounding_client_rect();
-            let current_canvas_rect = (
-                current_rect.left(),
-                current_rect.top(),
-                current_rect.width(),
-                current_rect.height(),
-            );
-
-            // Only recalculate if canvas dimensions changed (indicating zoom/resize)
-            if (current_canvas_rect.2 - cached_rect.2).abs() > 1.0
-                || (current_canvas_rect.3 - cached_rect.3).abs() > 1.0
-            {
-                // Update cached rect to account for the 5px translation
-                cached_rect = (
-                    current_canvas_rect.0 + 5.0,
-                    current_canvas_rect.1 + 5.0,
-                    current_canvas_rect.2,
-                    current_canvas_rect.3,
+            if let Some(canvas_element) = canvas_element.dyn_ref::<web_sys::HtmlElement>() {
+                let mouse_event = mouse_to_grid_coords(
+                    &event,
+                    canvas_element,
+                    grid_width,
+                    grid_height,
+                    Some(5.0), // Canvas translation offset
                 );
+                callback(mouse_event);
             }
-
-            // Convert mouse coordinates to grid coordinates
-            let (col, row) = MouseCoordinateCache {
-                cell_size: (CELL_WIDTH, CELL_HEIGHT),
-                canvas_rect: current_canvas_rect,
-                grid_size,
-            }
-            .client_to_grid(event.client_x() as f64, event.client_y() as f64);
-
-            callback(MouseEvent {
-                kind: MouseEventKind::from(&event),
-                col,
-                row,
-                ctrl: event.ctrl_key(),
-                alt: event.alt_key(),
-                shift: event.shift_key(),
-            });
         }) as Box<dyn FnMut(web_sys::MouseEvent)>);
 
         self.mouse_closure = Some(register_mouse_event_handler(&self.canvas.inner, closure)?);
