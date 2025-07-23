@@ -84,8 +84,8 @@ export class RatzillaCanvas {
         this.ctx.font = `${this.bold ? 'bold' : ''} ${this.italic ? 'italic' : ''} ${this.font_str}`;
     }
 
-    get_input_element() {
-        return this.textArea;
+    get_canvas() {
+        return this.canvas;
     }
 
     reinit_canvas() {
