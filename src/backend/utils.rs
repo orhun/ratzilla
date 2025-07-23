@@ -8,11 +8,22 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use std::fmt::Debug;
 use web_sys::{
     wasm_bindgen::{closure::Closure, JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
 };
+
+/// Mouse events that are handled by the mouse event handlers.
+const MOUSE_EVENTS: &[&str] = &[
+    "mousemove",
+    "mousedown",
+    "mouseup",
+    "mouseenter",
+    "mouseleave",
+    "click",
+    "dblclick",
+    "wheel",
+];
 
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -233,13 +244,11 @@ pub(super) fn register_mouse_event_handler(
 ) -> Result<Closure<dyn FnMut(web_sys::MouseEvent)>, Error> {
     let closure_ref = closure.as_ref();
 
-    ["mousemove", "mousedown", "mouseup"]
-        .iter()
-        .try_for_each(|event| {
-            element
-                .add_event_listener_with_callback(event, closure_ref.unchecked_ref())
-                .map_err(Error::from)
-        })?;
+    MOUSE_EVENTS.iter().try_for_each(|event| {
+        element
+            .add_event_listener_with_callback(event, closure_ref.unchecked_ref())
+            .map_err(Error::from)
+    })?;
 
     Ok(closure)
 }
@@ -250,11 +259,9 @@ pub(super) fn unregister_mouse_event_handler(
     element: &Element,
     closure: Closure<dyn FnMut(web_sys::MouseEvent)>,
 ) -> Result<(), Error> {
-    ["mousemove", "mousedown", "mouseup"]
-        .iter()
-        .try_for_each(|event| {
-            element
-                .remove_event_listener_with_callback(event, closure.as_ref().unchecked_ref())
-                .map_err(Error::from)
-        })
+    MOUSE_EVENTS.iter().try_for_each(|event| {
+        element
+            .remove_event_listener_with_callback(event, closure.as_ref().unchecked_ref())
+            .map_err(Error::from)
+    })
 }

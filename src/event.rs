@@ -14,10 +14,8 @@ pub struct KeyEvent {
 /// A mouse movement event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MouseEvent {
-    /// The mouse button that was pressed.
-    pub button: MouseButton,
     /// The triggered event.
-    pub event: MouseEventKind,
+    pub kind: MouseEventKind,
     /// The x grid coordinate of the mouse.
     pub col: u16,
     /// The y grid coordinate of the mouse.
@@ -126,7 +124,7 @@ impl From<web_sys::KeyboardEvent> for KeyCode {
 }
 
 /// A mouse button.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum MouseButton {
     /// Left mouse button
     Left,
@@ -149,10 +147,27 @@ pub enum MouseButton {
 pub enum MouseEventKind {
     /// Mouse moved
     Moved,
-    /// Mouse button pressed
-    Pressed,
+    /// Mouse button clicked
+    Clicked(MouseButton),
     /// Mouse button released
-    Released,
+    Released(MouseButton),
+    /// Mouse entered element
+    Entered,
+    /// Mouse left element
+    Exited,
+    /// Mouse single click (distinct from mousedown)
+    SingleClick(MouseButton),
+    /// Mouse double click
+    DoubleClick(MouseButton),
+    /// Mouse wheel scrolled
+    Wheel {
+        /// Horizontal scroll delta
+        delta_x: i16,
+        /// Vertical scroll delta
+        delta_y: i16,
+        /// Z-axis scroll delta
+        delta_z: i16,
+    },
     /// Unidentified mouse event
     Unidentified,
 }
@@ -170,8 +185,7 @@ impl MouseEvent {
         let ctrl = event.ctrl_key();
         let alt = event.alt_key();
         let shift = event.shift_key();
-        let event_type = event.type_().into();
-        let button = Self::resolve_mouse_button(event_type, event.button());
+        let event_type = MouseEventKind::from(&event);
         let (col, row) = Self::pixels_to_grid_coords(
             event.client_x() as u32,
             event.client_y() as u32,
@@ -179,8 +193,7 @@ impl MouseEvent {
         );
 
         MouseEvent {
-            button,
-            event: event_type,
+            kind: event_type,
             col,
             row,
             ctrl,
@@ -208,8 +221,7 @@ impl MouseEvent {
         let ctrl = event.ctrl_key();
         let alt = event.alt_key();
         let shift = event.shift_key();
-        let event_type = event.type_().into();
-        let button = Self::resolve_mouse_button(event_type, event.button());
+        let event_type = MouseEventKind::from(&event);
 
         // Calculate mouse position relative to the grid element
         let (left, top, _width, _height) = grid_rect;
@@ -220,23 +232,12 @@ impl MouseEvent {
         let (col, row) = Self::pixels_to_grid_coords(mouse_x, mouse_y, cell_size_px);
 
         MouseEvent {
-            button,
-            event: event_type,
+            kind: event_type,
             col,
             row,
             ctrl,
             alt,
             shift,
-        }
-    }
-
-    /// Determines the correct mouse button for the event, handling the JS API behavior
-    /// where move events always report button 0 (Left) regardless of actual button state.
-    fn resolve_mouse_button(event_type: MouseEventKind, raw_button: i16) -> MouseButton {
-        use MouseButton::*;
-        match (event_type, raw_button.into()) {
-            (MouseEventKind::Moved, Left) => Unidentified,
-            (_, button) => button,
         }
     }
 
@@ -263,13 +264,34 @@ impl From<i16> for MouseButton {
 }
 
 /// Convert a [`web_sys::MouseEvent`] to a [`MouseEventKind`].
-impl From<String> for MouseEventKind {
-    fn from(event: String) -> Self {
-        let event = event.as_str();
-        match event {
+impl From<&web_sys::MouseEvent> for MouseEventKind {
+    fn from(event: &web_sys::MouseEvent) -> Self {
+        use web_sys::wasm_bindgen::JsCast;
+
+        let event_type = event.type_();
+        match event_type.as_str() {
             "mousemove" => MouseEventKind::Moved,
-            "mousedown" => MouseEventKind::Pressed,
-            "mouseup" => MouseEventKind::Released,
+            "mousedown" => MouseEventKind::Clicked(event.button().into()),
+            "mouseup" => MouseEventKind::Released(event.button().into()),
+            "mouseenter" => MouseEventKind::Entered,
+            "mouseleave" => MouseEventKind::Exited,
+            "click" => MouseEventKind::SingleClick(event.button().into()),
+            "dblclick" => MouseEventKind::DoubleClick(event.button().into()),
+            "wheel" => {
+                if let Ok(wheel_event) = event.clone().dyn_into::<web_sys::WheelEvent>() {
+                    MouseEventKind::Wheel {
+                        delta_x: wheel_event.delta_x() as i16,
+                        delta_y: wheel_event.delta_y() as i16,
+                        delta_z: wheel_event.delta_z() as i16,
+                    }
+                } else {
+                    MouseEventKind::Wheel {
+                        delta_x: 0,
+                        delta_y: 0,
+                        delta_z: 0,
+                    }
+                }
+            }
             _ => MouseEventKind::Unidentified,
         }
     }

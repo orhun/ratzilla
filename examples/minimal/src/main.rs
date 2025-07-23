@@ -1,7 +1,7 @@
 use std::{cell::RefCell, io, rc::Rc};
 
 use ratzilla::ratatui::{
-    layout::Alignment,
+    layout::{Alignment, Constraint, Direction, Layout},
     style::Color,
     widgets::{Block, Paragraph},
 };
@@ -10,7 +10,7 @@ use ratzilla::backend::canvas::CanvasBackendOptions;
 use ratzilla::backend::dom::DomBackendOptions;
 use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use ratzilla::{
-    event::{KeyCode, MouseButton, MouseEvent, MouseEventKind},
+    event::{KeyCode, MouseEvent},
     WebRenderer,
 };
 
@@ -22,8 +22,7 @@ const GRUVBOX_BRIGHT_ORANGE: Color = Color::Rgb(254, 128, 25);
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
     let mouse_position = Rc::new(RefCell::new((0, 0)));
-    let mouse_button = Rc::new(RefCell::new(None::<MouseButton>));
-    let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
+    let mouse_event_data = Rc::new(RefCell::new(None::<MouseEvent>));
 
     let mut terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
         .dom_options(DomBackendOptions::default())
@@ -34,15 +33,12 @@ fn main() -> io::Result<()> {
     // Set up mouse event handling using the new WebRenderer API
     terminal.on_mouse_event({
         let mouse_position_cloned = mouse_position.clone();
-        let mouse_button_cloned = mouse_button.clone();
-        let mouse_event_kind_cloned = mouse_event_kind.clone();
+        let mouse_event_data_cloned = mouse_event_data.clone();
         move |mouse_event: MouseEvent| {
             let mut mouse_position = mouse_position_cloned.borrow_mut();
             *mouse_position = (mouse_event.col, mouse_event.row);
-            let mut mouse_button = mouse_button_cloned.borrow_mut();
-            *mouse_button = Some(mouse_event.button);
-            let mut mouse_event_kind = mouse_event_kind_cloned.borrow_mut();
-            *mouse_event_kind = Some(mouse_event.event);
+            let mut mouse_event_data = mouse_event_data_cloned.borrow_mut();
+            *mouse_event_data = Some(mouse_event);
         }
     }).ok(); // WebGL2 backend doesn't support mouse events, so we ignore the error
 
@@ -59,18 +55,20 @@ fn main() -> io::Result<()> {
     terminal.draw_web(move |f| {
         let counter = counter.borrow();
         let mouse_position = mouse_position.borrow();
-        let mouse_button = mouse_button.borrow();
-        let mouse_event_kind = mouse_event_kind.borrow();
+        let mouse_event_data = mouse_event_data.borrow();
 
+        // Split the area into sections
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3), // Space for counter
+                Constraint::Min(1),    // Rest for mouse event
+            ])
+            .split(f.area());
+
+        // Render counter (centered)
         f.render_widget(
-            Paragraph::new(format!(
-                "Space pressed: {counter}\n\
-                Column: {:?}\n\
-                Row: {:?}\n\
-                MouseButton: {mouse_button:?}\n\
-                MouseEvent: {mouse_event_kind:?}",
-                mouse_position.0, mouse_position.1
-            ))
+            Paragraph::new(format!("Space pressed: {counter}"))
             .alignment(Alignment::Center)
             .block(
                 Block::bordered()
@@ -78,7 +76,22 @@ fn main() -> io::Result<()> {
                     .title_alignment(Alignment::Center)
                     .border_style(Color::Yellow),
             ),
-            f.area(),
+            layout[0],
+        );
+
+        // Render mouse event (left-aligned within centered box)
+        f.render_widget(
+            Paragraph::new(
+                mouse_event_data.as_ref().map(|e| format!("{:#?}", e)).unwrap_or_else(|| "No mouse events yet".to_string())
+            )
+            .alignment(Alignment::Left)
+            .block(
+                Block::bordered()
+                    .title("Mouse Event")
+                    .title_alignment(Alignment::Center)
+                    .border_style(Color::Yellow),
+            ),
+            layout[1],
         );
 
         // Highlight the hovered cell
