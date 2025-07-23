@@ -9,7 +9,37 @@ export class RatzillaCanvas {
         if (this.parent == null) {
             this.parent = document.body;
         }
+        // Uses input hack from https://github.com/emilk/egui/blob/fdcaff8465eac8db8cc1ebbcbb9b97e0791a8363/crates/eframe/src/web/text_agent.rs#L18
+        this.inputElement = document.createElement("input");
+        this.inputElement.autofocus = true;
+        this.inputElement.type = "text";
+        this.inputElement.autocapitalize = "off";
+        this.inputElement.style.backgroundColor = "transparent";
+        this.inputElement.style.border = "none";
+        this.inputElement.style.outline = "none";
+        this.inputElement.style.width = "1px";
+        this.inputElement.style.height = "1px";
+        this.inputElement.style.caretColor = "transparent";
+        this.inputElement.style.position= "absolute";
+        this.inputElement.style.top = "0";
+        this.inputElement.style.left = "0";
+        this.inputElement.addEventListener("input", (event) => {
+            if (!event.isComposing) {
+                this.inputElement.blur();
+                this.inputElement.focus();
+            }
+
+            if (this.inputElement.value.length === 0 && !event.isComposing) {
+                this.inputElement.value = ""
+            }
+        });
         this.canvas = document.createElement("canvas");
+        this.canvas.tabIndex = 0;
+        this.canvas.style.outline = "none";
+        this.canvas.addEventListener("focus", () => {
+            this.inputElement.focus();
+        });
+        this.parent.appendChild(this.inputElement);
         this.parent.appendChild(this.canvas);
         this.font_str = font_str;
         this.backgroundColor = `#${backgroundColor.toString(16).padStart(6, '0')}`;
@@ -46,8 +76,8 @@ export class RatzillaCanvas {
         this.ctx.font = `${this.bold ? 'bold' : ''} ${this.italic ? 'italic' : ''} ${this.font_str}`;
     }
 
-    get_canvas() {
-        return this.canvas;
+    get_input_element() {
+        return this.textArea;
     }
 
     reinit_canvas() {

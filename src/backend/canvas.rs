@@ -122,7 +122,7 @@ extern "C" {
     fn measure_text(this: &RatzillaCanvas) -> Uint16Array;
 
     #[wasm_bindgen(method)]
-    fn get_canvas(this: &RatzillaCanvas) -> web_sys::HtmlCanvasElement;
+    fn get_input_element(this: &RatzillaCanvas) -> web_sys::HtmlInputElement;
 
     #[wasm_bindgen(method)]
     /// Returns the new number of cells in width and height in that order
@@ -260,10 +260,8 @@ struct Canvas {
     /// of things like italics, which my not be available in some fonts
     /// like Fira Code
     enabled_modifiers: Modifier,
-    /// The inner HTML canvas element
-    ///
-    /// Use **only** for implementing `WebBackend`
-    inner: web_sys::HtmlCanvasElement,
+    /// The element that keyboard input should be listened on
+    inner: web_sys::HtmlInputElement,
     /// Background color.
     background_color: Color,
     /// Width of a single cell.
@@ -319,7 +317,7 @@ impl Canvas {
         );
 
         let mut canvas = Self {
-            inner: buffer.ratzilla_canvas().get_canvas(),
+            inner: buffer.ratzilla_canvas().get_input_element(),
             buffer,
             initialized,
             enabled_modifiers,
