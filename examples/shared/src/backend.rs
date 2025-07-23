@@ -1,15 +1,16 @@
-use std::io;
-use std::fmt;
-use std::convert::TryFrom;
-use web_sys::{window, Url};
+use crate::fps;
+use crate::utils::inject_backend_footer;
 use ratzilla::backend::canvas::CanvasBackendOptions;
 use ratzilla::backend::dom::DomBackendOptions;
 use ratzilla::backend::webgl2::WebGl2BackendOptions;
-use ratzilla::{CanvasBackend, DomBackend, WebGl2Backend};
-use ratzilla::ratatui::{Terminal, TerminalOptions};
 use ratzilla::ratatui::backend::Backend;
-use crate::fps;
-use crate::utils::inject_backend_footer;
+use ratzilla::ratatui::{Terminal, TerminalOptions};
+use ratzilla::web_sys::Element;
+use ratzilla::{CanvasBackend, DomBackend, WebBackend, WebGl2Backend};
+use std::convert::TryFrom;
+use std::fmt;
+use std::io;
+use web_sys::{window, Url};
 
 /// Available backend types
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -39,7 +40,9 @@ impl TryFrom<String> for BackendType {
             "dom" => Ok(BackendType::Dom),
             "canvas" => Ok(BackendType::Canvas),
             "webgl2" => Ok(BackendType::WebGl2),
-            _ => Err(format!("Invalid backend type: '{s}'. Valid options are: dom, canvas, webgl2")),
+            _ => Err(format!(
+                "Invalid backend type: '{s}'. Valid options are: dom, canvas, webgl2"
+            )),
         }
     }
 }
@@ -51,13 +54,13 @@ impl fmt::Display for BackendType {
 }
 
 /// Enum wrapper for different Ratzilla backends that implements the Ratatui Backend trait.
-/// 
+///
 /// This enum allows switching between different rendering backends at runtime while
 /// providing a unified interface. All backend operations are delegated to the wrapped
 /// backend implementation.
-/// 
+///
 /// # Backends
-/// 
+///
 /// - `Dom`: HTML DOM-based rendering with accessibility features
 /// - `Canvas`: Canvas 2D API rendering with full Unicode support  
 /// - `WebGl2`: GPU-accelerated rendering using WebGL2 and beamterm-renderer
@@ -74,6 +77,16 @@ impl RatzillaBackend {
             RatzillaBackend::Dom(_) => BackendType::Dom,
             RatzillaBackend::Canvas(_) => BackendType::Canvas,
             RatzillaBackend::WebGl2(_) => BackendType::WebGl2,
+        }
+    }
+}
+
+impl WebBackend for RatzillaBackend {
+    fn listening_element(&self) -> &Element {
+        match self {
+            RatzillaBackend::Dom(dom) => dom.listening_element(),
+            RatzillaBackend::Canvas(canvas) => canvas.listening_element(),
+            RatzillaBackend::WebGl2(webgl) => webgl.listening_element(),
         }
     }
 }
@@ -177,7 +190,7 @@ pub struct FpsTrackingBackend {
 
 impl FpsTrackingBackend {
     /// Create a new FPS tracking backend that wraps the given backend.
-    /// 
+    ///
     /// Frame timing will be recorded automatically on each successful flush operation.
     pub fn new(backend: RatzillaBackend) -> Self {
         Self { inner: backend }
@@ -192,6 +205,12 @@ impl FpsTrackingBackend {
 impl From<RatzillaBackend> for FpsTrackingBackend {
     fn from(backend: RatzillaBackend) -> Self {
         Self::new(backend)
+    }
+}
+
+impl WebBackend for FpsTrackingBackend {
+    fn listening_element(&self) -> &Element {
+        self.inner.listening_element()
     }
 }
 
@@ -383,7 +402,6 @@ impl MultiBackendBuilder {
 
         Ok(terminal)
     }
-
 }
 
 impl From<BackendType> for MultiBackendBuilder {

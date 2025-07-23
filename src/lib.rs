@@ -28,4 +28,5 @@ pub use web_sys;
 pub use backend::{
     canvas::CanvasBackend, cursor::CursorShape, dom::DomBackend, webgl2::WebGl2Backend,
 };
+pub use render::WebBackend;
 pub use render::WebRenderer;

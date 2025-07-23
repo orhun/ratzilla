@@ -1,25 +1,47 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ratzilla Demo</title>
-    <style>
-      body {
-        margin: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        align-content: center;
-        background-color: #121212;
-      }
-      pre {
-        font-family: "Fira Code", monospace;
-        font-size: 16px;
-        margin: 0px;
-      }
-    </style>
-  </head>
-  <body></body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ratzilla Demo</title>
+  <style>
+    html {
+      height: 100%;
+    }
+
+    body {
+      margin: 20px;
+      height: calc(100% - 40px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      align-content: center;
+      background-color: #121212;
+    }
+
+    pre {
+      font-family: "Fira Code", monospace;
+      font-size: 16px;
+      margin: 0px;
+    }
+  </style>
+</head>
+
+<body>
+  <script type="module">
+    const firaCodeFace = new FontFace('Fira Code', 'url(https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-Regular.woff2)', {style: "normal", weight: "normal"});
+    const firaCodeBoldFace = new FontFace('Fira Code', 'url(https://cdn.jsdelivr.net/npm/firacode@6.2.0/distr/woff2/FiraCode-Bold.woff2)', {style: "normal", weight: "bold"});
+    const fontPromises = [firaCodeFace.load(), firaCodeBoldFace.load()];
+    addEventListener("TrunkApplicationStarted", (wasm) => {
+      Promise.all(fontPromises).then((faces) => {
+        document.fonts.add(faces[0]);
+        document.fonts.add(faces[1]);
+        window.wasmBindings.main();
+      });
+    });
+  </script>
+</body>
+
 </html>

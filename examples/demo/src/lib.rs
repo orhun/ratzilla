@@ -6,17 +6,16 @@
 //! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
 //! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{cell::RefCell, io::Result, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use app::App;
 use clap::Parser;
-use ratzilla::event::KeyCode;
-use ratzilla::WebRenderer;
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
-use ratzilla::{
-    backend::webgl2::WebGl2BackendOptions,
-    backend::canvas::CanvasBackendOptions,
-};
+use ratzilla::event::KeyCode;
+use ratzilla::ratatui::style::Modifier;
+use ratzilla::web_sys::wasm_bindgen::{self, prelude::*};
+use ratzilla::WebRenderer;
+use ratzilla::{backend::canvas::CanvasBackendOptions, backend::webgl2::WebGl2BackendOptions};
 
 mod app;
 
@@ -35,13 +34,18 @@ struct Cli {
     unicode: bool,
 }
 
-fn main() -> Result<()> {
+#[wasm_bindgen]
+pub fn main() {
+    console_error_panic_hook::set_once();
+
     let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
-    
+
     // Create backend with explicit size like main branch (1600x900)
     let canvas_options = CanvasBackendOptions::new()
-        .size((1600, 900));
-    
+        .font(String::from("16px Fira Code"))
+        // Fira Code does not have an italic variation
+        .disable_modifiers(Modifier::ITALIC);
+
     let webgl2_options = WebGl2BackendOptions::new()
         .measure_performance(true)
         .size((1600, 900));
@@ -49,8 +53,9 @@ fn main() -> Result<()> {
     let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
         .canvas_options(canvas_options)
         .webgl2_options(webgl2_options)
-        .build_terminal()?;
-    
+        .build_terminal()
+        .unwrap();
+
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
@@ -68,6 +73,9 @@ fn main() -> Result<()> {
                 KeyCode::Down => {
                     app_state.on_down();
                 }
+                KeyCode::Char(' ') => {
+                    app_state.pause_unpause();
+                }
                 KeyCode::Char(c) => app_state.on_key(c),
                 _ => {}
             }
@@ -79,6 +87,4 @@ fn main() -> Result<()> {
         let elapsed = app_state.on_tick();
         ui::draw(elapsed, f, &mut app_state);
     });
-
-    Ok(())
 }

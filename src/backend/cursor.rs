@@ -1,4 +1,4 @@
-use ratatui::style::{Style, Stylize};
+use ratatui::style::Modifier;
 
 /// Supported cursor shapes.
 #[derive(Debug, Default)]
@@ -12,18 +12,18 @@ pub enum CursorShape {
 
 impl CursorShape {
     /// Transforms the given style to hide the cursor.
-    pub fn hide(&self, style: Style) -> Style {
+    pub fn hide(&self, style: Modifier) -> Modifier {
         match self {
-            CursorShape::SteadyBlock => style.not_reversed(),
-            CursorShape::SteadyUnderScore => style.not_underlined(),
+            CursorShape::SteadyBlock => style ^ Modifier::REVERSED,
+            CursorShape::SteadyUnderScore => style ^ Modifier::UNDERLINED,
         }
     }
 
     /// Transforms the given style to show the cursor.
-    pub fn show(&self, style: Style) -> Style {
+    pub fn show(&self, style: Modifier) -> Modifier {
         match self {
-            CursorShape::SteadyBlock => style.reversed(),
-            CursorShape::SteadyUnderScore => style.underlined(),
+            CursorShape::SteadyBlock => style | Modifier::REVERSED,
+            CursorShape::SteadyUnderScore => style | Modifier::UNDERLINED,
         }
     }
 }

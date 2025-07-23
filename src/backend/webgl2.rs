@@ -1,6 +1,7 @@
 use crate::{
     backend::{color::to_rgb, utils::*},
     error::Error,
+    render::WebBackend,
     CursorShape,
 };
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
@@ -288,8 +289,8 @@ impl WebGl2Backend {
         let idx = pos.y as usize * w + pos.x as usize;
 
         if idx < self.buffer.len() {
-            let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
-            self.buffer[idx].set_style(cursor_style);
+            let cursor_modifier = self.cursor_shape.show(self.buffer[idx].modifier);
+            self.buffer[idx].modifier = cursor_modifier;
         }
 
         Ok(())
@@ -366,8 +367,8 @@ impl Backend for WebGl2Backend {
             let w = self.context.terminal_grid.terminal_size().0 as usize;
 
             if let Some(cell) = self.buffer.get_mut(y * w + x) {
-                let style = self.cursor_shape.hide(cell.style());
-                cell.set_style(style);
+                let modifier = self.cursor_shape.hide(cell.modifier);
+                cell.modifier = modifier;
             }
         }
 
@@ -420,12 +421,18 @@ impl Backend for WebGl2Backend {
 
             let old_idx = y * w + x;
             if let Some(old_cell) = self.buffer.get_mut(old_idx) {
-                let style = self.cursor_shape.hide(old_cell.style());
-                old_cell.set_style(style);
+                let modifier = self.cursor_shape.hide(old_cell.modifier);
+                old_cell.modifier = modifier;
             }
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+}
+
+impl WebBackend for WebGl2Backend {
+    fn listening_element(&self) -> &web_sys::Element {
+        self.context.renderer.canvas()
     }
 }
 
