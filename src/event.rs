@@ -148,9 +148,9 @@ pub enum MouseEventKind {
     /// Mouse moved
     Moved,
     /// Mouse button clicked
-    Clicked(MouseButton),
+    ButtonDown(MouseButton),
     /// Mouse button released
-    Released(MouseButton),
+    ButtonUp(MouseButton),
     /// Mouse entered element
     Entered,
     /// Mouse left element
@@ -271,8 +271,8 @@ impl From<&web_sys::MouseEvent> for MouseEventKind {
         let event_type = event.type_();
         match event_type.as_str() {
             "mousemove" => MouseEventKind::Moved,
-            "mousedown" => MouseEventKind::Clicked(event.button().into()),
-            "mouseup" => MouseEventKind::Released(event.button().into()),
+            "mousedown" => MouseEventKind::ButtonDown(event.button().into()),
+            "mouseup" => MouseEventKind::ButtonUp(event.button().into()),
             "mouseenter" => MouseEventKind::Entered,
             "mouseleave" => MouseEventKind::Exited,
             "click" => MouseEventKind::SingleClick(event.button().into()),
