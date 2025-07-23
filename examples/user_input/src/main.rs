@@ -15,7 +15,7 @@ use ratzilla::{event::KeyCode, WebRenderer};
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
 
 fn main() -> io::Result<()> {
-    let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+    let mut terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
         .dom_options(ratzilla::backend::dom::DomBackendOptions::new(None, CursorShape::SteadyUnderScore))
         .build_terminal()?;
 

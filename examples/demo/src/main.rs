@@ -46,7 +46,7 @@ fn main() -> Result<()> {
         .measure_performance(true)
         .size((1600, 900));
 
-    let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
+    let mut terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
         .canvas_options(canvas_options)
         .webgl2_options(webgl2_options)
         .build_terminal()?;
