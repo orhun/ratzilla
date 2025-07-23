@@ -185,7 +185,7 @@ impl CanvasBackend {
             debug_mode: None,
             mouse_closure: None,
             key_closure: None,
-            })
+        })
     }
 
     /// Sets the background color of the canvas.

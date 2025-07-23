@@ -1,6 +1,7 @@
 use crate::{
     backend::color::ansi_to_rgb,
     error::Error,
+    event::{MouseEvent, MouseEventKind},
     utils::{get_screen_size, get_window_size, is_mobile},
 };
 use compact_str::{format_compact, CompactString};
@@ -8,8 +9,10 @@ use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
-use web_sys::{wasm_bindgen::{closure::Closure, JsCast, JsValue}, window, Document, Element, HtmlCanvasElement, HtmlElement, Window};
-use crate::event::{MouseEvent, MouseEventKind};
+use web_sys::{
+    wasm_bindgen::{closure::Closure, JsCast, JsValue},
+    window, Document, Element, HtmlCanvasElement, HtmlElement, Window,
+};
 
 /// Mouse events that are handled by the mouse event handlers.
 const MOUSE_EVENTS: &[&str] = &[

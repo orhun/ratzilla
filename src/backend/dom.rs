@@ -401,7 +401,7 @@ impl WebEventHandler for DomBackend {
         let grid_width = self.buffer[0].len() as u16;
         let grid_height = self.buffer.len() as u16;
         let grid_element = self.grid.clone();
-        
+
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
             if let Some(element) = grid_element.dyn_ref::<web_sys::HtmlElement>() {
                 let mouse_event = mouse_to_grid_coords(
