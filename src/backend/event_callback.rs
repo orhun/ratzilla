@@ -1,10 +1,13 @@
-use web_sys::{Element, HtmlElement};
-use web_sys::wasm_bindgen::closure::Closure;
-use web_sys::wasm_bindgen::JsCast;
-use crate::backend::utils::get_document;
-use crate::error::Error;
-use crate::event::{KeyEvent, MouseEvent, MouseEventKind};
+use crate::{
+    backend::utils::get_document,
+    error::Error,
+    event::{KeyEvent, MouseEvent, MouseEventKind},
+};
 use std::{cell::RefCell, rc::Rc};
+use web_sys::{
+    wasm_bindgen::{closure::Closure, JsCast},
+    Element, HtmlElement,
+};
 
 /// Mouse events that are handled by the mouse event handlers.
 const MOUSE_EVENTS: &[&str] = &[
@@ -19,7 +22,7 @@ const MOUSE_EVENTS: &[&str] = &[
 ];
 
 /// Manages web event listeners with automatic cleanup.
-/// 
+///
 /// This struct wraps JavaScript event listeners with proper lifecycle management,
 /// automatically removing event listeners when the struct is dropped.
 #[derive(Debug)]
@@ -31,14 +34,11 @@ pub(super) struct EventCallback<T> {
 
 impl EventCallback<web_sys::KeyboardEvent> {
     /// Creates a new keyboard event callback that listens for keydown events.
-    /// 
+    ///
     /// # Arguments
     /// * `element` - The DOM element to store (though events are registered on document)
     /// * `callback` - Function to call when keyboard events occur
-    pub fn new_key<F>(
-        element: Element,
-        mut callback: F,
-    ) -> Result<Self, Error>
+    pub fn new_key<F>(element: Element, mut callback: F) -> Result<Self, Error>
     where
         F: FnMut(KeyEvent) + 'static,
     {
@@ -60,10 +60,10 @@ impl EventCallback<web_sys::KeyboardEvent> {
 
 impl EventCallback<web_sys::MouseEvent> {
     /// Creates a new mouse event callback with coordinate transformation.
-    /// 
+    ///
     /// Registers listeners for all mouse events (move, down, up, enter, leave, click, dblclick, wheel)
     /// and converts browser coordinates to terminal grid coordinates.
-    /// 
+    ///
     /// # Arguments
     /// * `element` - The DOM element to listen on
     /// * `grid_width` - Terminal width in characters for coordinate mapping
@@ -234,7 +234,8 @@ impl<T> Drop for EventCallback<T> {
     fn drop(&mut self) {
         let closure = &self.closure.as_ref();
         for event_type in self.event_types {
-            let _ = self.element
+            let _ = self
+                .element
                 .remove_event_listener_with_callback(event_type, closure.unchecked_ref());
         }
     }

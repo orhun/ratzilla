@@ -13,7 +13,6 @@ use web_sys::{
     window, Document, Element, HtmlCanvasElement, Window,
 };
 
-
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
