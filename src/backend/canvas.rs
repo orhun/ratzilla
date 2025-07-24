@@ -5,6 +5,7 @@ use std::io::Result as IoResult;
 use crate::{
     backend::{
         color::{actual_bg_color, actual_fg_color},
+        event_callback::EventCallback,
         utils::*,
     },
     error::Error,
@@ -21,7 +22,7 @@ use ratatui::{
 };
 use web_sys::{
     js_sys::{Boolean, Map},
-    wasm_bindgen::{closure::Closure, JsCast, JsValue},
+    wasm_bindgen::{JsCast, JsValue},
 };
 
 /// Width of a single cell.
@@ -138,10 +139,10 @@ pub struct CanvasBackend {
     cursor_shape: CursorShape,
     /// Draw cell boundaries with specified color.
     debug_mode: Option<String>,
-    /// Active mouse event closure for cleanup.
-    mouse_closure: Option<Closure<dyn FnMut(web_sys::MouseEvent)>>,
-    /// Active key event closure for cleanup.
-    key_closure: Option<Closure<dyn FnMut(web_sys::KeyboardEvent)>>,
+    /// Active mouse event callback for cleanup.
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
 }
 
 impl CanvasBackend {
@@ -183,8 +184,8 @@ impl CanvasBackend {
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
-            mouse_closure: None,
-            key_closure: None,
+            mouse_callback: None,
+            key_callback: None,
         })
     }
 
@@ -561,8 +562,8 @@ impl WebEventHandler for CanvasBackend {
         let grid_width = self.buffer[0].len() as u16;
         let grid_height = self.buffer.len() as u16;
 
-        self.mouse_closure = Some(register_mouse_event_handler_with_wheel_normalization(
-            &self.canvas.inner,
+        self.mouse_callback = Some(EventCallback::new_mouse(
+            self.canvas.inner.clone().into(),
             grid_width,
             grid_height,
             Some(5.0), // Canvas translation offset
@@ -572,40 +573,26 @@ impl WebEventHandler for CanvasBackend {
     }
 
     fn clear_mouse_events(&mut self) -> Result<(), Error> {
-        if let Some(closure) = self.mouse_closure.take() {
-            unregister_mouse_event_handler(&self.canvas.inner, closure)?;
-        }
+        self.mouse_callback.take();
         Ok(())
     }
 
-    fn setup_key_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(KeyEvent) + 'static,
     {
         // Clear existing key events first
         self.clear_key_events()?;
 
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            callback(event.into());
-        });
-
-        get_document()?
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-
-        self.key_closure = Some(closure);
+        self.key_callback = Some(EventCallback::new_key(
+            get_document()?.unchecked_into(),
+            callback,
+        )?);
         Ok(())
     }
 
     fn clear_key_events(&mut self) -> Result<(), Error> {
-        if let Some(closure) = self.key_closure.take() {
-            let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
-            let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-
-            document
-                .remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-                .map_err(Error::from)?;
-        }
+        self.key_callback.take();
         Ok(())
     }
 }

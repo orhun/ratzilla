@@ -6,10 +6,8 @@ use ratzilla::ratatui::{
     widgets::{Block, Paragraph},
 };
 
-use ratzilla::backend::canvas::CanvasBackendOptions;
-use ratzilla::backend::dom::DomBackendOptions;
-use ratzilla::backend::webgl2::WebGl2BackendOptions;
 use ratzilla::{
+    backend::{canvas::CanvasBackendOptions, dom::DomBackendOptions, webgl2::WebGl2BackendOptions},
     event::{KeyCode, MouseEvent},
     WebRenderer,
 };
@@ -31,26 +29,30 @@ fn main() -> io::Result<()> {
         .build_terminal()?;
 
     // Set up mouse event handling using the new WebRenderer API
-    terminal.on_mouse_event({
-        let mouse_position_cloned = mouse_position.clone();
-        let mouse_event_data_cloned = mouse_event_data.clone();
-        move |mouse_event: MouseEvent| {
-            let mut mouse_position = mouse_position_cloned.borrow_mut();
-            *mouse_position = (mouse_event.col, mouse_event.row);
-            let mut mouse_event_data = mouse_event_data_cloned.borrow_mut();
-            *mouse_event_data = Some(mouse_event);
-        }
-    }).ok(); // WebGL2 backend doesn't support mouse events, so we ignore the error
-
-    terminal.on_key_event({
-        let counter_cloned = counter.clone();
-        move |key_event| {
-            if key_event.code == KeyCode::Char(' ') {
-                let mut counter = counter_cloned.borrow_mut();
-                *counter += 1;
+    terminal
+        .on_mouse_event({
+            let mouse_position_cloned = mouse_position.clone();
+            let mouse_event_data_cloned = mouse_event_data.clone();
+            move |mouse_event: MouseEvent| {
+                let mut mouse_position = mouse_position_cloned.borrow_mut();
+                *mouse_position = (mouse_event.col, mouse_event.row);
+                let mut mouse_event_data = mouse_event_data_cloned.borrow_mut();
+                *mouse_event_data = Some(mouse_event);
             }
-        }
-    }).ok(); // Ignore errors for consistency
+        })
+        .ok(); // WebGL2 backend doesn't support mouse events, so we ignore the error
+
+    terminal
+        .on_key_event({
+            let counter_cloned = counter.clone();
+            move |key_event| {
+                if key_event.code == KeyCode::Char(' ') {
+                    let mut counter = counter_cloned.borrow_mut();
+                    *counter += 1;
+                }
+            }
+        })
+        .ok(); // Ignore errors for consistency
 
     terminal.draw_web(move |f| {
         let counter = counter.borrow();
@@ -69,20 +71,23 @@ fn main() -> io::Result<()> {
         // Render counter (centered)
         f.render_widget(
             Paragraph::new(format!("Space pressed: {counter}"))
-            .alignment(Alignment::Center)
-            .block(
-                Block::bordered()
-                    .title("Ratzilla")
-                    .title_alignment(Alignment::Center)
-                    .border_style(Color::Yellow),
-            ),
+                .alignment(Alignment::Center)
+                .block(
+                    Block::bordered()
+                        .title("Ratzilla")
+                        .title_alignment(Alignment::Center)
+                        .border_style(Color::Yellow),
+                ),
             layout[0],
         );
 
         // Render mouse event (left-aligned within centered box)
         f.render_widget(
             Paragraph::new(
-                mouse_event_data.as_ref().map(|e| format!("{:#?}", e)).unwrap_or_else(|| "No mouse events yet".to_string())
+                mouse_event_data
+                    .as_ref()
+                    .map(|e| format!("{:#?}", e))
+                    .unwrap_or_else(|| "No mouse events yet".to_string()),
             )
             .alignment(Alignment::Left)
             .block(

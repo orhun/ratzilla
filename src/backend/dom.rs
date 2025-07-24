@@ -12,7 +12,7 @@ use web_sys::{
 };
 
 use crate::{
-    backend::utils::*,
+    backend::{event_callback::EventCallback, utils::*},
     error::Error,
     event::{KeyEvent, MouseEvent},
     render::WebEventHandler,
@@ -85,10 +85,10 @@ pub struct DomBackend {
     cursor_position: Option<Position>,
     /// Cached cell size in pixels (width, height).
     cell_size_px: Option<(u32, u32)>,
-    /// Active mouse event closure for cleanup.
-    mouse_closure: Option<web_sys::wasm_bindgen::closure::Closure<dyn FnMut(web_sys::MouseEvent)>>,
-    /// Active key event closure for cleanup.
-    key_closure: Option<web_sys::wasm_bindgen::closure::Closure<dyn FnMut(web_sys::KeyboardEvent)>>,
+    /// Active mouse event callback for cleanup.
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
 }
 
 impl DomBackend {
@@ -128,8 +128,8 @@ impl DomBackend {
             document,
             cursor_position: None,
             cell_size_px: None,
-            mouse_closure: None,
-            key_closure: None,
+            mouse_callback: None,
+            key_callback: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -384,8 +384,8 @@ impl std::fmt::Debug for DomBackend {
             .field("options", &self.options)
             .field("cursor_position", &self.cursor_position)
             .field("cell_size_px", &self.cell_size_px)
-            .field("mouse_closure", &self.mouse_closure.is_some())
-            .field("key_closure", &self.key_closure.is_some())
+            .field("mouse_callback", &self.mouse_callback.is_some())
+            .field("key_callback", &self.key_callback.is_some())
             .finish()
     }
 }
@@ -401,8 +401,8 @@ impl WebEventHandler for DomBackend {
         let grid_width = self.buffer[0].len() as u16;
         let grid_height = self.buffer.len() as u16;
 
-        self.mouse_closure = Some(register_mouse_event_handler_with_wheel_normalization(
-            &self.grid,
+        self.mouse_callback = Some(EventCallback::new_mouse(
+            self.grid.clone(),
             grid_width,
             grid_height,
             None, // No offset for DOM backend
@@ -413,37 +413,26 @@ impl WebEventHandler for DomBackend {
     }
 
     fn clear_mouse_events(&mut self) -> Result<(), Error> {
-        if let Some(closure) = self.mouse_closure.take() {
-            unregister_mouse_event_handler(&self.grid, closure)?;
-        }
+        self.mouse_callback.take();
         Ok(())
     }
 
-    fn setup_key_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(KeyEvent) + 'static,
     {
         // Clear existing key events first
         self.clear_key_events()?;
 
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            callback(event.into());
-        });
-
-        self.document
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-
-        self.key_closure = Some(closure);
+        self.key_callback = Some(EventCallback::new_key(
+            self.document.clone().unchecked_into(),
+            callback,
+        )?);
         Ok(())
     }
 
     fn clear_key_events(&mut self) -> Result<(), Error> {
-        if let Some(closure) = self.key_closure.take() {
-            self.document
-                .remove_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-                .map_err(Error::from)?;
-        }
+        self.key_callback.take();
         Ok(())
     }
 }
