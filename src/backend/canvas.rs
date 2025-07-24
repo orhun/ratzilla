@@ -5,7 +5,7 @@ use std::io::Result as IoResult;
 use crate::{
     backend::{
         color::{actual_bg_color, actual_fg_color},
-        event_callback::EventCallback,
+        event_callback::{EventCallback, MouseConfig},
         utils::*,
     },
     error::Error,
@@ -564,9 +564,9 @@ impl WebEventHandler for CanvasBackend {
 
         self.mouse_callback = Some(EventCallback::new_mouse(
             self.canvas.inner.clone().into(),
-            grid_width,
-            grid_height,
-            Some(5.0), // Canvas translation offset
+            MouseConfig::new(grid_width, grid_height)
+                .with_offset(5.0) // Canvas translation offset
+                .with_cell_dimensions(CELL_WIDTH, CELL_HEIGHT), // Cell dimensions for accurate coordinate mapping
             callback,
         )?);
         Ok(())

@@ -12,7 +12,10 @@ use web_sys::{
 };
 
 use crate::{
-    backend::{event_callback::EventCallback, utils::*},
+    backend::{
+        event_callback::{EventCallback, MouseConfig},
+        utils::*,
+    },
     error::Error,
     event::{KeyEvent, MouseEvent},
     render::WebEventHandler,
@@ -403,9 +406,7 @@ impl WebEventHandler for DomBackend {
 
         self.mouse_callback = Some(EventCallback::new_mouse(
             self.grid.clone(),
-            grid_width,
-            grid_height,
-            None, // No offset for DOM backend
+            MouseConfig::new(grid_width, grid_height), // DOM backend uses default config
             callback,
         )?);
 

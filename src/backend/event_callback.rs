@@ -66,27 +66,14 @@ impl EventCallback<web_sys::MouseEvent> {
     ///
     /// # Arguments
     /// * `element` - The DOM element to listen on
-    /// * `grid_width` - Terminal width in characters for coordinate mapping
-    /// * `grid_height` - Terminal height in characters for coordinate mapping  
-    /// * `offset` - Optional pixel offset for coordinate calculation (e.g., canvas padding)
+    /// * `config` - Mouse configuration for coordinate transformation
     /// * `callback` - Function to call when mouse events occur
-    pub fn new_mouse<F>(
-        element: Element,
-        grid_width: u16,
-        grid_height: u16,
-        offset: Option<f64>,
-        callback: F,
-    ) -> Result<Self, Error>
+    pub fn new_mouse<F>(element: Element, config: MouseConfig, callback: F) -> Result<Self, Error>
     where
         F: FnMut(MouseEvent) + 'static,
     {
-        let closure = register_mouse_event_handler_with_wheel_normalization(
-            &element,
-            grid_width,
-            grid_height,
-            offset,
-            callback,
-        )?;
+        let closure =
+            register_mouse_event_handler_with_wheel_normalization(&element, config, callback)?;
 
         Ok(Self {
             event_types: MOUSE_EVENTS,
@@ -96,28 +83,77 @@ impl EventCallback<web_sys::MouseEvent> {
     }
 }
 
+/// Configuration for mouse event handling coordinate transformation.
+#[derive(Debug, Clone)]
+pub(super) struct MouseConfig {
+    /// Terminal grid width in characters
+    pub grid_width: u16,
+    /// Terminal grid height in characters
+    pub grid_height: u16,
+    /// Optional pixel offset for coordinate calculation (e.g., canvas padding)
+    pub offset: Option<f64>,
+    /// Optional cell dimensions (width, height) in pixels for accurate coordinate mapping
+    pub cell_dimensions: Option<(f64, f64)>,
+}
+
+impl MouseConfig {
+    /// Creates a new MouseConfig with just grid dimensions (suitable for DOM backend)
+    pub fn new(grid_width: u16, grid_height: u16) -> Self {
+        Self {
+            grid_width,
+            grid_height,
+            offset: None,
+            cell_dimensions: None,
+        }
+    }
+
+    /// Sets the pixel offset (e.g., for canvas padding)
+    pub fn with_offset(mut self, offset: f64) -> Self {
+        self.offset = Some(offset);
+        self
+    }
+
+    /// Sets the cell dimensions for accurate coordinate mapping
+    pub fn with_cell_dimensions(mut self, width: f64, height: f64) -> Self {
+        self.cell_dimensions = Some((width, height));
+        self
+    }
+}
+
 /// Converts mouse coordinates to grid coordinates using element dimensions
 /// This is the core function both backends use for accurate coordinate calculation
 fn mouse_to_grid_coords(
     event: &web_sys::MouseEvent,
     element: &HtmlElement,
-    grid_width: u16,
-    grid_height: u16,
-    offset: Option<f64>,
+    config: &MouseConfig,
 ) -> MouseEvent {
     let rect = element.get_bounding_client_rect();
 
     // Calculate relative position within the element
-    let relative_x = (event.client_x() as f64 - rect.left() - offset.unwrap_or(0.0)).max(0.0);
-    let relative_y = (event.client_y() as f64 - rect.top() - offset.unwrap_or(0.0)).max(0.0);
+    let offset = config.offset.unwrap_or(0.0);
+    let relative_x = (event.client_x() as f64 - rect.left() - offset).max(0.0);
+    let relative_y = (event.client_y() as f64 - rect.top() - offset).max(0.0);
 
-    // Map coordinates as fractions of element dimensions to grid coordinates
-    let col = ((relative_x / rect.width()) * grid_width as f64) as u16;
-    let row = ((relative_y / rect.height()) * grid_height as f64) as u16;
+    // Calculate the actual drawable area
+    let (drawable_width, drawable_height) =
+        if let Some((cell_width, cell_height)) = config.cell_dimensions {
+            // Use the actual grid area based on cell dimensions (CanvasBackends)
+            (
+                config.grid_width as f64 * cell_width,
+                config.grid_height as f64 * cell_height,
+            )
+        } else {
+            // Use the full element dimensions (DomBackend)
+            (rect.width(), rect.height())
+        };
+
+    // Map coordinates as fractions of drawable area to grid coordinates
+    let col = ((relative_x / drawable_width) * config.grid_width as f64) as u16;
+    let row = ((relative_y / drawable_height) * config.grid_height as f64) as u16;
 
     // Clamp to grid bounds
-    let col = col.min(grid_width.saturating_sub(1));
-    let row = row.min(grid_height.saturating_sub(1));
+    let col = col.min(config.grid_width.saturating_sub(1));
+    let row = row.min(config.grid_height.saturating_sub(1));
 
     MouseEvent {
         kind: MouseEventKind::from(event),
@@ -148,9 +184,7 @@ fn register_mouse_event_handler(
 /// Registers a mouse event handler that normalizes wheel deltas to sensible terminal scroll amounts.
 fn register_mouse_event_handler_with_wheel_normalization<F>(
     element: &Element,
-    grid_width: u16,
-    grid_height: u16,
-    offset: Option<f64>,
+    config: MouseConfig,
     callback: F,
 ) -> Result<Closure<dyn FnMut(web_sys::MouseEvent)>, Error>
 where
@@ -161,8 +195,7 @@ where
 
     let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
         if let Some(html_element) = element_clone.dyn_ref::<web_sys::HtmlElement>() {
-            let mut mouse_event =
-                mouse_to_grid_coords(&event, html_element, grid_width, grid_height, offset);
+            let mut mouse_event = mouse_to_grid_coords(&event, html_element, &config);
 
             // Normalize wheel deltas if it's a wheel event
             if let MouseEventKind::Wheel {
@@ -203,12 +236,14 @@ fn normalize_wheel_deltas(delta_mode: u32, delta_col: f64, delta_row: f64) -> (f
         // 0: DOM_DELTA_PIXEL - convert to 1-3 lines based on magnitude
         // 1: DOM_DELTA_LINE  - clamp to max 3 lines
         // 2: DOM_DELTA_PAGE  - treat as 3 lines
-        (sign * match delta_mode {
-            0 => (delta.abs() / 50.0) - 25.0,
-            1 => delta,
-            2 => 3.0,
-            _ => 0.0,
-        }).clamp(-3.0, 3.0)
+        (sign
+            * match delta_mode {
+                0 => (delta.abs() / 50.0) - 25.0,
+                1 => delta,
+                2 => 3.0,
+                _ => 0.0,
+            })
+        .clamp(-3.0, 3.0)
     }
 
     (
