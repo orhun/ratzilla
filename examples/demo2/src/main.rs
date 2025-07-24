@@ -48,7 +48,10 @@ fn main() -> std::io::Result<()> {
     let viewport = Viewport::Fixed(Rect::new(0, 0, 81, 18));
     
     let terminal = MultiBackendBuilder::with_fallback(BackendType::Canvas)
-        .webgl2_options(WebGl2BackendOptions::new().measure_performance(true))
+        .webgl2_options(WebGl2BackendOptions::new()
+            .measure_performance(true)
+            .enable_mouse_selection()
+        )
         .terminal_options(TerminalOptions { viewport })
         .build_terminal()?;
     
