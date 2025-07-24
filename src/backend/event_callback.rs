@@ -198,30 +198,17 @@ fn normalize_wheel_deltas(delta_mode: u32, delta_col: f64, delta_row: f64) -> (f
             return 0.0;
         }
 
-        let abs_delta = delta.abs();
         let sign = delta.signum();
 
-        match delta_mode {
-            0 => {
-                // DOM_DELTA_PIXEL - convert to 1-3 lines based on magnitude
-                if abs_delta < 50.0 {
-                    sign * 1.0
-                } else if abs_delta < 150.0 {
-                    sign * 2.0
-                } else {
-                    sign * 3.0
-                }
-            }
-            1 => {
-                // DOM_DELTA_LINE - clamp to max 3 lines
-                (delta).clamp(-3.0, 3.0)
-            }
-            2 => {
-                // DOM_DELTA_PAGE - treat as 3 lines
-                sign * 3.0
-            }
+        // 0: DOM_DELTA_PIXEL - convert to 1-3 lines based on magnitude
+        // 1: DOM_DELTA_LINE  - clamp to max 3 lines
+        // 2: DOM_DELTA_PAGE  - treat as 3 lines
+        (sign * match delta_mode {
+            0 => (delta.abs() / 50.0) - 25.0,
+            1 => delta,
+            2 => 3.0,
             _ => 0.0,
-        }
+        }).clamp(-3.0, 3.0)
     }
 
     (
