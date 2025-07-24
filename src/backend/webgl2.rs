@@ -1,5 +1,5 @@
 use crate::{
-    backend::{color::to_rgb, utils::*},
+    backend::{color::to_rgb, event_callback::EventCallback, utils::*},
     error::Error,
     event::{KeyEvent, MouseEvent},
     render::WebEventHandler,
@@ -14,6 +14,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
+use web_sys::wasm_bindgen::JsCast;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -164,6 +165,10 @@ pub struct WebGl2Backend {
     cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
+    /// Active mouse event callback for cleanup (currently unused - mouse events not supported).
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
 }
 
 impl WebGl2Backend {
@@ -205,6 +210,8 @@ impl WebGl2Backend {
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             performance,
+            key_callback: None,
+            mouse_callback: None,
         })
     }
 
@@ -436,40 +443,36 @@ impl WebEventHandler for WebGl2Backend {
     where
         F: FnMut(MouseEvent) + 'static,
     {
+        // Clear any existing mouse events (no-op currently)
+        self.clear_mouse_events()?;
+
+        // Mouse events are not supported in WebGL2Backend
+        // Structure is prepared for future implementation
         Err(Error::MouseEventsNotSupported)
     }
 
     fn clear_mouse_events(&mut self) -> Result<(), Error> {
-        // No-op since mouse events are not supported
+        // Clear mouse callback (no-op currently since mouse events aren't supported)
+        self.mouse_callback.take();
         Ok(())
     }
 
-    fn setup_key_events<F>(&mut self, mut callback: F) -> Result<(), Error>
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
     where
         F: FnMut(KeyEvent) + 'static,
     {
-        use web_sys::wasm_bindgen::{prelude::Closure, JsCast};
+        // Clear existing key events first
+        self.clear_key_events()?;
 
-        // Note: This implementation doesn't store the closure for cleanup
-        // This maintains the same behavior as the original WebRenderer::on_key_event
-        let closure = Closure::<dyn FnMut(_)>::new(move |event: web_sys::KeyboardEvent| {
-            callback(event.into());
-        });
-
-        let window = web_sys::window().ok_or(Error::UnableToRetrieveWindow)?;
-        let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
-
-        document
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
-            .map_err(Error::from)?;
-
-        closure.forget(); // Note: This leaks memory if called multiple times
+        self.key_callback = Some(EventCallback::new_key(
+            get_document()?.unchecked_into(),
+            callback,
+        )?);
         Ok(())
     }
 
     fn clear_key_events(&mut self) -> Result<(), Error> {
-        // Cannot clear keys without storing the closure reference
-        // This matches the original WebRenderer behavior
+        self.key_callback.take();
         Ok(())
     }
 }
