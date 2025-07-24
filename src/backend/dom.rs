@@ -65,6 +65,7 @@ impl DomBackendOptions {
 ///
 /// In other words, it transforms the [`Cell`]s into `<span>`s which are then
 /// appended to a `<pre>` element.
+#[derive(Debug)]
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
@@ -360,36 +361,6 @@ impl Backend for DomBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
-    }
-}
-
-impl std::fmt::Debug for DomBackend {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DomBackend")
-            .field("initialized", &self.initialized)
-            .field(
-                "buffer",
-                &format!(
-                    "{}x{} buffer",
-                    self.buffer.len(),
-                    self.buffer.first().map_or(0, |row| row.len())
-                ),
-            )
-            .field(
-                "prev_buffer",
-                &format!(
-                    "{}x{} buffer",
-                    self.prev_buffer.len(),
-                    self.prev_buffer.first().map_or(0, |row| row.len())
-                ),
-            )
-            .field("cells", &format!("{} cells", self.cells.len()))
-            .field("options", &self.options)
-            .field("cursor_position", &self.cursor_position)
-            .field("cell_size_px", &self.cell_size_px)
-            .field("mouse_callback", &self.mouse_callback.is_some())
-            .field("key_callback", &self.key_callback.is_some())
-            .finish()
     }
 }
 
