@@ -7,7 +7,6 @@ use ratzilla::{
         layout::{Position, Rect},
         style::Color,
         widgets::Widget,
-        Terminal,
     },
     WebRenderer,
 };
