@@ -4,9 +4,7 @@ use crate::{
     widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
-use beamterm_renderer::{
-    mouse::*, select, CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
-};
+use beamterm_renderer::{mouse::*, select, CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal};
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
 use ratatui::{
@@ -17,7 +15,7 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use std::{cell::RefCell, fmt::Debug, io::Result as IoResult, mem::swap, rc::Rc};
-use web_sys::{wasm_bindgen::JsCast, window, Element};
+use web_sys::{wasm_bindgen::JsCast, window, Element, HtmlCanvasElement, HtmlElement};
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -40,12 +38,14 @@ pub struct WebGl2BackendOptions {
     canvas_padding_color: Option<Color>,
     /// The cursor shape.
     cursor_shape: CursorShape,
+    /// Hyperlink click callback.
+    hyperlink_callback: Option<HyperlinkCallback>,
     /// Whether to use beamterm's internal mouse handler for selection.
     default_mouse_handler: bool,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
-    /// Hyperlink click callback.
-    hyperlink_callback: Option<HyperlinkCallback>,
+    /// Enable console debugging and introspection API
+    console_debug_api: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -132,6 +132,13 @@ impl WebGl2BackendOptions {
             .map(|c| to_rgb(c, 0x000000))
             .unwrap_or(0x000000)
     }
+
+    /// Enables debug API during terminal creation. The debug api
+    /// is accessible from the browser console under `window.__beamterm_debug`.
+    pub fn enable_console_debug_api(mut self) -> Self {
+        self.console_debug_api = true;
+        self
+    }
 }
 
 /// WebGl2 backend for high-performance terminal rendering.
@@ -205,10 +212,10 @@ pub struct WebGl2Backend {
     hyperlink_cells: Option<Rc<RefCell<BitVec>>>,
     /// Mouse handler for hyperlink clicks.
     hyperlink_mouse_handler: Option<TerminalMouseHandler>,
-    /// Hyperlink click callback.
-    hyperlink_callback: Option<HyperlinkCallback>,
     /// Current cursor state over hyperlinks (shared with mouse handler).
     cursor_over_hyperlink: Option<Rc<RefCell<bool>>>,
+    /// Hyperlink click callback.
+    _hyperlink_callback: Option<HyperlinkCallback>,
 }
 
 impl WebGl2Backend {
@@ -237,26 +244,10 @@ impl WebGl2Backend {
         // Parent element of canvas (uses <body> unless specified)
         let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
-        let (width, height) = options
-            .size
-            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
-
-        let canvas = create_canvas_in_element(&parent, width, height)?;
-
-        let context = Beamterm::builder(canvas)
-            .canvas_padding_color(options.get_canvas_padding_color())
-            .fallback_glyph(&options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
-            .font_atlas(options.font_atlas.take().unwrap_or_default());
-
-        let context = if options.default_mouse_handler {
-            context.default_mouse_input_handler(SelectionMode::Block, true)
-        } else {
-            context
-        }
-        .build()?;
+        let beamterm = Self::init_beamterm(&mut options, &parent)?;
 
         let hyperlink_cells = if options.hyperlink_callback.is_some() {
-            let indices = BitVec::repeat(false, context.cell_count());
+            let indices = BitVec::repeat(false, beamterm.cell_count());
             Some(Rc::new(RefCell::new(indices)))
         } else {
             None
@@ -281,7 +272,7 @@ impl WebGl2Backend {
                 .clone()
                 .expect("known to exist at this point");
             Some(Self::create_hyperlink_mouse_handler(
-                &context,
+                &beamterm,
                 hyperlink_cells.clone(),
                 callback.callback.clone(),
                 cursor_state,
@@ -291,14 +282,14 @@ impl WebGl2Backend {
         };
 
         Ok(Self {
-            beamterm: context,
+            beamterm,
             cursor_position: None,
             options,
             hyperlink_cells,
             hyperlink_mouse_handler,
-            hyperlink_callback,
             performance,
             cursor_over_hyperlink,
+            _hyperlink_callback: hyperlink_callback,
         })
     }
 
@@ -562,6 +553,37 @@ impl WebGl2Backend {
             .get(cell_idx)
             .map(|b| *b)
             .unwrap_or(false)
+    }
+
+    /// Initializes the beamterm renderer with the given options and parent element.
+    fn init_beamterm(
+        options: &mut WebGl2BackendOptions,
+        parent: &Element
+    ) -> Result<Terminal, Error> {
+        let (width, height) = options
+            .size
+            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
+
+        let canvas = create_canvas_in_element(&parent, width, height)?;
+
+        let beamterm = Beamterm::builder(canvas)
+            .canvas_padding_color(options.get_canvas_padding_color())
+            .fallback_glyph(&options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
+            .font_atlas(options.font_atlas.take().unwrap_or_default());
+
+        let beamterm = if options.default_mouse_handler {
+            beamterm.default_mouse_input_handler(SelectionMode::Block, true)
+        } else {
+            beamterm
+        };
+
+        let beamterm = if options.console_debug_api {
+            beamterm.enable_debug_api()
+        } else {
+            beamterm
+        };
+
+        Ok(beamterm.build()?)
     }
 }
 
