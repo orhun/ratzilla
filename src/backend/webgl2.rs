@@ -5,8 +5,7 @@ use crate::{
     CursorShape,
 };
 use beamterm_renderer::{
-    mouse::*, select, CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
-    Terminal,
+    mouse::*, select, CellData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal,
 };
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
@@ -19,6 +18,9 @@ use ratatui::{
 };
 use std::{cell::RefCell, fmt::Debug, io::Result as IoResult, mem::swap, rc::Rc};
 use web_sys::{wasm_bindgen::JsCast, window, Element, HtmlCanvasElement, HtmlElement};
+
+/// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
+pub use beamterm_renderer::FontAtlasData;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
