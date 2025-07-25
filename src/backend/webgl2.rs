@@ -4,7 +4,10 @@ use crate::{
     widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
-use beamterm_renderer::{mouse::*, select, CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal};
+use beamterm_renderer::{
+    mouse::*, select, CellData, FontAtlasData, GlyphEffect, SelectionMode, Terminal as Beamterm,
+    Terminal,
+};
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
 use ratatui::{
@@ -558,7 +561,7 @@ impl WebGl2Backend {
     /// Initializes the beamterm renderer with the given options and parent element.
     fn init_beamterm(
         options: &mut WebGl2BackendOptions,
-        parent: &Element
+        parent: &Element,
     ) -> Result<Terminal, Error> {
         let (width, height) = options
             .size
