@@ -53,6 +53,3 @@ pub(crate) mod utils;
 
 /// Cursor shapes.
 pub mod cursor;
-
-/// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
-pub use beamterm_renderer::FontAtlasData;
