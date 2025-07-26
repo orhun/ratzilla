@@ -598,7 +598,9 @@ impl Backend for WebGl2Backend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        if content.size_hint().1 != Some(0) {
+        // we only update when we have new cell data or if the mouse selection
+        // handler is enabled (otherwise, we fail to update the visualized selection).
+        if content.size_hint().1 != Some(0) || self.options.default_mouse_handler {
             self.update_grid(content)?;
         }
 
