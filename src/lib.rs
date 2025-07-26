@@ -17,7 +17,7 @@ pub mod widgets;
 pub mod backend;
 
 /// Rendering.
-mod render;
+pub mod render;
 
 // Re-export ratatui crate.
 pub use ratatui;
@@ -28,4 +28,4 @@ pub use web_sys;
 pub use backend::{
     canvas::CanvasBackend, cursor::CursorShape, dom::DomBackend, webgl2::WebGl2Backend,
 };
-pub use render::WebRenderer;
+pub use render::{WebEventHandler, WebRenderer};
