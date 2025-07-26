@@ -11,6 +11,7 @@ use ratzilla::{
 };
 
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 
 fn main() -> io::Result<()> {
     let counter = Rc::new(RefCell::new(0));
@@ -19,6 +20,10 @@ fn main() -> io::Result<()> {
     let mouse_event_kind = Rc::new(RefCell::new(None::<MouseEventKind>));
 
     let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .webgl2_options(WebGl2BackendOptions::new()
+            .enable_console_debug_api()
+            .enable_mouse_selection()
+        )
         .build_terminal()?;
 
     terminal.on_key_event({
