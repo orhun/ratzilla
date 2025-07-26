@@ -11,7 +11,11 @@ use wave_effect::WaveInterference;
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let terminal = MultiBackendBuilder::with_fallback(BackendType::WebGl2)
-        .webgl2_options(WebGl2BackendOptions::new().measure_performance(true).grid_id("container"))
+        .webgl2_options(WebGl2BackendOptions::new()
+            .measure_performance(true)
+            .grid_id("container")
+            .enable_console_debug_api()
+        )
         .build_terminal()?;
 
     let mut effect = WaveInterference::new().into_effect();

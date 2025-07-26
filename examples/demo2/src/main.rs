@@ -51,6 +51,7 @@ fn main() -> std::io::Result<()> {
         .webgl2_options(WebGl2BackendOptions::new()
             .measure_performance(true)
             .enable_mouse_selection()
+            .enable_console_debug_api()
         )
         .terminal_options(TerminalOptions { viewport })
         .build_terminal()?;
