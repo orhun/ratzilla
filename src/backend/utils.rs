@@ -3,11 +3,7 @@ use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
-use compact_str::{format_compact, CompactString};
-use ratatui::{
-    buffer::Cell,
-    style::{Color, Modifier},
-};
+use ratatui::{buffer::Cell, style::Modifier};
 use web_sys::{
     wasm_bindgen::{JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
@@ -87,13 +83,6 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style}")
 }
 
-/// Converts a Color to a CSS style.
-pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
-    let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());
-
-    format_compact!("rgb({}, {}, {})", color.0, color.1, color.2)
-}
-
 /// Calculates the number of pixels that can fit in the window.
 pub(crate) fn get_raw_window_size() -> (u16, u16) {
     fn js_val_to_int<I: TryFrom<usize>>(val: JsValue) -> Option<I> {
@@ -124,13 +113,6 @@ pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
         get_window_size()
     };
     vec![vec![Cell::default(); size.width as usize]; size.height as usize]
-}
-
-/// Returns a buffer based on the canvas size.
-pub(crate) fn get_sized_buffer_from_canvas(canvas: &HtmlCanvasElement) -> Vec<Vec<Cell>> {
-    let width = canvas.client_width() as u16 / 10_u16;
-    let height = canvas.client_height() as u16 / 19_u16;
-    vec![vec![Cell::default(); width as usize]; height as usize]
 }
 
 /// Returns the document object from the window.

@@ -170,8 +170,8 @@ impl From<web_sys::MouseEvent> for MouseEvent {
                 event.button().into()
             },
             event: event_type,
-            x: event.client_x() as u32,
-            y: event.client_y() as u32,
+            x: event.offset_x() as u32,
+            y: event.offset_y() as u32,
             ctrl,
             alt,
             shift,

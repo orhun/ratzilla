@@ -225,6 +225,7 @@ pub struct Server<'a> {
 pub struct App<'a> {
     pub title: &'a str,
     pub should_quit: bool,
+    pub paused: bool,
     pub tabs: TabsState<'a>,
     pub show_chart: bool,
     pub progress: f64,
@@ -260,6 +261,7 @@ impl<'a> App<'a> {
         App {
             title,
             should_quit: false,
+            paused: false,
             tabs: TabsState::new(vec!["Tab0", "Tab1", "Tab2"]),
             show_chart: true,
             progress: 0.0,
@@ -347,6 +349,17 @@ impl<'a> App<'a> {
     }
 
     pub fn on_tick(&mut self) -> Duration {
+        // calculate elapsed time since last frame
+        let now = web_time::Instant::now();
+        let elapsed = now.duration_since(self.last_frame).as_millis() as u32;
+        self.last_frame = now;
+
+        let elapsed = Duration::from_millis(elapsed);
+
+        if self.paused {
+            return elapsed;
+        }
+
         // Update progress
         self.progress += 0.001;
         if self.progress > 1.0 {
@@ -361,13 +374,11 @@ impl<'a> App<'a> {
 
         let event = self.barchart.pop().unwrap();
         self.barchart.insert(0, event);
+        elapsed
+    }
 
-        // calculate elapsed time since last frame
-        let now = web_time::Instant::now();
-        let elapsed = now.duration_since(self.last_frame).as_millis() as u32;
-        self.last_frame = now;
-
-        Duration::from_millis(elapsed)
+    pub fn pause_unpause(&mut self) {
+        self.paused = !self.paused;
     }
 
     fn add_transition_tab_effect(&mut self) {

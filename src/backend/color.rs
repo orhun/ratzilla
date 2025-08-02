@@ -39,20 +39,46 @@ pub(super) fn ansi_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
 }
 
 /// Returns the actual foreground color of a cell, considering the `REVERSED` modifier.
-pub(super) fn actual_fg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.bg
+pub(super) fn actual_fg_color(
+    cell: &Cell,
+    modifiers: Modifier,
+    fg_fallback: Color,
+    bg_fallback: Color,
+) -> Color {
+    if modifiers.contains(Modifier::REVERSED) {
+        if cell.bg == Color::Reset {
+            bg_fallback
+        } else {
+            cell.bg
+        }
     } else {
-        cell.fg
+        if cell.fg == Color::Reset {
+            fg_fallback
+        } else {
+            cell.fg
+        }
     }
 }
 
 /// Returns the actual background color of a cell, considering the `REVERSED` modifier.
-pub(super) fn actual_bg_color(cell: &Cell) -> Color {
-    if cell.modifier.contains(Modifier::REVERSED) {
-        cell.fg
+pub(super) fn actual_bg_color(
+    cell: &Cell,
+    modifiers: Modifier,
+    fg_fallback: Color,
+    bg_fallback: Color,
+) -> Color {
+    if modifiers.contains(Modifier::REVERSED) {
+        if cell.fg == Color::Reset {
+            fg_fallback
+        } else {
+            cell.fg
+        }
     } else {
-        cell.bg
+        if cell.bg == Color::Reset {
+            bg_fallback
+        } else {
+            cell.bg
+        }
     }
 }
 

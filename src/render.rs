@@ -1,14 +1,22 @@
 use ratatui::{prelude::Backend, Frame, Terminal};
 use std::{cell::RefCell, rc::Rc};
-use web_sys::{wasm_bindgen::prelude::*, window};
+use web_sys::{wasm_bindgen::prelude::*, window, Element};
 
 use crate::event::{KeyEvent, MouseEvent};
+
+/// Trait for providing backend-specific shared functionality
+/// for each backend
+pub trait WebBackend {
+    /// This is the element that event listeners will be added
+    /// to to capture mouse and keyboard events
+    fn listening_element(&self) -> &Element;
+}
 
 /// Trait for rendering on the web.
 ///
 /// It provides all the necessary methods to render the terminal on the web
 /// and also interact with the browser such as handling key events.
-pub trait WebRenderer {
+pub trait WebRenderer: WebBackend {
     /// Renders the terminal on the web.
     ///
     /// This method takes a closure that will be called on every update
@@ -53,10 +61,10 @@ pub trait WebRenderer {
         });
         let window = window().unwrap();
         let document = window.document().unwrap();
-        document
+        self.listening_element()
             .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())
             .unwrap();
-        document
+        self.listening_element()
             .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())
             .unwrap();
         document
@@ -74,12 +82,21 @@ pub trait WebRenderer {
     }
 }
 
+impl<T> WebBackend for Terminal<T>
+where
+    T: Backend + WebBackend + 'static,
+{
+    fn listening_element(&self) -> &Element {
+        self.backend().listening_element()
+    }
+}
+
 /// Implement [`WebRenderer`] for Ratatui's [`Terminal`].
 ///
 /// This implementation creates a loop that calls the [`Terminal::draw`] method.
 impl<T> WebRenderer for Terminal<T>
 where
-    T: Backend + 'static,
+    T: Backend + WebBackend + 'static,
 {
     fn draw_web<F>(mut self, mut render_callback: F)
     where
