@@ -236,11 +236,14 @@ There is a Vercel deployment template available for Ratzilla [here](https://verc
 
 ## Acknowledgements
 
-Thanks to [Webatui] projects for the inspiration and the initial implementation of the essential parts of DOM backend.
+Thanks to [Webatui] projects for the inspiration.
 
-Special thanks to [Martin Blasko] for his huge help and contributions.
+Special thanks to:
 
-Lastly, thanks to [Ratatui] for providing the core TUI components.
+- [Martin Blasko] for his huge help with the initial implementation.
+- [Adrian Papari] for implementing WebGL2 backend.
+
+Lastly, thanks to [Ratatui] for providing the core UI components.
 
 [trunk]: https://trunkrs.dev
 [Ratatui]: https://ratatui.rs
@@ -249,6 +252,7 @@ Lastly, thanks to [Ratatui] for providing the core TUI components.
 [`Hyperlink`]: https://docs.rs/ratzilla/latest/ratzilla/widgets/struct.Hyperlink.html
 [Webatui]: https://github.com/TylerBloom/webatui
 [Martin Blasko]: https://github.com/MartinBspheroid
+[Adrian Papari]: https://github.com/junkdog
 [Vercel]: https://vercel
 
 ## Contributing
