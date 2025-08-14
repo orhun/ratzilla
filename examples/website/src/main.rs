@@ -16,6 +16,7 @@ use tachyonfx::{
     fx::{self, RepeatMode},
     CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion, Shader,
 };
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 
 struct State {
     intro_effect: Effect,
@@ -54,8 +55,14 @@ impl Default for State {
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+    
     let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .webgl2_options(WebGl2BackendOptions::new()
+            .enable_hyperlinks()
+            .enable_mouse_selection()
+        )
         .build_terminal()?;
+    
     let mut state = State::default();
     terminal.on_key_event(move |key| handle_key_event(key));
     terminal.draw_web(move |f| ui(f, &mut state));

@@ -13,10 +13,20 @@ use ratzilla::ratatui::{
 };
 use ratzilla::{event::KeyCode, WebRenderer};
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
+use ratzilla::backend::dom::DomBackendOptions;
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 
 fn main() -> io::Result<()> {
+    let dom_options = DomBackendOptions::new(None, CursorShape::SteadyUnderScore);
+
+    let webgl2_options = WebGl2BackendOptions::new()
+        .cursor_shape(CursorShape::SteadyUnderScore)
+        .enable_console_debug_api()
+        .enable_mouse_selection();
+
     let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
-        .dom_options(ratzilla::backend::dom::DomBackendOptions::new(None, CursorShape::SteadyUnderScore))
+        .dom_options(dom_options)
+        .webgl2_options(webgl2_options)
         .build_terminal()?;
 
     let app = Rc::new(RefCell::new(App::new()));
