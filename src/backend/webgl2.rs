@@ -16,8 +16,8 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Modifier},
 };
-use std::{cell::RefCell, fmt::Debug, io::Result as IoResult, mem::swap, rc::Rc};
-use web_sys::{wasm_bindgen::JsCast, window, Element, HtmlCanvasElement, HtmlElement};
+use std::{cell::RefCell, io::Result as IoResult, mem::swap, rc::Rc};
+use web_sys::{wasm_bindgen::JsCast, window, Element};
 
 /// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
 pub use beamterm_renderer::FontAtlasData;
@@ -775,7 +775,7 @@ fn resolve_fg_bg_colors(cell: &Cell) -> (u32, u32) {
 }
 
 /// Converts a [`Cell`] into a [`CellData`] for the beamterm renderer.
-fn cell_data(cell: &Cell) -> CellData {
+fn cell_data(cell: &Cell) -> CellData<'_> {
     let (fg, bg) = resolve_fg_bg_colors(cell);
     CellData::new_with_style_bits(cell.symbol(), into_glyph_bits(cell.modifier), fg, bg)
 }
