@@ -794,10 +794,10 @@ fn cell_data(cell: &Cell) -> CellData<'_> {
 ///                    0000_0000_0000_1000  (UNDERLINED at bit 3)
 ///                    0000_0001_0000_0000  (CROSSED_OUT at bit 8)
 ///
-/// FontStyle bits:    0000_0010_0000_0000  (Bold as bit 9)
-///                    0000_0100_0000_0000  (Italic as bit 10)
-/// GlyphEffect bits:  0001_0000_0000_0000  (Underline at bit 12)
-///                    0010_0000_0000_0000  (Strikethrough at bit 13)
+/// FontStyle bits:    0000_0100_0000_0000  (Bold as bit 10)
+///                    0000_1000_0000_0000  (Italic as bit 11)
+/// GlyphEffect bits:  0010_0000_0000_0000  (Underline at bit 13)
+///                    0100_0000_0000_0000  (Strikethrough at bit 14)
 ///
 /// Shift operations:  bit 0 << 9 = bit 9
 ///                    bit 2 << 8 = bit 10
@@ -807,10 +807,10 @@ fn cell_data(cell: &Cell) -> CellData<'_> {
 const fn into_glyph_bits(modifier: Modifier) -> u16 {
     let m = modifier.bits();
 
-    (m << 9) & (1 << 9)    // bold
-    | (m << 8) & (1 << 10) // italic
-    | (m << 9) & (1 << 12) // underline
-    | (m << 5) & (1 << 13) // strikethrough
+    (m << 9) & (1 << 10)   // bold
+    | (m << 8) & (1 << 11) // italic
+    | (m << 9) & (1 << 13) // underline
+    | (m << 5) & (1 << 14) // strikethrough
 }
 
 /// A `Debug`-derive friendly convenience wrapper
