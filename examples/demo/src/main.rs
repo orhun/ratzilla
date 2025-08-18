@@ -36,7 +36,7 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-    let app_state = Rc::new(RefCell::new(App::new("Demo", false)));
+    let app_state = Rc::new(RefCell::new(App::new("Demo", true)));
     
     // Create backend with explicit size like main branch (1600x900)
     let canvas_options = CanvasBackendOptions::new()

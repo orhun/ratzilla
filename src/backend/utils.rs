@@ -84,7 +84,14 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
         modifier_style.push_str("text-decoration: line-through; ");
     }
 
-    format!("{fg_style} {bg_style} {modifier_style}")
+    // ensure consistent width for braille characters
+    let braille_style = if contains_braille(cell) {
+        "display: inline-block; width: 1ch; font-variant-numeric: tabular-nums; "
+    } else {
+        ""
+    };
+
+    format!("{fg_style} {bg_style} {modifier_style}{braille_style}")
 }
 
 /// Converts a Color to a CSS style.
@@ -185,4 +192,12 @@ pub(crate) fn create_canvas_in_element(
     parent.append_child(&element)?;
 
     Ok(canvas)
+}
+
+/// Checks if the given cell contains a braille character.
+fn contains_braille(cell: &Cell) -> bool {
+    cell.symbol()
+        .chars()
+        .next()
+        .is_some_and(|c| ('\u{2800}'..='\u{28FF}').contains(&c))
 }
