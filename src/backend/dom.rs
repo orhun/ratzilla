@@ -6,6 +6,7 @@ use ratatui::{
     layout::{Position, Size},
     prelude::Backend,
 };
+use unicode_width::UnicodeWidthStr;
 use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast},
     window, Document, Element, Window,
@@ -148,10 +149,13 @@ impl DomBackend {
     fn prerender(&mut self) -> Result<(), Error> {
         for line in self.buffer.iter() {
             let mut line_cells: Vec<Element> = Vec::new();
-            let mut hyperlink: Vec<Cell> = Vec::new();
+            let mut hyperlink: Vec<(Cell, bool)> = Vec::new();
+            let mut skip = 0;
             for (i, cell) in line.iter().enumerate() {
+                let overwritten = skip > 0;
+                skip = std::cmp::max(skip, cell.symbol().width()).saturating_sub(1);
                 if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    hyperlink.push(cell.clone());
+                    hyperlink.push((cell.clone(), overwritten));
                     // If the next cell is not part of the hyperlink, close it
                     if !line
                         .get(i + 1)
@@ -159,8 +163,8 @@ impl DomBackend {
                         .unwrap_or(false)
                     {
                         let anchor = create_anchor(&self.document, &hyperlink)?;
-                        for link_cell in &hyperlink {
-                            let span = create_span(&self.document, link_cell)?;
+                        for (link_cell, overwritten) in &hyperlink {
+                            let span = create_span(&self.document, link_cell, *overwritten)?;
                             self.cells.push(span.clone());
                             anchor.append_child(&span)?;
                         }
@@ -168,7 +172,7 @@ impl DomBackend {
                         hyperlink.clear();
                     }
                 } else {
-                    let span = create_span(&self.document, cell)?;
+                    let span = create_span(&self.document, cell, overwritten)?;
                     self.cells.push(span.clone());
                     line_cells.push(span);
                 }
@@ -192,14 +196,22 @@ impl DomBackend {
     /// accordingly.
     fn update_grid(&mut self) -> Result<(), Error> {
         for (y, line) in self.buffer.iter().enumerate() {
+            let mut skip = 0;
             for (x, cell) in line.iter().enumerate() {
+                let overwritten = skip > 0;
+                skip = std::cmp::max(skip, cell.symbol().width()).saturating_sub(1);
                 if cell.modifier.contains(HYPERLINK_MODIFIER) {
                     continue;
                 }
                 if cell != &self.prev_buffer[y][x] {
                     let elem = self.cells[y * self.buffer[0].len() + x].clone();
                     elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_style_as_css(cell))?;
+                    if overwritten {
+                        // If the cell is overwritten, hide it
+                        elem.set_attribute("style", "display: none;")?;
+                    } else {
+                        elem.set_attribute("style", &get_cell_style_as_css(cell))?;
+                    }
                 }
             }
         }
