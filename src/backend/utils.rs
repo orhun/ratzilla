@@ -14,23 +14,31 @@ use web_sys::{
 };
 
 /// Creates a new `<span>` element with the given cell.
-pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
+pub(crate) fn create_span(
+    document: &Document,
+    cell: &Cell,
+    overwritten: bool,
+) -> Result<Element, Error> {
     let span = document.create_element("span")?;
     span.set_inner_html(cell.symbol());
 
-    let style = get_cell_style_as_css(cell);
-    span.set_attribute("style", &style)?;
+    if overwritten {
+        span.set_attribute("style", "display: none;")?;
+    } else {
+        let style = get_cell_style_as_css(cell);
+        span.set_attribute("style", &style)?;
+    }
     Ok(span)
 }
 
 /// Creates a new `<a>` element with the given cells.
-pub(crate) fn create_anchor(document: &Document, cells: &[Cell]) -> Result<Element, Error> {
+pub(crate) fn create_anchor(document: &Document, cells: &[(Cell, bool)]) -> Result<Element, Error> {
     let anchor = document.create_element("a")?;
     anchor.set_attribute(
         "href",
-        &cells.iter().map(|c| c.symbol()).collect::<String>(),
+        &cells.iter().map(|c| c.0.symbol()).collect::<String>(),
     )?;
-    anchor.set_attribute("style", &get_cell_style_as_css(&cells[0]))?;
+    anchor.set_attribute("style", &get_cell_style_as_css(&cells[0].0))?;
     Ok(anchor)
 }
 
