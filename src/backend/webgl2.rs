@@ -1,6 +1,8 @@
 use crate::{
-    backend::{color::to_rgb, utils::*},
+    backend::{color::to_rgb, event_callback::EventCallback, utils::*},
     error::Error,
+    event::{KeyEvent, MouseEvent},
+    render::WebEventHandler,
     CursorShape,
 };
 use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
@@ -12,6 +14,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{cmp::min, io::Result as IoResult, mem::swap};
+use web_sys::wasm_bindgen::JsCast;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
@@ -162,6 +165,10 @@ pub struct WebGl2Backend {
     cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
+    /// Active mouse event callback for cleanup (currently unused - mouse events not supported).
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
 }
 
 impl WebGl2Backend {
@@ -203,6 +210,8 @@ impl WebGl2Backend {
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             performance,
+            key_callback: None,
+            mouse_callback: None,
         })
     }
 
@@ -425,6 +434,45 @@ impl Backend for WebGl2Backend {
             }
         }
         self.cursor_position = Some(new_pos);
+        Ok(())
+    }
+}
+
+impl WebEventHandler for WebGl2Backend {
+    fn setup_mouse_events<F>(&mut self, _callback: F) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        // Clear any existing mouse events (no-op currently)
+        self.clear_mouse_events()?;
+
+        // Mouse events are not supported in WebGL2Backend
+        // Structure is prepared for future implementation
+        Err(Error::MouseEventsNotSupported)
+    }
+
+    fn clear_mouse_events(&mut self) -> Result<(), Error> {
+        // Clear mouse callback (no-op currently since mouse events aren't supported)
+        self.mouse_callback.take();
+        Ok(())
+    }
+
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(KeyEvent) + 'static,
+    {
+        // Clear existing key events first
+        self.clear_key_events()?;
+
+        self.key_callback = Some(EventCallback::new_key(
+            get_document()?.unchecked_into(),
+            callback,
+        )?);
+        Ok(())
+    }
+
+    fn clear_key_events(&mut self) -> Result<(), Error> {
+        self.key_callback.take();
         Ok(())
     }
 }

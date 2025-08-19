@@ -43,6 +43,10 @@ pub enum Error {
     /// Failed to retrieve a HTML/js component, such as `Performance`.
     #[error("Failed to retrieve component: {0}")]
     UnableToRetrieveComponent(&'static str),
+
+    /// Mouse events are not supported by this backend.
+    #[error("Mouse events are not supported by this backend")]
+    MouseEventsNotSupported,
 }
 
 /// Convert [`wasm_bindgen::JsValue`] to [`Error`].

@@ -11,10 +11,20 @@ use web_sys::{
     window, Document, Element, Window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{
+    backend::{
+        event_callback::{EventCallback, MouseConfig},
+        utils::*,
+    },
+    error::Error,
+    event::{KeyEvent, MouseEvent},
+    render::WebEventHandler,
+    widgets::hyperlink::HYPERLINK_MODIFIER,
+    CursorShape,
+};
 
 /// Options for the [`DomBackend`].
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct DomBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -77,6 +87,12 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Cached cell size in pixels (width, height).
+    cell_size_px: Option<(u32, u32)>,
+    /// Active mouse event callback for cleanup.
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
 }
 
 impl DomBackend {
@@ -103,6 +119,7 @@ impl DomBackend {
     pub fn new_with_options(options: DomBackendOptions) -> Result<Self, Error> {
         let window = window().ok_or(Error::UnableToRetrieveWindow)?;
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
+
         let mut backend = Self {
             initialized: Rc::new(RefCell::new(false)),
             buffer: vec![],
@@ -114,9 +131,13 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
+            cell_size_px: None,
+            mouse_callback: None,
+            key_callback: None,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
+
         Ok(backend)
     }
 
@@ -138,6 +159,8 @@ impl DomBackend {
         self.cells.clear();
         self.buffer = get_sized_buffer();
         self.prev_buffer = self.buffer.clone();
+        // Reset cell size cache when grid is reset
+        self.cell_size_px = None;
         Ok(())
     }
 
@@ -337,6 +360,51 @@ impl Backend for DomBackend {
             }
         }
         self.cursor_position = Some(new_pos);
+        Ok(())
+    }
+}
+
+impl WebEventHandler for DomBackend {
+    fn setup_mouse_events<F>(&mut self, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        // Clear existing mouse events first
+        self.clear_mouse_events()?;
+
+        let grid_width = self.buffer[0].len() as u16;
+        let grid_height = self.buffer.len() as u16;
+
+        self.mouse_callback = Some(EventCallback::new_mouse(
+            self.grid.clone(),
+            MouseConfig::new(grid_width, grid_height), // DOM backend uses default config
+            callback,
+        )?);
+
+        Ok(())
+    }
+
+    fn clear_mouse_events(&mut self) -> Result<(), Error> {
+        self.mouse_callback.take();
+        Ok(())
+    }
+
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(KeyEvent) + 'static,
+    {
+        // Clear existing key events first
+        self.clear_key_events()?;
+
+        self.key_callback = Some(EventCallback::new_key(
+            self.document.clone().unchecked_into(),
+            callback,
+        )?);
+        Ok(())
+    }
+
+    fn clear_key_events(&mut self) -> Result<(), Error> {
+        self.key_callback.take();
         Ok(())
     }
 }
