@@ -1,6 +1,7 @@
 use bitvec::{bitvec, prelude::BitVec};
 use ratatui::layout::Rect;
 use std::io::Result as IoResult;
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     backend::{
@@ -300,7 +301,7 @@ impl CanvasBackend {
                     self.canvas.context.rect(
                         x as f64 * CELL_WIDTH,
                         y as f64 * CELL_HEIGHT,
-                        CELL_WIDTH,
+                        cell.symbol().width() as f64 * CELL_WIDTH,
                         CELL_HEIGHT,
                     );
                     self.canvas.context.clip();
