@@ -498,7 +498,7 @@ impl WebGl2Backend {
         let cursor_state_clone = cursor_state.clone();
 
         let mouse_handler = TerminalMouseHandler::new(
-            &canvas,
+            canvas,
             grid,
             move |event: TerminalMouseEvent, grid: &beamterm_renderer::TerminalGrid| {
                 match event.event_type {
@@ -569,11 +569,11 @@ impl WebGl2Backend {
             .size
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
-        let canvas = create_canvas_in_element(&parent, width, height)?;
+        let canvas = create_canvas_in_element(parent, width, height)?;
 
         let beamterm = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
-            .fallback_glyph(&options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
+            .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
             .font_atlas(options.font_atlas.take().unwrap_or_default());
 
         let beamterm = if options.default_mouse_handler {
@@ -711,7 +711,7 @@ fn extract_hyperlink_url(
 
     // Find hyperlink boundaries
     let (link_start, link_end) =
-        find_hyperlink_bounds(&*hyperlink_cells.borrow(), start_col, row, cols)?;
+        find_hyperlink_bounds(&hyperlink_cells.borrow(), start_col, row, cols)?;
 
     // Extract text using beamterm's grid
     extract_text_from_grid(grid, link_start, link_end, row)
@@ -799,18 +799,18 @@ fn cell_data(cell: &Cell) -> CellData<'_> {
 /// GlyphEffect bits:  0010_0000_0000_0000  (Underline at bit 13)
 ///                    0100_0000_0000_0000  (Strikethrough at bit 14)
 ///
-/// Shift operations:  bit 0 << 9 = bit 9
-///                    bit 2 << 8 = bit 10
-///                    bit 3 << 9 = bit 12
-///                    bit 8 << 5 = bit 13
+/// Shift operations:  bit 0 << 10 = bit 9 (bold)
+///                    bit 2 << 9  = bit 10 (italic)
+///                    bit 3 << 10 = bit 12 (underline)
+///                    bit 8 << 6  = bit 13 (strikethrough)
 /// ```
 const fn into_glyph_bits(modifier: Modifier) -> u16 {
     let m = modifier.bits();
 
-    (m << 9) & (1 << 10)   // bold
-    | (m << 8) & (1 << 11) // italic
-    | (m << 9) & (1 << 13) // underline
-    | (m << 5) & (1 << 14) // strikethrough
+    (m << 10) & (1 << 10)   // bold
+    | (m << 9) & (1 << 11)  // italic
+    | (m << 10) & (1 << 13) // underline
+    | (m << 6) & (1 << 14) // strikethrough
 }
 
 /// A `Debug`-derive friendly convenience wrapper
