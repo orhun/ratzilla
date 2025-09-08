@@ -799,10 +799,10 @@ fn cell_data(cell: &Cell) -> CellData<'_> {
 /// GlyphEffect bits:  0010_0000_0000_0000  (Underline at bit 13)
 ///                    0100_0000_0000_0000  (Strikethrough at bit 14)
 ///
-/// Shift operations:  bit 0 << 10 = bit 9 (bold)
-///                    bit 2 << 9  = bit 10 (italic)
-///                    bit 3 << 10 = bit 12 (underline)
-///                    bit 8 << 6  = bit 13 (strikethrough)
+/// Shift operations:  bit 0 << 10 = bit 10 (bold)
+///                    bit 2 << 9  = bit 11 (italic)
+///                    bit 3 << 10 = bit 13 (underline)
+///                    bit 8 << 6  = bit 14 (strikethrough)
 /// ```
 const fn into_glyph_bits(modifier: Modifier) -> u16 {
     let m = modifier.bits();
