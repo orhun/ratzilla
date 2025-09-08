@@ -80,7 +80,14 @@ impl CanvasBackendOptions {
     }
 
     /// Sets the scale factor for the canvas.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `scale` is not positive.
     pub fn scale(mut self, scale: f64) -> Self {
+        if scale <= 0.0 {
+            panic!("Scale must be greater than 0");
+        }
         self.scale = scale;
         self
     }
@@ -124,9 +131,7 @@ impl Canvas {
             .expect("Unable to cast canvas context");
         context.set_font("16px monospace");
         context.set_text_baseline("top");
-        context
-            .scale(scale, scale)
-            .expect("Failed to scale canvas context");
+        context.scale(scale, scale)?;
 
         Ok(Self {
             inner: canvas,
