@@ -41,7 +41,16 @@ pub struct CanvasBackendOptions {
     grid_id: Option<String>,
     /// Override the automatically detected size.
     size: Option<(u32, u32)>,
-    /// Scale factor for the canvas.
+    /// Scale factor for the canvas. Setting this to a value greater than 1.0
+    /// will improve the rendering quality on high-DPI displays, at the cost
+    /// of performance.
+    ///
+    /// The memory usage of the canvas will increase with the square of the scale factor.
+    /// For example, a scale factor of 2.0 will use 4 times the memory.
+    ///
+    /// The default value is 1.0.
+    ///
+    /// Generally, a scale factor of 2.0 is a good compromise between quality and performance.
     scale: f64,
     /// Always clip foreground drawing to the cell rectangle. Helpful when
     /// dealing with out-of-bounds rendering from problematic fonts. Enabling
@@ -79,7 +88,16 @@ impl CanvasBackendOptions {
         self
     }
 
-    /// Sets the scale factor for the canvas.
+    /// Sets the scale factor for the canvas. Setting this to a value greater than 1.0
+    /// will improve the rendering quality on high-DPI displays, at the cost
+    /// of performance.
+    ///
+    /// The memory usage of the canvas will increase with the square of the scale factor.
+    /// For example, a scale factor of 2.0 will use 4 times the memory.
+    ///
+    /// The default value is 1.0.
+    ///
+    /// Generally, a scale factor of 2.0 is a good compromise between quality and performance.
     ///
     /// # Panics
     ///
