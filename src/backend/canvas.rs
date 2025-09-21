@@ -5,9 +5,12 @@ use std::io::Result as IoResult;
 use crate::{
     backend::{
         color::{actual_bg_color, actual_fg_color},
+        event_callback::{EventCallback, MouseConfig},
         utils::*,
     },
     error::Error,
+    event::{KeyEvent, MouseEvent},
+    render::WebEventHandler,
     CursorShape,
 };
 use ratatui::{
@@ -35,7 +38,7 @@ const CELL_WIDTH: f64 = 10.0;
 const CELL_HEIGHT: f64 = 19.0;
 
 /// Options for the [`CanvasBackend`].
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct CanvasBackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -136,6 +139,10 @@ pub struct CanvasBackend {
     cursor_shape: CursorShape,
     /// Draw cell boundaries with specified color.
     debug_mode: Option<String>,
+    /// Active mouse event callback for cleanup.
+    mouse_callback: Option<EventCallback<web_sys::MouseEvent>>,
+    /// Active key event callback for cleanup.
+    key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
 }
 
 impl CanvasBackend {
@@ -163,8 +170,10 @@ impl CanvasBackend {
             .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
 
         let canvas = Canvas::new(parent, width, height, Color::Black)?;
+
         let buffer = get_sized_buffer_from_canvas(&canvas.inner);
         let changed_cells = bitvec![0; buffer.len() * buffer[0].len()];
+
         Ok(Self {
             prev_buffer: buffer.clone(),
             always_clip_cells: options.always_clip_cells,
@@ -175,6 +184,8 @@ impl CanvasBackend {
             cursor_position: None,
             cursor_shape: CursorShape::SteadyBlock,
             debug_mode: None,
+            mouse_callback: None,
+            key_callback: None,
         })
     }
 
@@ -502,6 +513,7 @@ impl Backend for CanvasBackend {
 
     fn clear(&mut self) -> IoResult<()> {
         self.buffer = get_sized_buffer();
+        // Grid dimensions are updated automatically when buffer changes
         Ok(())
     }
 
@@ -535,6 +547,52 @@ impl Backend for CanvasBackend {
             }
         }
         self.cursor_position = Some(new_pos);
+        Ok(())
+    }
+}
+
+impl WebEventHandler for CanvasBackend {
+    fn setup_mouse_events<F>(&mut self, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(MouseEvent) + 'static,
+    {
+        // Clear existing mouse events first
+        self.clear_mouse_events()?;
+
+        let grid_width = self.buffer[0].len() as u16;
+        let grid_height = self.buffer.len() as u16;
+
+        self.mouse_callback = Some(EventCallback::new_mouse(
+            self.canvas.inner.clone().into(),
+            MouseConfig::new(grid_width, grid_height)
+                .with_offset(5.0) // Canvas translation offset
+                .with_cell_dimensions(CELL_WIDTH, CELL_HEIGHT), // Cell dimensions for accurate coordinate mapping
+            callback,
+        )?);
+        Ok(())
+    }
+
+    fn clear_mouse_events(&mut self) -> Result<(), Error> {
+        self.mouse_callback.take();
+        Ok(())
+    }
+
+    fn setup_key_events<F>(&mut self, callback: F) -> Result<(), Error>
+    where
+        F: FnMut(KeyEvent) + 'static,
+    {
+        // Clear existing key events first
+        self.clear_key_events()?;
+
+        self.key_callback = Some(EventCallback::new_key(
+            get_document()?.unchecked_into(),
+            callback,
+        )?);
+        Ok(())
+    }
+
+    fn clear_key_events(&mut self) -> Result<(), Error> {
+        self.key_callback.take();
         Ok(())
     }
 }
