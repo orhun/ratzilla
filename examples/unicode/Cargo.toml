@@ -1,0 +1,9 @@
+[package]
+name = "minimal"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ratzilla = { path = "../../" }
+examples-shared = { path = "../shared" }
