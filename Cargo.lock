@@ -380,6 +380,7 @@ dependencies = [
  "console_error_panic_hook",
  "ratatui",
  "thiserror",
+ "unicode-width 0.2.0",
  "web-sys",
 ]
 
