@@ -49,7 +49,7 @@ pub struct WebGl2BackendOptions {
     default_mouse_handler: bool,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
-    /// Enable console debugging and introspection API
+    /// Enable console debugging and introspection API.
     console_debug_api: bool,
 }
 
