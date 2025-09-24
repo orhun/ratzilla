@@ -403,6 +403,7 @@ impl WebGl2Backend {
     }
 
     /// Toggles the cursor visibility based on its current position.
+    ///
     /// If there is no cursor position, it does nothing.
     fn toggle_cursor(&mut self) {
         if let Some(pos) = self.cursor_position {
