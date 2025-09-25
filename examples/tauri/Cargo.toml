@@ -6,6 +6,6 @@ publish = false
 
 [dependencies]
 ratzilla = { path = "../../" }
-tachyonfx = { version = "0.13.0", default-features = false, features = ["web-time"] }
+tachyonfx = { version = "0.16.0", default-features = false, features = ["web-time"] }
 console_error_panic_hook = "0.1.7"
 examples-shared = { path = "../shared" }

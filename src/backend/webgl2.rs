@@ -1,25 +1,33 @@
 use crate::{
     backend::{color::to_rgb, utils::*},
     error::Error,
+    widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
-use beamterm_renderer::{CellData, FontAtlas, Renderer, TerminalGrid};
+use beamterm_renderer::{
+    mouse::*, select, CellData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal,
+};
+use bitvec::prelude::BitVec;
+use compact_str::CompactString;
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier},
 };
-use std::{cmp::min, io::Result as IoResult, mem::swap};
+use std::{cell::RefCell, io::Result as IoResult, mem::swap, rc::Rc};
+use web_sys::{wasm_bindgen::JsCast, window, Element};
+
+/// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
+pub use beamterm_renderer::FontAtlasData;
 
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
-const UPLOAD_CELLS_TO_GPU_MARK: &str = "upload-cells-to-gpu";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
 
 /// Options for the [`WebGl2Backend`].
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct WebGl2BackendOptions {
     /// The element ID.
     grid_id: Option<String>,
@@ -27,8 +35,22 @@ pub struct WebGl2BackendOptions {
     ///
     /// Overrides the automatically detected size if set.
     size: Option<(u32, u32)>,
+    /// Fallback glyph to use for characters not in the font atlas.
+    fallback_glyph: Option<CompactString>,
+    /// Override the default font atlas.
+    font_atlas: Option<FontAtlasData>,
+    /// The canvas padding color.
+    canvas_padding_color: Option<Color>,
+    /// The cursor shape.
+    cursor_shape: CursorShape,
+    /// Hyperlink click callback.
+    hyperlink_callback: Option<HyperlinkCallback>,
+    /// Whether to use beamterm's internal mouse handler for selection.
+    default_mouse_handler: bool,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
+    /// Enable console debugging and introspection API.
+    console_debug_api: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -39,7 +61,7 @@ impl WebGl2BackendOptions {
 
     /// Sets the element id of the canvas' parent element.
     pub fn grid_id(mut self, id: &str) -> Self {
-        self.grid_id = Some(id.to_string());
+        self.grid_id = Some(id.into());
         self
     }
 
@@ -55,37 +77,75 @@ impl WebGl2BackendOptions {
         self.measure_performance = measure;
         self
     }
-}
 
-/// WebGl2 renderer and context.
-#[derive(Debug)]
-struct WebGl2 {
-    /// The WebGL2 renderer.
-    renderer: Renderer,
-    /// Drawable representation of the terminal
-    terminal_grid: TerminalGrid,
-}
+    /// Sets the fallback glyph to use for characters not in the font atlas.
+    ///
+    /// If not set, defaults to a space character (` `).
+    pub fn fallback_glyph(mut self, glyph: &str) -> Self {
+        self.fallback_glyph = Some(glyph.into());
+        self
+    }
 
-impl WebGl2 {
-    /// Constructs a new [`WebGl2`].
-    fn new(parent_element: web_sys::Element, width: u32, height: u32) -> Result<Self, Error> {
-        let canvas = create_canvas_in_element(&parent_element, width, height)?;
+    /// Sets the canvas padding color.
+    ///
+    /// The padding area is the space not covered by the terminal grid.
+    pub fn canvas_padding_color(mut self, color: Color) -> Self {
+        self.canvas_padding_color = Some(color);
+        self
+    }
 
-        let renderer = Renderer::create_with_canvas(canvas)?;
-        let terminal_grid = TerminalGrid::new(
-            renderer.gl(),
-            FontAtlas::load_default(renderer.gl())?,
-            renderer.canvas_size(),
-        )?;
+    /// Sets the cursor shape to use when cursor is visible.
+    pub fn cursor_shape(mut self, shape: CursorShape) -> Self {
+        self.cursor_shape = shape;
+        self
+    }
 
-        Ok(Self {
-            terminal_grid,
-            renderer,
+    /// Sets a custom font atlas to use for rendering.
+    pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
+        self.font_atlas = Some(atlas);
+        self
+    }
+
+    /// Enables block-based mouse selection with automatic copy to clipboard on selection.
+    pub fn enable_mouse_selection(mut self) -> Self {
+        self.default_mouse_handler = true;
+        self
+    }
+
+    /// Enables hyperlinks in the canvas.
+    ///
+    /// Sets up a default mouse handler using [`WebGl2BackendOptions::on_hyperlink_click`].
+    pub fn enable_hyperlinks(self) -> Self {
+        self.on_hyperlink_click(|url| {
+            if let Some(w) = window() {
+                w.open_with_url_and_target(url, "_blank")
+                    .unwrap_or_default();
+            }
         })
     }
 
-    fn terminal_size(&self) -> (u16, u16) {
-        self.terminal_grid.terminal_size()
+    /// Sets a callback for when hyperlinks are clicked.
+    pub fn on_hyperlink_click<F>(mut self, callback: F) -> Self
+    where
+        F: FnMut(&str) + 'static,
+    {
+        self.hyperlink_callback = Some(HyperlinkCallback::new(callback));
+        self
+    }
+
+    /// Gets the canvas padding color, defaulting to black if not set.
+    fn get_canvas_padding_color(&self) -> u32 {
+        self.canvas_padding_color
+            .map(|c| to_rgb(c, 0x000000))
+            .unwrap_or(0x000000)
+    }
+
+    /// Enables debug API during terminal creation.
+    ///
+    /// The debug api is accessible from the browser console under `window.__beamterm_debug`.
+    pub fn enable_console_debug_api(mut self) -> Self {
+        self.console_debug_api = true;
+        self
     }
 }
 
@@ -114,9 +174,8 @@ impl WebGl2 {
 ///
 /// | Label                  | Operation                                                   |
 /// |------------------------|-------------------------------------------------------------|
-/// | `sync-terminal-buffer` | Updating the internal buffer with cell changes from Ratatui |
-/// | `upload-cells-to-gpu`  | Uploading changed cell data to GPU buffers                  |
-/// | `webgl-render`         | Executing the WebGL draw call to render the terminal        |
+/// | `sync-terminal-buffer` | Synchronizes Ratatui's cell data with beamterm's            |
+/// | `webgl-render`         | Flushes the GPU buffers and executes the WebGL draw call    |
 ///
 /// ## Viewing Performance Measurements
 ///
@@ -148,20 +207,23 @@ impl WebGl2 {
 /// avg('upload-cells-to-gpu')
 /// avg('sync-terminal-buffer')
 /// ```
-#[derive(Debug)]
 pub struct WebGl2Backend {
-    /// Current buffer.
-    buffer: Vec<Cell>,
-    /// Indicates if the cells have changed, requiring a
-    dirty_cell_data: bool,
-    /// WebGl2 context.
-    context: WebGl2,
+    /// WebGl2 terminal renderer.
+    beamterm: Beamterm,
+    /// The options used to create this backend.
+    options: WebGl2BackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// The cursor shape.
-    cursor_shape: CursorShape,
     /// Performance measurement.
     performance: Option<web_sys::Performance>,
+    /// Hyperlink tracking.
+    hyperlink_cells: Option<Rc<RefCell<BitVec>>>,
+    /// Mouse handler for hyperlink clicks.
+    hyperlink_mouse_handler: Option<TerminalMouseHandler>,
+    /// Current cursor state over hyperlinks (shared with mouse handler).
+    cursor_over_hyperlink: Option<Rc<RefCell<bool>>>,
+    /// Hyperlink click callback.
+    _hyperlink_callback: Option<HyperlinkCallback>,
 }
 
 impl WebGl2Backend {
@@ -180,7 +242,7 @@ impl WebGl2Backend {
     }
 
     /// Constructs a new [`WebGl2Backend`] with the given options.
-    pub fn new_with_options(options: WebGl2BackendOptions) -> Result<Self, Error> {
+    pub fn new_with_options(mut options: WebGl2BackendOptions) -> Result<Self, Error> {
         let performance = if options.measure_performance {
             Some(performance()?)
         } else {
@@ -190,74 +252,98 @@ impl WebGl2Backend {
         // Parent element of canvas (uses <body> unless specified)
         let parent = get_element_by_id_or_body(options.grid_id.as_ref())?;
 
-        let (width, height) = options
-            .size
-            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
+        let beamterm = Self::init_beamterm(&mut options, &parent)?;
 
-        let context = WebGl2::new(parent, width, height)?;
-        let buffer = vec![Cell::default(); context.terminal_grid.cell_count()];
+        let hyperlink_cells = if options.hyperlink_callback.is_some() {
+            let indices = BitVec::repeat(false, beamterm.cell_count());
+            Some(Rc::new(RefCell::new(indices)))
+        } else {
+            None
+        };
+
+        // Extract hyperlink callback from options
+        let hyperlink_callback = options.hyperlink_callback.take();
+
+        // Initialize cursor state tracking if hyperlinks are enabled
+        let cursor_over_hyperlink = if hyperlink_callback.is_some() {
+            Some(Rc::new(RefCell::new(false)))
+        } else {
+            None
+        };
+
+        // Set up hyperlink mouse handler if callback is provided
+        let hyperlink_mouse_handler = if let Some(ref callback) = hyperlink_callback {
+            let hyperlink_cells = hyperlink_cells
+                .clone()
+                .expect("known to exist at this point");
+            let cursor_state = cursor_over_hyperlink
+                .clone()
+                .expect("known to exist at this point");
+            Some(Self::create_hyperlink_mouse_handler(
+                &beamterm,
+                hyperlink_cells.clone(),
+                callback.callback.clone(),
+                cursor_state,
+            )?)
+        } else {
+            None
+        };
+
         Ok(Self {
-            buffer,
-            dirty_cell_data: false,
-            context,
+            beamterm,
             cursor_position: None,
-            cursor_shape: CursorShape::SteadyBlock,
+            options,
+            hyperlink_cells,
+            hyperlink_mouse_handler,
             performance,
+            cursor_over_hyperlink,
+            _hyperlink_callback: hyperlink_callback,
         })
     }
 
-    /// Sets the background color of the canvas.
-    ///
-    /// TODO: Pass onto the beamterm renderer once it supports it
-    pub fn set_background_color(&mut self, _color: Color) {
-        unimplemented!()
+    /// Returns the options objects used to create this backend.
+    pub fn options(&self) -> &WebGl2BackendOptions {
+        &self.options
     }
 
     /// Returns the [`CursorShape`].
     pub fn cursor_shape(&self) -> &CursorShape {
-        &self.cursor_shape
+        &self.options.cursor_shape
     }
 
     /// Set the [`CursorShape`].
     pub fn set_cursor_shape(mut self, shape: CursorShape) -> Self {
-        self.cursor_shape = shape;
+        self.options.cursor_shape = shape;
         self
     }
 
     /// Sets the canvas viewport and projection, reconfigures the terminal grid.
     pub fn resize_canvas(&mut self) -> Result<(), Error> {
-        let size_px = self.context.renderer.canvas_size();
-        let old_size = self.context.terminal_size();
+        let size_px = self.beamterm.canvas_size();
 
         // resize the terminal grid and viewport
-        let gl = self.context.renderer.gl();
-        self.context.terminal_grid.resize(gl, size_px)?;
-        self.context.renderer.resize(size_px.0, size_px.1);
+        self.beamterm.resize(size_px.0, size_px.1)?;
 
-        // resize the buffer if needed
-        let new_size = self.context.terminal_size();
-        if new_size != old_size {
-            self.dirty_cell_data = true;
-
-            let cells = &self.buffer;
-            self.buffer = resize_cell_grid(cells, old_size, new_size);
+        // Update mouse handler dimensions if it exists
+        if let Some(mouse_handler) = &mut self.hyperlink_mouse_handler {
+            let (cols, rows) = self.beamterm.terminal_size();
+            mouse_handler.update_dimensions(cols, rows);
         }
 
-        Ok(())
-    }
+        // clear any hyperlink cells; we'll get them in the next draw call
+        if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
+            let cell_count = self.beamterm.cell_count();
 
-    // Synchronizes the terminal buffer with beamterm's terminal grid.
-    fn update_grid(&mut self) -> Result<(), Error> {
-        if self.dirty_cell_data {
-            self.measure_begin(UPLOAD_CELLS_TO_GPU_MARK);
-            let gl = self.context.renderer.gl();
-            let terminal = &mut self.context.terminal_grid;
-            let cells = self.buffer.iter().map(cell_data);
+            let mut hyperlink_cells = hyperlink_cells.borrow_mut();
+            hyperlink_cells.clear();
+            hyperlink_cells.resize(cell_count, false);
+        }
 
-            terminal.update_cells(gl, cells)?;
-
-            self.dirty_cell_data = false;
-            self.measure_end(UPLOAD_CELLS_TO_GPU_MARK);
+        // Reset cursor state when canvas is resized
+        if let Some(cursor_state) = &self.cursor_over_hyperlink {
+            if let Ok(mut state) = cursor_state.try_borrow_mut() {
+                *state = false;
+            }
         }
 
         Ok(())
@@ -265,7 +351,7 @@ impl WebGl2Backend {
 
     /// Checks if the canvas size matches the display size and resizes it if necessary.
     fn check_canvas_resize(&mut self) -> Result<(), Error> {
-        let canvas = self.context.renderer.canvas();
+        let canvas = self.beamterm.canvas();
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
@@ -282,17 +368,70 @@ impl WebGl2Backend {
         Ok(())
     }
 
-    /// Draws the cursor at the specified position.
-    fn draw_cursor(&mut self, pos: Position) -> IoResult<()> {
-        let w = self.context.terminal_size().0 as usize;
-        let idx = pos.y as usize * w + pos.x as usize;
+    /// Updates the terminal grid with new cell content.
+    fn update_grid<'a, I>(&mut self, content: I) -> Result<(), Error>
+    where
+        I: Iterator<Item = (u16, u16, &'a Cell)>,
+    {
+        // If enabled, measures the time taken to synchronize the terminal buffer.
+        self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
 
-        if idx < self.buffer.len() {
-            let cursor_style = self.cursor_shape.show(self.buffer[idx].style());
-            self.buffer[idx].set_style(cursor_style);
+        // If hyperlink support is enabled, we need to track which cells are hyperlinks,
+        // before passing the content to the beamterm renderer.
+        if let Some(hyperlink_cells) = self.hyperlink_cells.as_mut() {
+            let w = self.beamterm.terminal_size().0 as usize;
+
+            let mut hyperlink_cells = hyperlink_cells.borrow_mut();
+
+            // Mark any cells that have the hyperlink modifier set (don't blink!).
+            // At this stage, we don't care about the actual cell content,
+            // as we can extract it on demand.
+            let cells = content.inspect(|(x, y, c)| {
+                let idx = *y as usize * w + *x as usize;
+                let is_hyperlink = c.modifier.contains(HYPERLINK_MODIFIER);
+                hyperlink_cells.set(idx, is_hyperlink);
+            });
+            let cells = cells.map(|(x, y, cell)| (x, y, cell_data(cell)));
+
+            self.beamterm.update_cells_by_position(cells)
+        } else {
+            let cells = content.map(|(x, y, cell)| (x, y, cell_data(cell)));
+            self.beamterm.update_cells_by_position(cells)
         }
+        .map_err(Error::from)?;
+
+        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
 
         Ok(())
+    }
+
+    /// Toggles the cursor visibility based on its current position.
+    ///
+    /// If there is no cursor position, it does nothing.
+    fn toggle_cursor(&mut self) {
+        if let Some(pos) = self.cursor_position {
+            self.draw_cursor(pos);
+        }
+    }
+
+    /// Draws the cursor at the specified position.
+    fn draw_cursor(&mut self, pos: Position) {
+        if let Some(c) = self
+            .beamterm
+            .grid()
+            .borrow_mut()
+            .cell_data_mut(pos.x, pos.y)
+        {
+            match self.options.cursor_shape {
+                CursorShape::SteadyBlock => {
+                    c.flip_colors();
+                }
+                CursorShape::SteadyUnderScore => {
+                    // if the overall style is underlined, remove it, otherwise add it
+                    c.style(c.get_style() ^ (GlyphEffect::Underline as u16));
+                }
+            }
+        }
     }
 
     /// Measures the beginning of a performance mark.
@@ -310,6 +449,151 @@ impl WebGl2Backend {
                 .unwrap_or_default();
         }
     }
+
+    /// Updates the canvas cursor style efficiently.
+    fn update_canvas_cursor_style(canvas: &web_sys::HtmlCanvasElement, is_pointer: bool) {
+        let cursor_value = if is_pointer { "pointer" } else { "default" };
+
+        if let Ok(element) = canvas.clone().dyn_into::<Element>() {
+            let current_style = element.get_attribute("style").unwrap_or_default();
+
+            // Find and replace cursor property, or append if not present
+            let new_style = if let Some(start) = current_style.find("cursor:") {
+                // Find the end of the cursor property (either ';' or end of string)
+                let after_cursor = &current_style[start..];
+                let end_pos = after_cursor
+                    .find(';')
+                    .map(|p| p + 1)
+                    .unwrap_or(after_cursor.len());
+                let full_end = start + end_pos;
+
+                format!(
+                    "{}cursor: {}{}",
+                    &current_style[..start],
+                    cursor_value,
+                    &current_style[full_end..]
+                )
+            } else if current_style.is_empty() {
+                format!("cursor: {}", cursor_value)
+            } else {
+                format!(
+                    "{}; cursor: {}",
+                    current_style.trim_end_matches(';'),
+                    cursor_value
+                )
+            };
+
+            let _ = element.set_attribute("style", &new_style);
+        }
+    }
+
+    /// Creates a mouse handler specifically for hyperlink clicks and hover effects.
+    fn create_hyperlink_mouse_handler(
+        beamterm: &Beamterm,
+        hyperlink_cells: Rc<RefCell<BitVec>>,
+        callback: Rc<RefCell<dyn FnMut(&str)>>,
+        cursor_state: Rc<RefCell<bool>>,
+    ) -> Result<TerminalMouseHandler, Error> {
+        let grid = beamterm.grid();
+        let canvas = beamterm.canvas();
+        let hyperlink_cells_clone = hyperlink_cells.clone();
+        let hyperlink_cells_move = hyperlink_cells.clone();
+        let canvas_clone = canvas.clone();
+        let cursor_state_clone = cursor_state.clone();
+
+        let mouse_handler = TerminalMouseHandler::new(
+            canvas,
+            grid,
+            move |event: TerminalMouseEvent, grid: &beamterm_renderer::TerminalGrid| {
+                match event.event_type {
+                    MouseEventType::MouseUp => {
+                        // Handle hyperlink clicks (left mouse button only)
+                        if event.button() == 0 {
+                            if let Some(url) = extract_hyperlink_url(
+                                hyperlink_cells_clone.clone(),
+                                grid,
+                                event.col,
+                                event.row,
+                            ) {
+                                if let Ok(mut cb) = callback.try_borrow_mut() {
+                                    cb(&url);
+                                }
+                            }
+                        }
+                    }
+                    MouseEventType::MouseMove => {
+                        // Handle cursor style changes on hover
+                        let is_over_hyperlink = Self::is_over_hyperlink_static(
+                            hyperlink_cells_move.clone(),
+                            grid,
+                            event.col,
+                            event.row,
+                        );
+
+                        // Only update cursor style if state has changed
+                        if let Ok(mut current_state) = cursor_state_clone.try_borrow_mut() {
+                            if *current_state != is_over_hyperlink {
+                                *current_state = is_over_hyperlink;
+                                Self::update_canvas_cursor_style(&canvas_clone, is_over_hyperlink);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            },
+        )?;
+
+        Ok(mouse_handler)
+    }
+
+    /// Checks if the given coordinates are over a hyperlink (static version for use in closures).
+    fn is_over_hyperlink_static(
+        hyperlink_cells: Rc<RefCell<BitVec>>,
+        grid: &beamterm_renderer::TerminalGrid,
+        col: u16,
+        row: u16,
+    ) -> bool {
+        let (cols, _) = grid.terminal_size();
+        let row_start_idx = row as usize * cols as usize;
+        let cell_idx = row_start_idx + col as usize;
+
+        hyperlink_cells
+            .borrow()
+            .get(cell_idx)
+            .map(|b| *b)
+            .unwrap_or(false)
+    }
+
+    /// Initializes the beamterm renderer with the given options and parent element.
+    fn init_beamterm(
+        options: &mut WebGl2BackendOptions,
+        parent: &Element,
+    ) -> Result<Terminal, Error> {
+        let (width, height) = options
+            .size
+            .unwrap_or_else(|| (parent.client_width() as u32, parent.client_height() as u32));
+
+        let canvas = create_canvas_in_element(parent, width, height)?;
+
+        let beamterm = Beamterm::builder(canvas)
+            .canvas_padding_color(options.get_canvas_padding_color())
+            .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
+            .font_atlas(options.font_atlas.take().unwrap_or_default());
+
+        let beamterm = if options.default_mouse_handler {
+            beamterm.default_mouse_input_handler(SelectionMode::Block, true)
+        } else {
+            beamterm
+        };
+
+        let beamterm = if options.console_debug_api {
+            beamterm.enable_debug_api()
+        } else {
+            beamterm
+        };
+
+        Ok(beamterm.build()?)
+    }
 }
 
 impl Backend for WebGl2Backend {
@@ -318,32 +602,10 @@ impl Backend for WebGl2Backend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        if content.size_hint().1 == Some(0) {
-            // No content to draw, nothing to do
-            return Ok(());
-        } else {
-            // Mark the cell data as dirty; triggers update_grid()
-            self.dirty_cell_data = true;
-        }
-
-        // Render existing content to the canvas.
-        self.measure_begin(WEBGL_RENDER_MARK);
-        let terminal = &mut self.context.terminal_grid;
-        self.context.renderer.render(terminal);
-        self.measure_end(WEBGL_RENDER_MARK);
-
-        // Update internal cell buffer with the new content
-        self.measure_begin(SYNC_TERMINAL_BUFFER_MARK);
-        let w = self.context.terminal_grid.terminal_size().0 as usize;
-        for (x, y, updated_cell) in content {
-            let (x, y) = (x as usize, y as usize);
-            self.buffer[y * w + x] = cell_with_safe_colors(updated_cell);
-        }
-        self.measure_end(SYNC_TERMINAL_BUFFER_MARK);
-
-        // Draw the cursor if set
-        if let Some(pos) = self.cursor_position {
-            self.draw_cursor(pos)?;
+        // we only update when we have new cell data or if the mouse selection
+        // handler is enabled (otherwise, we fail to update the visualized selection).
+        if content.size_hint().1 != Some(0) || self.options.default_mouse_handler {
+            self.update_grid(content)?;
         }
 
         Ok(())
@@ -355,22 +617,20 @@ impl Backend for WebGl2Backend {
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
         self.check_canvas_resize()?;
-        self.update_grid()?;
+
+        self.measure_begin(WEBGL_RENDER_MARK);
+
+        // Flushes GPU buffers and render existing content to the canvas
+        self.toggle_cursor(); // show cursor before rendering
+        self.beamterm.render_frame().map_err(Error::from)?;
+        self.toggle_cursor(); // restore cell to previous state
+
+        self.measure_end(WEBGL_RENDER_MARK);
+
         Ok(())
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-            let w = self.context.terminal_grid.terminal_size().0 as usize;
-
-            if let Some(cell) = self.buffer.get_mut(y * w + x) {
-                let style = self.cursor_shape.hide(cell.style());
-                cell.set_style(style);
-            }
-        }
-
         self.cursor_position = None;
         Ok(())
     }
@@ -380,18 +640,28 @@ impl Backend for WebGl2Backend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        self.buffer.fill(default_cell());
+        let cells = [CellData::new_with_style_bits(" ", 0, 0xffffff, 0x000000)]
+            .into_iter()
+            .cycle()
+            .take(self.beamterm.cell_count());
+
+        self.beamterm.update_cells(cells).map_err(Error::from)?;
+
+        if let Some(hyperlink_cells) = &mut self.hyperlink_cells {
+            hyperlink_cells.borrow_mut().clear();
+        }
+
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
-        let (w, h) = self.context.terminal_grid.terminal_size();
-        Ok(Size::new(w as _, h as _))
+        let (w, h) = self.beamterm.terminal_size();
+        Ok(Size::new(w, h))
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
-        let (cols, rows) = self.context.terminal_grid.terminal_size();
-        let (w, h) = self.context.renderer.canvas_size();
+        let (cols, rows) = self.beamterm.terminal_size();
+        let (w, h) = self.beamterm.canvas_size();
 
         Ok(WindowSize {
             columns_rows: Size::new(cols, rows),
@@ -407,66 +677,93 @@ impl Backend for WebGl2Backend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        let w = self.context.terminal_grid.terminal_size().0 as usize;
-
-        let new_pos = position.into();
-        if let Some(old_pos) = self.cursor_position {
-            if old_pos == new_pos {
-                return Ok(()); // No change in cursor position
-            }
-
-            let y = old_pos.y as usize;
-            let x = old_pos.x as usize;
-
-            let old_idx = y * w + x;
-            if let Some(old_cell) = self.buffer.get_mut(old_idx) {
-                let style = self.cursor_shape.hide(old_cell.style());
-                old_cell.set_style(style);
-            }
-        }
-        self.cursor_position = Some(new_pos);
+        self.cursor_position = Some(position.into());
         Ok(())
     }
 }
 
-/// Resizes the cell grid to the new size, copying existing cells where possible.
-///
-/// When the terminal dimensions change, this function creates a new cell buffer and
-/// preserves existing content in the overlapping region. Any cells outside the overlap
-/// are populated with default values.
-///
-/// # Arguments
-/// * `cells` - Current cell buffer to resize
-/// * `old_size` - Previous terminal dimensions (cols, rows)
-/// * `new_size` - New terminal dimensions (cols, rows)
-///
-/// # Returns
-/// A new cell buffer sized to `new_size`.
-fn resize_cell_grid(cells: &[Cell], old_size: (u16, u16), new_size: (u16, u16)) -> Vec<Cell> {
-    let old_size = (old_size.0 as usize, old_size.1 as usize);
-    let new_size = (new_size.0 as usize, new_size.1 as usize);
+/// Extracts text from beamterm grid using `[get_text(CellQuery)`].
+fn extract_text_from_grid(
+    grid: &beamterm_renderer::TerminalGrid,
+    start_col: u16,
+    end_col: u16,
+    row: u16,
+) -> Option<String> {
+    // Create a selection query for the hyperlink range
+    let query = select(SelectionMode::Block)
+        .start((start_col, row))
+        .end((end_col, row))
+        .trim_trailing_whitespace(true);
 
-    let new_len = new_size.0 * new_size.1;
-
-    let mut new_cells = Vec::with_capacity(new_len);
-    for _ in 0..new_len {
-        new_cells.push(default_cell());
+    let text = grid.get_text(query);
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
     }
-
-    // restrict dimensions to the overlapping area
-    for y in 0..min(old_size.1, new_size.1) {
-        for x in 0..min(old_size.0, new_size.0) {
-            // translate x,y to index for old and new buffer
-            let new_idx = y * new_size.0 + x;
-            let old_idx = y * old_size.0 + x;
-            new_cells[new_idx] = cells[old_idx].clone();
-        }
-    }
-
-    new_cells
 }
 
-fn cell_with_safe_colors(cell: &Cell) -> Cell {
+/// Extracts hyperlink URL from grid coordinates.
+fn extract_hyperlink_url(
+    hyperlink_cells: Rc<RefCell<BitVec>>,
+    grid: &beamterm_renderer::TerminalGrid,
+    start_col: u16,
+    row: u16,
+) -> Option<String> {
+    let hyperlink_cells = hyperlink_cells;
+    let (cols, _) = grid.terminal_size();
+
+    // Find hyperlink boundaries
+    let (link_start, link_end) =
+        find_hyperlink_bounds(&hyperlink_cells.borrow(), start_col, row, cols)?;
+
+    // Extract text using beamterm's grid
+    extract_text_from_grid(grid, link_start, link_end, row)
+}
+
+/// Finds the start and end boundaries of a hyperlink.
+fn find_hyperlink_bounds(
+    hyperlink_cells: &BitVec,
+    start_col: u16,
+    row: u16,
+    cols: u16,
+) -> Option<(u16, u16)> {
+    let row_start_idx = row as usize * cols as usize;
+
+    // Ensure clicked cell is a hyperlink
+    if !hyperlink_cells
+        .get(row_start_idx + start_col as usize)
+        .map(|b| *b)
+        .unwrap_or(false)
+    {
+        return None;
+    }
+
+    // Find start of hyperlink (scan left)
+    let mut link_start = start_col;
+    while link_start > 0 {
+        let idx = row_start_idx + (link_start - 1) as usize;
+        if !hyperlink_cells.get(idx).map(|b| *b).unwrap_or(false) {
+            break;
+        }
+        link_start -= 1;
+    }
+
+    // Find end of hyperlink (scan right)
+    let mut link_end = start_col;
+    while link_end < cols - 1 {
+        let idx = row_start_idx + (link_end + 1) as usize;
+        if !hyperlink_cells.get(idx).map(|b| *b).unwrap_or(false) {
+            break;
+        }
+        link_end += 1;
+    }
+
+    Some((link_start, link_end))
+}
+
+/// Resolves foreground and background colors for a [`Cell`].
+fn resolve_fg_bg_colors(cell: &Cell) -> (u32, u32) {
     let mut fg = cell.fg;
     let mut bg = cell.bg;
 
@@ -477,22 +774,14 @@ fn cell_with_safe_colors(cell: &Cell) -> Cell {
     let mut c = cell.clone();
     c.set_fg(fg);
     c.set_bg(bg);
-    c
+
+    (to_rgb(c.fg, 0xffffff), to_rgb(c.bg, 0x000000))
 }
 
-fn default_cell() -> Cell {
-    Cell::default()
-        .set_style(Style::default().fg(Color::White).bg(Color::Black))
-        .clone()
-}
-
-fn cell_data(cell: &Cell) -> CellData {
-    CellData::new_with_style_bits(
-        cell.symbol(),
-        into_glyph_bits(cell.modifier),
-        to_rgb(cell.fg, 0xffffff),
-        to_rgb(cell.bg, 0x000000),
-    )
+/// Converts a [`Cell`] into a [`CellData`] for the beamterm renderer.
+fn cell_data(cell: &Cell) -> CellData<'_> {
+    let (fg, bg) = resolve_fg_bg_colors(cell);
+    CellData::new_with_style_bits(cell.symbol(), into_glyph_bits(cell.modifier), fg, bg)
 }
 
 /// Extracts glyph styling bits from cell modifiers.
@@ -509,23 +798,49 @@ fn cell_data(cell: &Cell) -> CellData {
 ///                    0000_0000_0000_1000  (UNDERLINED at bit 3)
 ///                    0000_0001_0000_0000  (CROSSED_OUT at bit 8)
 ///
-/// FontStyle bits:    0000_0010_0000_0000  (Bold as bit 9)
-///                    0000_0100_0000_0000  (Italic as bit 10)
-/// GlyphEffect bits:  0001_0000_0000_0000  (Underline at bit 12)
-///                    0010_0000_0000_0000  (Strikethrough at bit 13)
+/// FontStyle bits:    0000_0100_0000_0000  (Bold as bit 10)
+///                    0000_1000_0000_0000  (Italic as bit 11)
+/// GlyphEffect bits:  0010_0000_0000_0000  (Underline at bit 13)
+///                    0100_0000_0000_0000  (Strikethrough at bit 14)
 ///
-/// Shift operations:  bit 0 << 9 = bit 9
-///                    bit 2 << 8 = bit 10
-///                    bit 3 << 9 = bit 12
-///                    bit 8 << 5 = bit 13
+/// Shift operations:  bit 0 << 10 = bit 10 (bold)
+///                    bit 2 << 9  = bit 11 (italic)
+///                    bit 3 << 10 = bit 13 (underline)
+///                    bit 8 << 6  = bit 14 (strikethrough)
 /// ```
 const fn into_glyph_bits(modifier: Modifier) -> u16 {
     let m = modifier.bits();
 
-    (m << 9) & (1 << 9)    // bold
-    | (m << 8) & (1 << 10) // italic
-    | (m << 9) & (1 << 12) // underline
-    | (m << 5) & (1 << 13) // strikethrough
+    (m << 10) & (1 << 10)   // bold
+    | (m << 9) & (1 << 11)  // italic
+    | (m << 10) & (1 << 13) // underline
+    | (m << 6) & (1 << 14) // strikethrough
+}
+
+/// A `Debug`-derive friendly convenience wrapper
+#[derive(Clone)]
+struct HyperlinkCallback {
+    callback: Rc<RefCell<dyn FnMut(&str)>>,
+}
+
+impl HyperlinkCallback {
+    /// Creates a new [`HyperlinkCallback`] with the given callback.
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnMut(&str) + 'static,
+    {
+        Self {
+            callback: Rc::new(RefCell::new(callback)),
+        }
+    }
+}
+
+impl std::fmt::Debug for HyperlinkCallback {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CallbackWrapper")
+            .field("callback", &"<callback>")
+            .finish()
+    }
 }
 
 #[cfg(test)]

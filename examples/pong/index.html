@@ -22,7 +22,17 @@
         font-size: 16px;
         margin: 0px;
       }
+
+      #container {
+        flex: 1; /* Take all remaining space */
+        width: 100%;
+        position: relative; /* For absolute positioning of canvas if needed */
+        overflow: hidden; /* Prevent any overflow */
+      }
     </style>
   </head>
-  <body></body>
+  <body>
+    <div id="container"></div>
+    <div style="height: 50px;"></div>
+  </body>
 </html>

@@ -1,8 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use ratzilla::{
-    event::KeyCode, utils::set_document_title, widgets::Hyperlink, WebRenderer,
-};
+use ratzilla::{event::KeyCode, utils::set_document_title, widgets::Hyperlink, CursorShape, WebRenderer};
 
 use ratzilla::ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
@@ -12,9 +10,11 @@ use ratzilla::ratatui::{
         canvas::{Canvas, Circle},
         Block, Paragraph, Widget,
     },
-    Terminal,
 };
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
+use ratzilla::backend::canvas::CanvasBackendOptions;
+use ratzilla::backend::dom::DomBackendOptions;
+use ratzilla::backend::webgl2::WebGl2BackendOptions;
 
 struct App {
     count: u64,
@@ -64,8 +64,19 @@ impl App {
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let app_state = Rc::new(RefCell::new(App::new()));
+
     let terminal = MultiBackendBuilder::with_fallback(BackendType::Dom)
+        .webgl2_options(WebGl2BackendOptions::new()
+            .grid_id("container")
+            .enable_hyperlinks()
+            .enable_mouse_selection()
+        )
+        .canvas_options(CanvasBackendOptions::new()
+            .grid_id("container")
+        )
+        .dom_options(DomBackendOptions::new(Some("container".into()), CursorShape::SteadyBlock))
         .build_terminal()?;
+
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
