@@ -79,14 +79,16 @@ impl WebGl2BackendOptions {
     }
 
     /// Sets the fallback glyph to use for characters not in the font atlas.
+    ///
     /// If not set, defaults to a space character (` `).
     pub fn fallback_glyph(mut self, glyph: &str) -> Self {
         self.fallback_glyph = Some(glyph.into());
         self
     }
 
-    /// Sets the canvas padding color. The padding area is the space not covered by the
-    /// terminal grid.
+    /// Sets the canvas padding color.
+    ///
+    /// The padding area is the space not covered by the terminal grid.
     pub fn canvas_padding_color(mut self, color: Color) -> Self {
         self.canvas_padding_color = Some(color);
         self
@@ -104,15 +106,15 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Enables block-based mouse selection with automatic copy to
-    /// clipboard on selection.
+    /// Enables block-based mouse selection with automatic copy to clipboard on selection.
     pub fn enable_mouse_selection(mut self) -> Self {
         self.default_mouse_handler = true;
         self
     }
 
-    /// Enables hyperlinks in the canvas. Sets up a default mouse handler
-    /// using [`WebGl2BackendOptions::on_hyperlink_click`].
+    /// Enables hyperlinks in the canvas.
+    ///
+    /// Sets up a default mouse handler using [`WebGl2BackendOptions::on_hyperlink_click`].
     pub fn enable_hyperlinks(self) -> Self {
         self.on_hyperlink_click(|url| {
             if let Some(w) = window() {
@@ -122,7 +124,7 @@ impl WebGl2BackendOptions {
         })
     }
 
-    /// Sets a callback for when hyperlinks are clicked
+    /// Sets a callback for when hyperlinks are clicked.
     pub fn on_hyperlink_click<F>(mut self, callback: F) -> Self
     where
         F: FnMut(&str) + 'static,
@@ -138,8 +140,9 @@ impl WebGl2BackendOptions {
             .unwrap_or(0x000000)
     }
 
-    /// Enables debug API during terminal creation. The debug api
-    /// is accessible from the browser console under `window.__beamterm_debug`.
+    /// Enables debug API during terminal creation.
+    ///
+    /// The debug api is accessible from the browser console under `window.__beamterm_debug`.
     pub fn enable_console_debug_api(mut self) -> Self {
         self.console_debug_api = true;
         self
@@ -679,7 +682,7 @@ impl Backend for WebGl2Backend {
     }
 }
 
-/// Extracts text from beamterm grid using get_text(CellQuery).
+/// Extracts text from beamterm grid using `[get_text(CellQuery)`].
 fn extract_text_from_grid(
     grid: &beamterm_renderer::TerminalGrid,
     start_col: u16,
@@ -700,7 +703,7 @@ fn extract_text_from_grid(
     }
 }
 
-/// Extracts hyperlink URL from grid coordinates (static version for use in closures).
+/// Extracts hyperlink URL from grid coordinates.
 fn extract_hyperlink_url(
     hyperlink_cells: Rc<RefCell<BitVec>>,
     grid: &beamterm_renderer::TerminalGrid,
@@ -718,7 +721,7 @@ fn extract_hyperlink_url(
     extract_text_from_grid(grid, link_start, link_end, row)
 }
 
-/// Finds the start and end boundaries of a hyperlink (static version).
+/// Finds the start and end boundaries of a hyperlink.
 fn find_hyperlink_bounds(
     hyperlink_cells: &BitVec,
     start_col: u16,
