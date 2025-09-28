@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - 2025-09-28
+
+We are excited to announce the 0.2.0 release of Ratzilla! 🎉
+
+This release comes with support for mouse events, improved WebGL2 backend integration, and better examples!
+
+### 🚀 Features
+
+- _(backend)_ Update WebGl2Backend integration by @junkdog in [#108](https://github.com/orhun/ratzilla/pull/108)
+- _(examples)_ Add multi-backend support by @junkdog in [#109](https://github.com/orhun/ratzilla/pull/109)
+- _(event)_ Support mouse events by @hecksadecimal in [#107](https://github.com/orhun/ratzilla/pull/107)
+
+### 🐛 Bug Fixes
+
+- _(webgl2)_ Honor Modifier::REVERSED for Color::Reset by @junkdog in [#127](https://github.com/orhun/ratzilla/pull/127)
+- _(template)_ Remove unused script in index.html by @Wybxc in [#120](https://github.com/orhun/ratzilla/pull/120)
+- _(dom)_ Ensure consistent width for braille characters by @junkdog in [#119](https://github.com/orhun/ratzilla/pull/119)
+- _(dom)_ Ensure consistent width for braille characters by @junkdog
+
+### 📚 Documentation
+
+- _(readme)_ Add 0x01d's website by @orhun in [#126](https://github.com/orhun/ratzilla/pull/126)
+- _(readme)_ Update acknowledgements by @orhun in [#115](https://github.com/orhun/ratzilla/pull/115)
+- _(readme)_ Add exabind to websites by @junkdog
+
+### ⚙️ Miscellaneous Tasks
+
+- _(deps)_ Update dependencies by @orhun in [#128](https://github.com/orhun/ratzilla/pull/128)
+- _(examples)_ Ignore Cargo.lock files by @junkdog in [#117](https://github.com/orhun/ratzilla/pull/117)
+
+## 💖 New Contributors
+
+- @Wybxc made their first contribution in [#120](https://github.com/orhun/ratzilla/pull/120)
+- @hecksadecimal made their first contribution in [#107](https://github.com/orhun/ratzilla/pull/107)
+
+**Full Changelog**: https://github.com/orhun/ratzilla/compare/v0.1.0...0.2.0
+
 ## 0.1.0 - 2025-06-13
 
 Happy to announce the 0.1.0 release of Ratzilla! 🎉
