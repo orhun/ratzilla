@@ -14,7 +14,7 @@ use ratzilla::{
 use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use tachyonfx::{
     fx::{self, RepeatMode},
-    CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion, Shader,
+    CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion, 
 };
 use ratzilla::backend::webgl2::WebGl2BackendOptions;
 
