@@ -1,5 +1,6 @@
 use std::io;
 
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use ratzilla::{
     ratatui::{
         prelude::*,
@@ -7,16 +8,13 @@ use ratzilla::{
     },
     WebRenderer,
 };
-use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use tachyonfx::{
     fx, CenteredShrink, Duration, Effect, EffectRenderer, EffectTimer, Interpolation, Motion,
-    Shader,
 };
 
 fn main() -> io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let terminal = MultiBackendBuilder::with_fallback(BackendType::Canvas)
-        .build_terminal()?;
+    let terminal = MultiBackendBuilder::with_fallback(BackendType::Canvas).build_terminal()?;
     let mut effect = fx::sequence(&[
         // first we "sweep in" the text from the left, before reversing the effect
         fx::ping_pong(fx::sweep_in(

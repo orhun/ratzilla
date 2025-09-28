@@ -9,39 +9,22 @@
 use std::{cell::RefCell, io::Result, rc::Rc};
 
 use app::App;
-use clap::Parser;
+use examples_shared::backend::{BackendType, MultiBackendBuilder};
 use ratzilla::event::KeyCode;
 use ratzilla::WebRenderer;
-use examples_shared::backend::{BackendType, MultiBackendBuilder};
-use ratzilla::{
-    backend::webgl2::WebGl2BackendOptions,
-    backend::canvas::CanvasBackendOptions,
-};
+use ratzilla::{backend::canvas::CanvasBackendOptions, backend::webgl2::WebGl2BackendOptions};
 
 mod app;
 
 mod effects;
 mod ui;
 
-/// Demo
-#[derive(Debug, Parser)]
-struct Cli {
-    /// time in ms between two ticks.
-    #[arg(short, long, default_value_t = 250)]
-    tick_rate: u64,
-
-    /// whether unicode symbols are used to improve the overall look of the app
-    #[arg(short, long, default_value_t = true)]
-    unicode: bool,
-}
-
 fn main() -> Result<()> {
     let app_state = Rc::new(RefCell::new(App::new("Demo", true)));
-    
+
     // Create backend with explicit size like main branch (1600x900)
-    let canvas_options = CanvasBackendOptions::new()
-        .size((1600, 900));
-    
+    let canvas_options = CanvasBackendOptions::new().size((1600, 900));
+
     let webgl2_options = WebGl2BackendOptions::new()
         .measure_performance(true)
         .enable_console_debug_api()
@@ -52,7 +35,7 @@ fn main() -> Result<()> {
         .canvas_options(canvas_options)
         .webgl2_options(webgl2_options)
         .build_terminal()?;
-    
+
     terminal.on_key_event({
         let app_state_cloned = app_state.clone();
         move |event| {
