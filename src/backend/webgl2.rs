@@ -523,7 +523,7 @@ impl WebGl2Backend {
                     }
                     MouseEventType::MouseMove => {
                         // Handle cursor style changes on hover
-                        let is_over_hyperlink = Self::is_over_hyperlink_static(
+                        let is_over_hyperlink = Self::is_over_hyperlink(
                             hyperlink_cells_move.clone(),
                             grid,
                             event.col,
@@ -546,8 +546,8 @@ impl WebGl2Backend {
         Ok(mouse_handler)
     }
 
-    /// Checks if the given coordinates are over a hyperlink (static version for use in closures).
-    fn is_over_hyperlink_static(
+    /// Checks if the given coordinates are over a hyperlink.
+    fn is_over_hyperlink(
         hyperlink_cells: Rc<RefCell<BitVec>>,
         grid: &beamterm_renderer::TerminalGrid,
         col: u16,
@@ -764,18 +764,14 @@ fn find_hyperlink_bounds(
 
 /// Resolves foreground and background colors for a [`Cell`].
 fn resolve_fg_bg_colors(cell: &Cell) -> (u32, u32) {
-    let mut fg = cell.fg;
-    let mut bg = cell.bg;
+    let mut fg = to_rgb(cell.fg, 0xffffff);
+    let mut bg = to_rgb(cell.bg, 0x000000);
 
     if cell.modifier.contains(Modifier::REVERSED) {
         swap(&mut fg, &mut bg);
     }
 
-    let mut c = cell.clone();
-    c.set_fg(fg);
-    c.set_bg(bg);
-
-    (to_rgb(c.fg, 0xffffff), to_rgb(c.bg, 0x000000))
+    (fg, bg)
 }
 
 /// Converts a [`Cell`] into a [`CellData`] for the beamterm renderer.
