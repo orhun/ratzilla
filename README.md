@@ -234,6 +234,7 @@ There is a Vercel deployment template available for Ratzilla [here](https://verc
 - <https://emrecansuster.com> - Personal website of Emrecan Şuşter ([source](https://github.com/Tarbetu/website))
 - <https://junkdog.github.io/exabind> - A tachyonfx tech demo: animated KDE keyboard shortcut viewer
 - <https://rbn.dev> - Personal website of 0x01d ([source](https://github.com/0x01d/website))
+- <https://gluesql.org/glues> - Glues, a Vim-inspired TUI note-taking app ([source](https://github.com/gluesql/glues))
 
 ## Acknowledgements
 
