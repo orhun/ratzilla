@@ -1,14 +1,77 @@
+use bitflags::bitflags;
+
+/// A generic event.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Event {
+    /// The terminal gained focus
+    FocusGained,
+    /// The terminal lost focus
+    FocusLost,
+    /// A single key event with additional pressed modifiers.
+    Key(KeyEvent),
+    /// A single mouse event with additional pressed modifiers.
+    Mouse(MouseEvent),
+    /// A string that was pasted into the terminal.
+    Paste(String),
+    /// An resize event with new dimensions after resize (columns, rows).
+    Resize(u16, u16),
+}
+
 /// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct KeyEvent {
     /// The key code.
     pub code: KeyCode,
-    /// Whether the control key is pressed.
-    pub ctrl: bool,
-    /// Whether the alt key is pressed.
-    pub alt: bool,
-    /// Whether the shift key is pressed.
-    pub shift: bool,
+    /// Additional key modifiers.
+    pub modifiers: KeyModifiers,
+    /// Kind of event.
+    pub kind: KeyEventKind,
+    /// Keyboard state.
+    pub state: KeyEventState,
+}
+
+/// Represents a keyboard event kind.
+#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash)]
+pub enum KeyEventKind {
+    Press,
+    Repeat,
+    Release,
+}
+
+bitflags! {
+    /// Represents key modifiers (shift, control, alt, etc.).
+    #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash)]
+    pub struct KeyModifiers: u8 {
+        /// Whether the shift key is pressed.
+        const SHIFT = 0b0000_0001;
+        /// Whether the control key is pressed.
+        const CONTROL = 0b0000_0010;
+        /// Whether the alt key is pressed.
+        const ALT = 0b0000_0100;
+        /// Whether the meta key is pressed.
+        const META = 0b0010_0000;
+        /// No key is pressed.
+        const NONE = 0b0000_0000;
+    }
+}
+
+bitflags! {
+    /// Represents extra state about the key event.
+    #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Copy, Hash)]
+    pub struct KeyEventState: u8 {
+        /// The key event origins from the keypad.
+        const KEYPAD = 0b0000_0001;
+        /// Caps Lock was enabled for this key event.
+        ///
+        /// **Note:** this is set for the initial press of Caps Lock itself.
+        const CAPS_LOCK = 0b0000_0010;
+        /// Num Lock was enabled for this key event.
+        ///
+        /// **Note:** this is set for the initial press of Num Lock itself.
+        const NUM_LOCK = 0b0000_0100;
+        /// No other state applied.
+        const NONE = 0b0000_0000;
+    }
 }
 
 /// A mouse movement event.
@@ -33,14 +96,14 @@ pub struct MouseEvent {
 /// Convert a [`web_sys::KeyboardEvent`] to a [`KeyEvent`].
 impl From<web_sys::KeyboardEvent> for KeyEvent {
     fn from(event: web_sys::KeyboardEvent) -> Self {
-        let ctrl = event.ctrl_key();
-        let alt = event.alt_key();
-        let shift = event.shift_key();
+        let shift = if event.shift_key() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+        let ctrl = if event.ctrl_key() { KeyModifiers::CONTROL } else { KeyModifiers::NONE };
+        let alt = if event.alt_key() { KeyModifiers::ALT } else { KeyModifiers::NONE };
         KeyEvent {
             code: event.into(),
-            ctrl,
-            alt,
-            shift,
+            modifiers: shift | ctrl | alt ,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
         }
     }
 }
@@ -85,9 +148,9 @@ pub enum KeyCode {
 /// Convert a [`web_sys::KeyboardEvent`] to a [`KeyCode`].
 impl From<web_sys::KeyboardEvent> for KeyCode {
     fn from(event: web_sys::KeyboardEvent) -> Self {
-        let key = event.key();
+        let key = event.code();
         if key.len() == 1 {
-            let char = key.chars().next();
+            let char = key.chars().last();
             if let Some(char) = char {
                 return KeyCode::Char(char);
             } else {
