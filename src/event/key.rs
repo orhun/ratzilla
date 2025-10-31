@@ -1,21 +1,6 @@
-use bitflags::bitflags;
+//! Module for `KeyEvent` and related structs.
 
-/// A generic event.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Event {
-    /// The terminal gained focus
-    FocusGained,
-    /// The terminal lost focus
-    FocusLost,
-    /// A single key event with additional pressed modifiers.
-    Key(KeyEvent),
-    /// A single mouse event with additional pressed modifiers.
-    Mouse(MouseEvent),
-    /// A string that was pasted into the terminal.
-    Paste(String),
-    /// An resize event with new dimensions after resize (columns, rows).
-    Resize(u16, u16),
-}
+use bitflags::bitflags;
 
 /// A key event.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -33,8 +18,14 @@ pub struct KeyEvent {
 /// Represents a keyboard event kind.
 #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum KeyEventKind {
+    /// A key has been pressed.
+    /// 
+    /// **Note:** this correlates to `keydown`, not `keypress`.
     Press,
+    /// Any event in which `event.repeat` is true.
+    /// This is mostly kept for parity.
     Repeat,
+    /// A key has been released.
     Release,
 }
 
@@ -72,25 +63,6 @@ bitflags! {
         /// No other state applied.
         const NONE = 0b0000_0000;
     }
-}
-
-/// A mouse movement event.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct MouseEvent {
-    /// The mouse button that was pressed.
-    pub button: MouseButton,
-    /// The triggered event.
-    pub event: MouseEventKind,
-    /// The x coordinate of the mouse.
-    pub x: u32,
-    /// The y coordinate of the mouse.
-    pub y: u32,
-    /// Whether the control key is pressed.
-    pub ctrl: bool,
-    /// Whether the alt key is pressed.
-    pub alt: bool,
-    /// Whether the shift key is pressed.
-    pub shift: bool,
 }
 
 /// Convert a [`web_sys::KeyboardEvent`] to a [`KeyEvent`].
@@ -148,16 +120,16 @@ pub enum KeyCode {
 /// Convert a [`web_sys::KeyboardEvent`] to a [`KeyCode`].
 impl From<web_sys::KeyboardEvent> for KeyCode {
     fn from(event: web_sys::KeyboardEvent) -> Self {
-        let key = event.code();
+        let code = event.code();
+        let key = event.key();
         if key.len() == 1 {
-            let char = key.chars().last();
-            if let Some(char) = char {
+            if let Some(char) = key.chars().next() {
                 return KeyCode::Char(char);
             } else {
                 return KeyCode::Unidentified;
             }
         }
-        match key.as_str() {
+        match code.as_str() {
             "F1" => KeyCode::F(1),
             "F2" => KeyCode::F(2),
             "F3" => KeyCode::F(3),
@@ -184,87 +156,6 @@ impl From<web_sys::KeyboardEvent> for KeyCode {
             "PageDown" => KeyCode::PageDown,
             "Escape" => KeyCode::Esc,
             _ => KeyCode::Unidentified,
-        }
-    }
-}
-
-/// A mouse button.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum MouseButton {
-    /// Left mouse button
-    Left,
-    /// Right mouse button
-    Right,
-    /// Middle mouse button
-    Middle,
-    /// Back mouse button
-    Back,
-    /// Forward mouse button
-    Forward,
-    /// Unidentified mouse button
-    Unidentified,
-}
-
-/// A mouse event.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum MouseEventKind {
-    /// Mouse moved
-    Moved,
-    /// Mouse button pressed
-    Pressed,
-    /// Mouse button released
-    Released,
-    /// Unidentified mouse event
-    Unidentified,
-}
-
-/// Convert a [`web_sys::MouseEvent`] to a [`MouseEvent`].
-impl From<web_sys::MouseEvent> for MouseEvent {
-    fn from(event: web_sys::MouseEvent) -> Self {
-        let ctrl = event.ctrl_key();
-        let alt = event.alt_key();
-        let shift = event.shift_key();
-        let event_type = event.type_().into();
-        MouseEvent {
-            // Button is only valid if it is a mousedown or mouseup event.
-            button: if event_type == MouseEventKind::Moved {
-                MouseButton::Unidentified
-            } else {
-                event.button().into()
-            },
-            event: event_type,
-            x: event.client_x() as u32,
-            y: event.client_y() as u32,
-            ctrl,
-            alt,
-            shift,
-        }
-    }
-}
-
-/// Convert a [`web_sys::MouseEvent`] to a [`MouseButton`].
-impl From<i16> for MouseButton {
-    fn from(button: i16) -> Self {
-        match button {
-            0 => MouseButton::Left,
-            1 => MouseButton::Middle,
-            2 => MouseButton::Right,
-            3 => MouseButton::Back,
-            4 => MouseButton::Forward,
-            _ => MouseButton::Unidentified,
-        }
-    }
-}
-
-/// Convert a [`web_sys::MouseEvent`] to a [`MouseEventKind`].
-impl From<String> for MouseEventKind {
-    fn from(event: String) -> Self {
-        let event = event.as_str();
-        match event {
-            "mousemove" => MouseEventKind::Moved,
-            "mousedown" => MouseEventKind::Pressed,
-            "mouseup" => MouseEventKind::Released,
-            _ => MouseEventKind::Unidentified,
         }
     }
 }
