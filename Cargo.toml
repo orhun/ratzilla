@@ -10,7 +10,7 @@ repository = "https://github.com/orhun/ratzilla"
 keywords = ["tui", "webassembly", "ratatui"]
 categories = ["wasm"]
 include = ["src/**/*", "Cargo.*", "LICENSE", "README.md", "CHANGELOG.md"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 web-sys = { version = "0.3.82", features = [

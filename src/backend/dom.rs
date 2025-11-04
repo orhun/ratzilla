@@ -7,11 +7,12 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast},
-    window, Document, Element, Window,
+    Document, Element, Window,
+    wasm_bindgen::{JsCast, prelude::Closure},
+    window,
 };
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{CursorShape, backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]

@@ -19,7 +19,7 @@ pub struct KeyEvent {
 #[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum KeyEventKind {
     /// A key has been pressed.
-    /// 
+    ///
     /// **Note:** this correlates to `keydown`, not `keypress`.
     Press,
     /// Any event in which `event.repeat` is true.
@@ -68,12 +68,24 @@ bitflags! {
 /// Convert a [`web_sys::KeyboardEvent`] to a [`KeyEvent`].
 impl From<web_sys::KeyboardEvent> for KeyEvent {
     fn from(event: web_sys::KeyboardEvent) -> Self {
-        let shift = if event.shift_key() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
-        let ctrl = if event.ctrl_key() { KeyModifiers::CONTROL } else { KeyModifiers::NONE };
-        let alt = if event.alt_key() { KeyModifiers::ALT } else { KeyModifiers::NONE };
+        let shift = if event.shift_key() {
+            KeyModifiers::SHIFT
+        } else {
+            KeyModifiers::NONE
+        };
+        let ctrl = if event.ctrl_key() {
+            KeyModifiers::CONTROL
+        } else {
+            KeyModifiers::NONE
+        };
+        let alt = if event.alt_key() {
+            KeyModifiers::ALT
+        } else {
+            KeyModifiers::NONE
+        };
         KeyEvent {
             code: event.into(),
-            modifiers: shift | ctrl | alt ,
+            modifiers: shift | ctrl | alt,
             kind: KeyEventKind::Press,
             state: KeyEventState::NONE,
         }
