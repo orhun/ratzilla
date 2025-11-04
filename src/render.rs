@@ -1,4 +1,4 @@
-use ratatui::{prelude::Backend, Frame, Terminal};
+use ratatui::{Frame, Terminal, prelude::Backend};
 use std::{cell::RefCell, rc::Rc};
 use web_sys::{wasm_bindgen::prelude::*, window};
 

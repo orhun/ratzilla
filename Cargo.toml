@@ -10,10 +10,10 @@ repository = "https://github.com/orhun/ratzilla"
 keywords = ["tui", "webassembly", "ratatui"]
 categories = ["wasm"]
 include = ["src/**/*", "Cargo.*", "LICENSE", "README.md", "CHANGELOG.md"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-web-sys = { version = "0.3.81", features = [
+web-sys = { version = "0.3.82", features = [
     'console',
     'CanvasRenderingContext2d',
     'Document',
@@ -40,6 +40,7 @@ web-sys = { version = "0.3.81", features = [
 compact_str = "0.9.0"
 ratatui = { version = "0.29", default-features = false, features = ["all-widgets"] }
 console_error_panic_hook = "0.1.7"
-thiserror = "2.0.12"
+thiserror = "2.0.17"
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc", "std"] }
 beamterm-renderer = "0.8.0"
+bitflags = "2.10.0"

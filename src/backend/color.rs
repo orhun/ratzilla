@@ -91,13 +91,7 @@ fn indexed_color_to_rgb(index: u8) -> u32 {
 
             // Convert 0-5 range to 0-255 RGB
             // Values: 0 -> 0, 1 -> 95, 2 -> 135, 3 -> 175, 4 -> 215, 5 -> 255
-            let to_rgb = |n: u8| -> u32 {
-                if n == 0 {
-                    0
-                } else {
-                    55 + 40 * n as u32
-                }
-            };
+            let to_rgb = |n: u8| -> u32 { if n == 0 { 0 } else { 55 + 40 * n as u32 } };
 
             to_rgb(r) << 16 | to_rgb(g) << 8 | to_rgb(b)
         }

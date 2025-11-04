@@ -1,11 +1,11 @@
 use crate::{
+    CursorShape,
     backend::{color::to_rgb, utils::*},
     error::Error,
     widgets::hyperlink::HYPERLINK_MODIFIER,
-    CursorShape,
 };
 use beamterm_renderer::{
-    mouse::*, select, CellData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal,
+    CellData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal, mouse::*, select,
 };
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
@@ -17,7 +17,7 @@ use ratatui::{
     style::{Color, Modifier},
 };
 use std::{cell::RefCell, io::Result as IoResult, mem::swap, rc::Rc};
-use web_sys::{wasm_bindgen::JsCast, window, Element};
+use web_sys::{Element, wasm_bindgen::JsCast, window};
 
 /// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
 pub use beamterm_renderer::FontAtlasData;
@@ -431,7 +431,7 @@ impl WebGl2Backend {
                     c.style(c.get_style() ^ (GlyphEffect::Underline as u16));
                 }
             }
-        }
+        };
     }
 
     /// Measures the beginning of a performance mark.
