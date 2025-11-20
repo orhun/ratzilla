@@ -13,6 +13,7 @@ use web_sys::{
     window, Document, Element, HtmlCanvasElement, Window,
 };
 
+use unicode_width::UnicodeWidthStr;
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
@@ -91,7 +92,10 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
         ""
     };
 
-    format!("{fg_style} {bg_style} {modifier_style}{braille_style}")
+    format!(
+        "{fg_style} {bg_style} {modifier_style}{braille_style}display: inline-block; width: {}ch;",
+        cell.symbol().width()
+    )
 }
 
 /// Converts a Color to a CSS style.

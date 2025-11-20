@@ -1,4 +1,5 @@
 use std::{cell::RefCell, io::Result as IoResult, rc::Rc};
+use web_sys::console;
 
 use ratatui::{
     backend::WindowSize,
@@ -7,7 +8,7 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast},
+    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
     window, Document, Element, Window,
 };
 
@@ -213,6 +214,8 @@ impl Backend for DomBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
+        use unicode_width::UnicodeWidthStr;
+
         if !*self.initialized.borrow() {
             // Only runs on resize event.
             if self
@@ -225,19 +228,39 @@ impl Backend for DomBackend {
             }
         }
 
+        let mut last_pos: Option<(usize, usize, &'a Cell)> = None;
+        let mut decrement_acc = 0;
+
         // Update the cells with new content
         for (x, y, cell) in content {
             let y = y as usize;
             let x = x as usize;
+
+            if let Some((prev_x, prev_y, prev_cell)) = last_pos {
+                if y == prev_y + 1 {
+                    decrement_acc = 0; // reset the x shifting decrement after newline
+                } else {
+                    let inc = prev_cell.symbol().width() - 1;
+                    decrement_acc += inc;
+                    let msg = format!("{}", inc);
+                    console::log_1(&JsValue::from_str(&msg));
+                }
+            }
+
+            let msg = format!("{x} {y} {} {}", cell.symbol(), decrement_acc);
+            console::log_1(&JsValue::from_str(&msg));
+
             if y < self.buffer.len() {
                 let line = &mut self.buffer[y];
                 line.extend(
                     std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())),
                 );
                 if x < line.len() {
-                    line[x] = cell.clone();
+                    line[x - decrement_acc] = cell.clone();
                 }
             }
+
+            last_pos = Some((x, y, cell));
         }
 
         // Draw the cursor if set
