@@ -1,5 +1,4 @@
 use std::{cell::RefCell, io::Result as IoResult, rc::Rc};
-use web_sys::console;
 
 use ratatui::{
     backend::WindowSize,
@@ -11,6 +10,8 @@ use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast, JsValue},
     window, Document, Element, Window,
 };
+
+use unicode_width::UnicodeWidthStr;
 
 use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
 
@@ -60,10 +61,6 @@ impl DomBackendOptions {
 pub struct DomBackend {
     /// Whether the backend has been initialized.
     initialized: Rc<RefCell<bool>>,
-    /// Current buffer.
-    buffer: Vec<Vec<Cell>>,
-    /// Previous buffer.
-    prev_buffer: Vec<Vec<Cell>>,
     /// Cells.
     cells: Vec<Element>,
     /// Grid element.
@@ -78,6 +75,10 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Width of the buffer.
+    width: u16,
+    /// Height of the buffer.
+    height: u16,
 }
 
 impl DomBackend {
@@ -106,8 +107,6 @@ impl DomBackend {
         let document = window.document().ok_or(Error::UnableToRetrieveDocument)?;
         let mut backend = Self {
             initialized: Rc::new(RefCell::new(false)),
-            buffer: vec![],
-            prev_buffer: vec![],
             cells: vec![],
             grid: document.create_element("div")?,
             grid_parent: get_element_by_id_or_body(options.grid_id.as_ref())?,
@@ -115,6 +114,8 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
+            width: 110,
+            height: 20,
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -137,42 +138,20 @@ impl DomBackend {
         self.grid = self.document.create_element("div")?;
         self.grid.set_attribute("id", &self.options.grid_id())?;
         self.cells.clear();
-        self.buffer = get_sized_buffer();
-        self.prev_buffer = self.buffer.clone();
         Ok(())
     }
 
     /// Pre-render the content to the screen.
     ///
-    /// This function is called from [`flush`] once to render the initial
-    /// content to the screen.
+    /// This function is called from [`draw`] once to render the right
+    /// number of cells to the screen.
     fn prerender(&mut self) -> Result<(), Error> {
-        for line in self.buffer.iter() {
+        for _y in 0..self.height {
             let mut line_cells: Vec<Element> = Vec::new();
-            let mut hyperlink: Vec<Cell> = Vec::new();
-            for (i, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    hyperlink.push(cell.clone());
-                    // If the next cell is not part of the hyperlink, close it
-                    if !line
-                        .get(i + 1)
-                        .map(|c| c.modifier.contains(HYPERLINK_MODIFIER))
-                        .unwrap_or(false)
-                    {
-                        let anchor = create_anchor(&self.document, &hyperlink)?;
-                        for link_cell in &hyperlink {
-                            let span = create_span(&self.document, link_cell)?;
-                            self.cells.push(span.clone());
-                            anchor.append_child(&span)?;
-                        }
-                        line_cells.push(anchor);
-                        hyperlink.clear();
-                    }
-                } else {
-                    let span = create_span(&self.document, cell)?;
-                    self.cells.push(span.clone());
-                    line_cells.push(span);
-                }
+            for _x in 0..self.width {
+                let span = create_span(&self.document, &Cell::default())?;
+                self.cells.push(span.clone());
+                line_cells.push(span);
             }
 
             // Create a <pre> element for the line
@@ -188,35 +167,20 @@ impl DomBackend {
         }
         Ok(())
     }
-
-    /// Compare the current buffer to the previous buffer and updates the grid
-    /// accordingly.
-    fn update_grid(&mut self) -> Result<(), Error> {
-        for (y, line) in self.buffer.iter().enumerate() {
-            for (x, cell) in line.iter().enumerate() {
-                if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                    continue;
-                }
-                if cell != &self.prev_buffer[y][x] {
-                    let elem = self.cells[y * self.buffer[0].len() + x].clone();
-                    elem.set_inner_html(cell.symbol());
-                    elem.set_attribute("style", &get_cell_style_as_css(cell))?;
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Backend for DomBackend {
-    // Populates the buffer with the given content.
+    /// Draw the new content to the screen.
+    ///
+    /// This function is called in the [`ratatui::Terminal::flush`] function.
+    /// This function recreate the DOM structure when it gets a resize event.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        use unicode_width::UnicodeWidthStr;
-
         if !*self.initialized.borrow() {
+            self.initialized.replace(true);
+
             // Only runs on resize event.
             if self
                 .document
@@ -226,90 +190,44 @@ impl Backend for DomBackend {
                 self.grid_parent.set_inner_html("");
                 self.reset_grid()?;
             }
-        }
 
-        let mut last_pos: Option<(usize, usize, &'a Cell)> = None;
-        let mut decrement_acc = 0;
-
-        // Update the cells with new content
-        for (x, y, cell) in content {
-            let y = y as usize;
-            let x = x as usize;
-
-            if let Some((prev_x, prev_y, prev_cell)) = last_pos {
-                if y == prev_y + 1 {
-                    decrement_acc = 0; // reset the x shifting decrement after newline
-                } else {
-                    let inc = prev_cell.symbol().width() - 1;
-                    decrement_acc += inc;
-                    let msg = format!("{}", inc);
-                    console::log_1(&JsValue::from_str(&msg));
-                }
-            }
-
-            let msg = format!("{x} {y} {} {}", cell.symbol(), decrement_acc);
-            console::log_1(&JsValue::from_str(&msg));
-
-            if y < self.buffer.len() {
-                let line = &mut self.buffer[y];
-                line.extend(
-                    std::iter::repeat_with(Cell::default).take(x.saturating_sub(line.len())),
-                );
-                if x < line.len() {
-                    line[x - decrement_acc] = cell.clone();
-                }
-            }
-
-            last_pos = Some((x, y, cell));
-        }
-
-        // Draw the cursor if set
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() {
-                let cursor_style = self.options.cursor_shape().show(line[x].style());
-                line[x].set_style(cursor_style);
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Flush the content to the screen.
-    ///
-    /// This function is called after the [`DomBackend::draw`] function to
-    /// actually render the content to the screen.
-    fn flush(&mut self) -> IoResult<()> {
-        if !*self.initialized.borrow() {
-            self.initialized.replace(true);
             self.grid_parent
                 .append_child(&self.grid)
                 .map_err(Error::from)?;
             self.prerender()?;
-            // Set the previous buffer to the current buffer for the first render
-            self.prev_buffer = self.buffer.clone();
         }
-        // Check if the buffer has changed since the last render and update the grid
-        if self.buffer != self.prev_buffer {
-            self.update_grid()?;
+
+        for (x, y, cell) in content {
+            let x = x as usize;
+            let y = y as usize;
+            if cell.modifier.contains(HYPERLINK_MODIFIER) {
+                continue;
+            }
+            let cell_position = y * (self.width as usize) + x;
+            let elem = self.cells[cell_position].clone();
+
+            elem.set_inner_html(cell.symbol());
+            elem.set_attribute("style", &get_cell_style_as_css(cell));
+
+            if cell.symbol().width() == 2 {
+                let next_elem = self.cells[cell_position + 1].clone();
+                next_elem.set_inner_html("");
+                next_elem.set_attribute("style", &get_cell_style_as_css(&Cell::new("")));
+            }
         }
-        self.prev_buffer = self.buffer.clone();
+
+        Ok(())
+    }
+
+    /// This function is called after the [`DomBackend::draw`] function.
+    ///
+    /// This function does nothing because the content is directly
+    /// displayed by the draw function.
+    fn flush(&mut self) -> IoResult<()> {
         Ok(())
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
-        if let Some(pos) = self.cursor_position {
-            let y = pos.y as usize;
-            let x = pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() {
-                let style = self.options.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
-            }
-        }
-        self.cursor_position = None;
         Ok(())
     }
 
@@ -326,14 +244,16 @@ impl Backend for DomBackend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        self.buffer = get_sized_buffer();
+        // self.buffer = get_sized_buffer();
+        // TODO: call reset_grid()
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
+        // TODO: find a way to get the buffer size from ratatui::Terminal
         Ok(Size::new(
-            self.buffer[0].len().saturating_sub(1) as u16,
-            self.buffer.len().saturating_sub(1) as u16,
+            self.width.saturating_sub(1),
+            self.height.saturating_sub(1),
         ))
     }
 
@@ -349,17 +269,6 @@ impl Backend for DomBackend {
     }
 
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
-        let new_pos = position.into();
-        if let Some(old_pos) = self.cursor_position {
-            let y = old_pos.y as usize;
-            let x = old_pos.x as usize;
-            let line = &mut self.buffer[y];
-            if x < line.len() && old_pos != new_pos {
-                let style = self.options.cursor_shape.hide(line[x].style());
-                line[x].set_style(style);
-            }
-        }
-        self.cursor_position = Some(new_pos);
         Ok(())
     }
 }

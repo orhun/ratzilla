@@ -87,15 +87,14 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 
     // ensure consistent width for braille characters
     let braille_style = if contains_braille(cell) {
-        "display: inline-block; width: 1ch; font-variant-numeric: tabular-nums; "
+        "font-variant-numeric: tabular-nums; "
     } else {
         ""
     };
 
-    format!(
-        "{fg_style} {bg_style} {modifier_style}{braille_style}display: inline-block; width: {}ch;",
-        cell.symbol().width()
-    )
+    let sizing = format!("display: inline-block; width: {}ch;", cell.symbol().width());
+
+    format!("{fg_style} {bg_style} {modifier_style} {braille_style} {sizing}")
 }
 
 /// Converts a Color to a CSS style.
