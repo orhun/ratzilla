@@ -6,6 +6,7 @@ use crate::{
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
+    layout::Size,
     style::{Color, Modifier},
 };
 use web_sys::{
@@ -128,12 +129,17 @@ pub(crate) fn get_raw_screen_size() -> (i32, i32) {
 
 /// Returns a buffer based on the screen size.
 pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
-    let size = if is_mobile() {
+    let size = get_size();
+    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
+}
+
+/// Returns a buffer size based on the screen size.
+pub(crate) fn get_size() -> Size {
+    if is_mobile() {
         get_screen_size()
     } else {
         get_window_size()
-    };
-    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
+    }
 }
 
 /// Returns a buffer based on the canvas size.

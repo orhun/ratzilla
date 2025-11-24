@@ -7,7 +7,7 @@ use ratatui::{
     prelude::Backend,
 };
 use web_sys::{
-    wasm_bindgen::{prelude::Closure, JsCast, JsValue},
+    wasm_bindgen::{prelude::Closure, JsCast},
     window, Document, Element, Window,
 };
 
@@ -75,10 +75,8 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
-    /// Width of the buffer.
-    width: u16,
-    /// Height of the buffer.
-    height: u16,
+    /// Buffer size to pass to [`ratatui::Terminal`]
+    size: Size,
 }
 
 impl DomBackend {
@@ -114,8 +112,7 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
-            width: 110,
-            height: 20,
+            size: get_size(),
         };
         backend.add_on_resize_listener();
         backend.reset_grid()?;
@@ -146,9 +143,9 @@ impl DomBackend {
     /// This function is called from [`draw`] once to render the right
     /// number of cells to the screen.
     fn prerender(&mut self) -> Result<(), Error> {
-        for _y in 0..self.height {
+        for _y in 0..self.size.height {
             let mut line_cells: Vec<Element> = Vec::new();
-            for _x in 0..self.width {
+            for _x in 0..self.size.width {
                 let span = create_span(&self.document, &Cell::default())?;
                 self.cells.push(span.clone());
                 line_cells.push(span);
@@ -203,12 +200,13 @@ impl Backend for DomBackend {
             if cell.modifier.contains(HYPERLINK_MODIFIER) {
                 continue;
             }
-            let cell_position = y * (self.width as usize) + x;
+            let cell_position = y * (self.size.width as usize) + x;
             let elem = self.cells[cell_position].clone();
 
             elem.set_inner_html(cell.symbol());
             elem.set_attribute("style", &get_cell_style_as_css(cell));
 
+            // don't display the next cell if a fullwidth glyph preceeds it
             if cell.symbol().width() == 2 {
                 let next_elem = self.cells[cell_position + 1].clone();
                 next_elem.set_inner_html("");
@@ -244,16 +242,13 @@ impl Backend for DomBackend {
     }
 
     fn clear(&mut self) -> IoResult<()> {
-        // self.buffer = get_sized_buffer();
-        // TODO: call reset_grid()
         Ok(())
     }
 
     fn size(&self) -> IoResult<Size> {
-        // TODO: find a way to get the buffer size from ratatui::Terminal
         Ok(Size::new(
-            self.width.saturating_sub(1),
-            self.height.saturating_sub(1),
+            self.size.width.saturating_sub(1),
+            self.size.height.saturating_sub(1),
         ))
     }
 
