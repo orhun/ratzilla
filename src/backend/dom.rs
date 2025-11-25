@@ -138,11 +138,11 @@ impl DomBackend {
         Ok(())
     }
 
-    /// Pre-render the content to the screen.
+    /// Pre-render a blank content to the screen.
     ///
-    /// This function is called from [`draw`] once to render the right
-    /// number of cells to the screen.
-    fn prerender(&mut self) -> Result<(), Error> {
+    /// This function is called from [`draw`] once (or after a resize)
+    /// to render the right number of cells to the screen.
+    fn populate(&mut self) -> Result<(), Error> {
         for _y in 0..self.size.height {
             let mut line_cells: Vec<Element> = Vec::new();
             for _x in 0..self.size.width {
@@ -186,12 +186,15 @@ impl Backend for DomBackend {
             {
                 self.grid_parent.set_inner_html("");
                 self.reset_grid()?;
+
+                // update size
+                self.size = get_size();
             }
 
             self.grid_parent
                 .append_child(&self.grid)
                 .map_err(Error::from)?;
-            self.prerender()?;
+            self.populate()?;
         }
 
         for (x, y, cell) in content {
