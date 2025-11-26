@@ -98,6 +98,76 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style} {braille_style} {sizing}")
 }
 
+/// Update or remove a CSS field in the inline `style` attribute.
+/// - If `value` is `Some(v)`: sets/updates `field: v`.
+/// - If `value` is `None`: removes `field`.
+/// - If the final style is empty: removes the `style` attribute entirely.
+pub(crate) fn update_css_field(
+    field: String,
+    value: Option<String>,
+    elem: &Element,
+) -> Result<(), JsValue> {
+    // Get current inline style (as raw string)
+    let css = elem.get_attribute("style").unwrap_or_default();
+
+    // Parse existing CSS into a Vec<(property, value)>
+    let mut styles: Vec<(String, String)> = css
+        .split(';')
+        .filter_map(|decl| {
+            let decl = decl.trim();
+            if decl.is_empty() {
+                return None;
+            }
+            let mut parts = decl.splitn(2, ':');
+            let key = parts.next()?.trim();
+            let val = parts.next()?.trim();
+            if key.is_empty() || val.is_empty() {
+                None
+            } else {
+                Some((key.to_string(), val.to_string()))
+            }
+        })
+        .collect();
+
+    // Normalize the target field name (CSS is case-insensitive for property names)
+    let target = field.trim().to_string();
+
+    // Either update/add or remove the field
+    match value {
+        Some(new_val) => {
+            let new_val = new_val.trim().to_string();
+            let mut found = false;
+            for (k, v) in styles.iter_mut() {
+                if k.eq_ignore_ascii_case(&target) {
+                    *v = new_val.clone();
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                styles.push((target, new_val));
+            }
+        }
+        None => {
+            styles.retain(|(k, _)| !k.eq_ignore_ascii_case(&target));
+        }
+    }
+
+    // Rebuild CSS string
+    let updated_css = styles
+        .iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .collect::<Vec<String>>()
+        .join("; ");
+
+    // Apply or remove attribute if empty
+    if updated_css.is_empty() {
+        elem.remove_attribute("style")
+    } else {
+        elem.set_attribute("style", &updated_css)
+    }
+}
+
 /// Converts a Color to a CSS style.
 pub(crate) fn get_canvas_color(color: Color, fallback_color: Color) -> CompactString {
     let color = ansi_to_rgb(color).unwrap_or_else(|| ansi_to_rgb(fallback_color).unwrap());

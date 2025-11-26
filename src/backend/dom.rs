@@ -75,6 +75,8 @@ pub struct DomBackend {
     options: DomBackendOptions,
     /// Cursor position.
     cursor_position: Option<Position>,
+    /// Last Cursor position.
+    last_cursor_position: Option<Position>,
     /// Buffer size to pass to [`ratatui::Terminal`]
     size: Size,
 }
@@ -112,6 +114,7 @@ impl DomBackend {
             window,
             document,
             cursor_position: None,
+            last_cursor_position: None,
             size: get_size(),
         };
         backend.add_on_resize_listener();
@@ -198,22 +201,23 @@ impl Backend for DomBackend {
         }
 
         for (x, y, cell) in content {
-            let x = x as usize;
-            let y = y as usize;
             if cell.modifier.contains(HYPERLINK_MODIFIER) {
                 continue;
             }
-            let cell_position = y * (self.size.width as usize) + x;
+            let cell_position = (y * self.size.width + x) as usize;
             let elem = self.cells[cell_position].clone();
 
             elem.set_inner_html(cell.symbol());
-            elem.set_attribute("style", &get_cell_style_as_css(cell));
+            elem.set_attribute("style", &get_cell_style_as_css(cell))
+                .map_err(Error::from)?;
 
             // don't display the next cell if a fullwidth glyph preceeds it
             if cell.symbol().width() == 2 {
                 let next_elem = self.cells[cell_position + 1].clone();
                 next_elem.set_inner_html("");
-                next_elem.set_attribute("style", &get_cell_style_as_css(&Cell::new("")));
+                next_elem
+                    .set_attribute("style", &get_cell_style_as_css(&Cell::new("")))
+                    .map_err(Error::from)?;
             }
         }
 
@@ -229,10 +233,40 @@ impl Backend for DomBackend {
     }
 
     fn hide_cursor(&mut self) -> IoResult<()> {
+        if let Some(pos) = self.cursor_position {
+            let cell_position = (pos.y * self.size.width + pos.x) as usize;
+
+            // Use CursorShape::None to clear cursor CSS
+            for (field, value) in CursorShape::None.get_css_field_value() {
+                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
+            }
+        }
+
         Ok(())
     }
 
+    /// Show cursor.
+    ///
+    /// First hide cursor at last known cursor position
     fn show_cursor(&mut self) -> IoResult<()> {
+        // Remove cursor at last position
+        if let Some(pos) = self.last_cursor_position {
+            let cell_position = (pos.y * self.size.width + pos.x) as usize;
+            for (field, value) in CursorShape::None.get_css_field_value() {
+                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
+            }
+        }
+
+        // Show cursor at current position
+        if let Some(pos) = self.cursor_position {
+            let cell_position = (pos.y * self.size.width + pos.x) as usize;
+
+            // Use the current cursor shape (assuming you store it in self.cursor_shape)
+            for (field, value) in self.options.cursor_shape.get_css_field_value() {
+                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
+            }
+        }
+
         Ok(())
     }
 
@@ -266,7 +300,11 @@ impl Backend for DomBackend {
         }
     }
 
+    /// Update cursor_position and last_cursor_position
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
+        self.last_cursor_position = self.cursor_position;
+        self.cursor_position = Some(position.into());
+
         Ok(())
     }
 }
