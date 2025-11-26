@@ -234,7 +234,7 @@ There is a Vercel deployment template available for Ratzilla [here](https://verc
 - <https://junkdog.github.io/exabind> - A tachyonfx tech demo: animated KDE keyboard shortcut viewer
 - <https://rbn.dev> - Personal website of 0x01d ([source](https://github.com/0x01d/website))
 - <https://gluesql.org/glues> - Glues, a Vim-inspired TUI note-taking app ([source](https://github.com/gluesql/glues))
-- <https://alertangel.github.io/> - AlertAngel : A device (WIP) to make monitoring the Elderly a breeze. ([source](https://github.com/AlertAngel/alertangel.github.io))
+- <https://alertangel.github.io/> - Website for AlertAngel: A device to make monitoring the Elderly a breeze. ([source](https://github.com/AlertAngel/alertangel.github.io)) (WIP)
 
 ## Acknowledgements
 
