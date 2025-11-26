@@ -6,6 +6,7 @@ use crate::{
 use compact_str::{format_compact, CompactString};
 use ratatui::{
     buffer::Cell,
+    layout::Size,
     style::{Color, Modifier},
 };
 use web_sys::{
@@ -13,6 +14,7 @@ use web_sys::{
     window, Document, Element, HtmlCanvasElement, Window,
 };
 
+use unicode_width::UnicodeWidthStr;
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
@@ -86,12 +88,84 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 
     // ensure consistent width for braille characters
     let braille_style = if contains_braille(cell) {
-        "display: inline-block; width: 1ch; font-variant-numeric: tabular-nums; "
+        "font-variant-numeric: tabular-nums; "
     } else {
         ""
     };
 
-    format!("{fg_style} {bg_style} {modifier_style}{braille_style}")
+    let sizing = format!("display: inline-block; width: {}ch;", cell.symbol().width());
+
+    format!("{fg_style} {bg_style} {modifier_style} {braille_style} {sizing}")
+}
+
+/// Update or remove a CSS field in the inline `style` attribute.
+/// - If `value` is `Some(v)`: sets/updates `field: v`.
+/// - If `value` is `None`: removes `field`.
+/// - If the final style is empty: removes the `style` attribute entirely.
+pub(crate) fn update_css_field(
+    field: String,
+    value: Option<String>,
+    elem: &Element,
+) -> Result<(), JsValue> {
+    // Get current inline style (as raw string)
+    let css = elem.get_attribute("style").unwrap_or_default();
+
+    // Parse existing CSS into a Vec<(property, value)>
+    let mut styles: Vec<(String, String)> = css
+        .split(';')
+        .filter_map(|decl| {
+            let decl = decl.trim();
+            if decl.is_empty() {
+                return None;
+            }
+            let mut parts = decl.splitn(2, ':');
+            let key = parts.next()?.trim();
+            let val = parts.next()?.trim();
+            if key.is_empty() || val.is_empty() {
+                None
+            } else {
+                Some((key.to_string(), val.to_string()))
+            }
+        })
+        .collect();
+
+    // Normalize the target field name (CSS is case-insensitive for property names)
+    let target = field.trim().to_string();
+
+    // Either update/add or remove the field
+    match value {
+        Some(new_val) => {
+            let new_val = new_val.trim().to_string();
+            let mut found = false;
+            for (k, v) in styles.iter_mut() {
+                if k.eq_ignore_ascii_case(&target) {
+                    *v = new_val.clone();
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                styles.push((target, new_val));
+            }
+        }
+        None => {
+            styles.retain(|(k, _)| !k.eq_ignore_ascii_case(&target));
+        }
+    }
+
+    // Rebuild CSS string
+    let updated_css = styles
+        .iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .collect::<Vec<String>>()
+        .join("; ");
+
+    // Apply or remove attribute if empty
+    if updated_css.is_empty() {
+        elem.remove_attribute("style")
+    } else {
+        elem.set_attribute("style", &updated_css)
+    }
 }
 
 /// Converts a Color to a CSS style.
@@ -125,12 +199,17 @@ pub(crate) fn get_raw_screen_size() -> (i32, i32) {
 
 /// Returns a buffer based on the screen size.
 pub(crate) fn get_sized_buffer() -> Vec<Vec<Cell>> {
-    let size = if is_mobile() {
+    let size = get_size();
+    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
+}
+
+/// Returns a buffer size based on the screen size.
+pub(crate) fn get_size() -> Size {
+    if is_mobile() {
         get_screen_size()
     } else {
         get_window_size()
-    };
-    vec![vec![Cell::default(); size.width as usize]; size.height as usize]
+    }
 }
 
 /// Returns a buffer based on the canvas size.
