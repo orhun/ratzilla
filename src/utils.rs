@@ -7,7 +7,7 @@ use crate::{
 
 use web_sys::{
     js_sys::{Array, Function, Reflect},
-    wasm_bindgen::{prelude::*, JsValue},
+    wasm_bindgen::{JsValue, prelude::*},
 };
 
 /// Sets the document title.

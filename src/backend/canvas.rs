@@ -3,12 +3,12 @@ use ratatui::layout::Rect;
 use std::io::Result as IoResult;
 
 use crate::{
+    CursorShape,
     backend::{
         color::{actual_bg_color, actual_fg_color},
         utils::*,
     },
     error::Error,
-    CursorShape,
 };
 use ratatui::{
     backend::WindowSize,

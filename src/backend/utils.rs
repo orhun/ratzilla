@@ -3,14 +3,15 @@ use crate::{
     error::Error,
     utils::{get_screen_size, get_window_size, is_mobile},
 };
-use compact_str::{format_compact, CompactString};
+use compact_str::{CompactString, format_compact};
 use ratatui::{
     buffer::Cell,
     style::{Color, Modifier},
 };
 use web_sys::{
+    Document, Element, HtmlCanvasElement, Window,
     wasm_bindgen::{JsCast, JsValue},
-    window, Document, Element, HtmlCanvasElement, Window,
+    window,
 };
 
 /// Creates a new `<span>` element with the given cell.
