@@ -13,7 +13,7 @@ use web_sys::{
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::{backend::utils::*, error::Error, widgets::hyperlink::HYPERLINK_MODIFIER, CursorShape};
+use crate::{backend::utils::*, error::Error, CursorShape};
 
 /// Options for the [`DomBackend`].
 #[derive(Debug, Default)]
@@ -201,9 +201,6 @@ impl Backend for DomBackend {
         }
 
         for (x, y, cell) in content {
-            if cell.modifier.contains(HYPERLINK_MODIFIER) {
-                continue;
-            }
             let cell_position = (y * self.size.width + x) as usize;
             let elem = self.cells[cell_position].clone();
 
