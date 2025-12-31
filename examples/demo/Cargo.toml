@@ -5,9 +5,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
-rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
-ratzilla = { path = "../../" }
-tachyonfx = { version = "0.16.0", default-features = false, features = ["web-time"] }
-web-time = "1.1.0"
-examples-shared = { path = "../shared" }
+rand = { workspace = true, features = ["small_rng"] }
+ratzilla.workspace = true
+tachyonfx.workspace = true
+web-time.workspace = true
+examples-shared.workspace = true
 # tui-big-text = "0.6.1"

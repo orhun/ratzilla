@@ -1,10 +1,14 @@
-use std::{cell::RefCell, io::Result as IoResult, rc::Rc};
+use std::{
+    cell::RefCell,
+    io::{Error as IoError, Result as IoResult},
+    rc::Rc,
+};
 
 use ratatui::{
     backend::WindowSize,
     buffer::Cell,
     layout::{Position, Size},
-    prelude::Backend,
+    prelude::{backend::ClearType, Backend},
 };
 use web_sys::{
     wasm_bindgen::{prelude::Closure, JsCast},
@@ -208,6 +212,8 @@ impl DomBackend {
 }
 
 impl Backend for DomBackend {
+    type Error = IoError;
+
     // Populates the buffer with the given content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
@@ -338,5 +344,12 @@ impl Backend for DomBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> Result<(), Self::Error> {
+        match clear_type {
+            ClearType::All => self.clear(),
+            _ => Err(IoError::other("unimplemented")),
+        }
     }
 }

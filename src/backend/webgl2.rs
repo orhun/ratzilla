@@ -10,13 +10,18 @@ use beamterm_renderer::{
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
 use ratatui::{
-    backend::WindowSize,
+    backend::{ClearType, WindowSize},
     buffer::Cell,
     layout::{Position, Size},
     prelude::Backend,
     style::{Color, Modifier},
 };
-use std::{cell::RefCell, io::Result as IoResult, mem::swap, rc::Rc};
+use std::{
+    cell::RefCell,
+    io::{Error as IoError, Result as IoResult},
+    mem::swap,
+    rc::Rc,
+};
 use web_sys::{wasm_bindgen::JsCast, window, Element};
 
 /// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
@@ -597,6 +602,8 @@ impl WebGl2Backend {
 }
 
 impl Backend for WebGl2Backend {
+    type Error = IoError;
+
     // Populates the buffer with the *updated* cell content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
@@ -679,6 +686,13 @@ impl Backend for WebGl2Backend {
     fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> IoResult<()> {
         self.cursor_position = Some(position.into());
         Ok(())
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> Result<(), Self::Error> {
+        match clear_type {
+            ClearType::All => self.clear(),
+            _ => Err(IoError::other("unimplemented")),
+        }
     }
 }
 

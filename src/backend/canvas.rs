@@ -1,6 +1,6 @@
 use bitvec::{bitvec, prelude::BitVec};
-use ratatui::layout::Rect;
-use std::io::Result as IoResult;
+use ratatui::{backend::ClearType, layout::Rect};
+use std::io::{Error as IoError, Result as IoResult};
 
 use crate::{
     backend::{
@@ -425,6 +425,8 @@ impl CanvasBackend {
 }
 
 impl Backend for CanvasBackend {
+    type Error = IoError;
+
     // Populates the buffer with the given content.
     fn draw<'a, I>(&mut self, content: I) -> IoResult<()>
     where
@@ -536,6 +538,13 @@ impl Backend for CanvasBackend {
         }
         self.cursor_position = Some(new_pos);
         Ok(())
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> Result<(), Self::Error> {
+        match clear_type {
+            ClearType::All => self.clear(),
+            _ => Err(IoError::other("unimplemented")),
+        }
     }
 }
 

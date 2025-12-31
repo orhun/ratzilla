@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ratzilla = { path = "../.." }
-web-sys = { version = "0.3", features = [
+ratzilla.workspace = true
+web-sys = { workspace = true, features = [
     "Window",
     "Document",
     "Element",
@@ -14,5 +14,5 @@ web-sys = { version = "0.3", features = [
     "Url",
     "UrlSearchParams",
 ] }
-wasm-bindgen = "0.2"
-web-time = "1.1" 
+wasm-bindgen.workspace = true
+web-time.workspace = true 
