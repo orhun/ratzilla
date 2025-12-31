@@ -1,6 +1,6 @@
 use crate::effects;
 use rand::{
-    distributions::{Distribution, Uniform},
+    distr::{Distribution, Uniform},
     rngs::SmallRng,
     SeedableRng,
 };
@@ -78,7 +78,7 @@ pub struct RandomSignal {
 impl RandomSignal {
     pub fn new(lower: u64, upper: u64) -> Self {
         Self {
-            distribution: Uniform::new(lower, upper),
+            distribution: Uniform::new(lower, upper).unwrap(),
             rng: SmallRng::seed_from_u64(0),
         }
     }

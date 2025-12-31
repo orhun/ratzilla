@@ -1,9 +1,8 @@
-use ratzilla::ratatui::buffer::Buffer;
-use ratzilla::ratatui::layout::Rect;
-use std::fmt::Debug;
-use std::rc::Rc;
+use ratzilla::ratatui::{buffer::Buffer, layout::Rect};
+use std::{fmt::Debug, rc::Rc};
 use tachyonfx::{
-    color_from_hsl, default_shader_impl, CellFilter, ColorSpace, Duration, Interpolation, Shader,
+    color_from_hsl, default_shader_impl, CellFilter, CellIterator, ColorSpace, Duration,
+    FilterProcessor, Interpolation, Shader,
 };
 
 /// A shader that creates wave interference patterns
@@ -17,7 +16,7 @@ pub struct WaveInterference {
     /// Optional rectangular area to apply the effect to
     area: Option<Rect>,
     /// Cell filter to control which cells are affected
-    cell_filter: Option<CellFilter>,
+    cell_filter: Option<FilterProcessor>,
     /// Color space to use for color calculations
     color_space: ColorSpace,
 }
@@ -88,8 +87,11 @@ impl Shader for WaveInterference {
 
         let elapsed_cos = elapsed.cos();
 
+        // NOTE: need to clone this because of signature and lifetime annotation change in
+        // Shader::cell_iter in https://github.com/junkdog/tachyonfx/pull/42/files#diff-5671d25d4f836e2bf332bb7fb82756277aa49796ac1f32565a3615d58ea943df
         // apply effect to each cell in the area
-        let cell_iter = self.cell_iter(buf, area);
+        let filter_processor = self.filter_processor().cloned();
+        let cell_iter = CellIterator::new(buf, area, filter_processor.as_ref());
 
         for (pos, cell) in cell_iter {
             let pos = (pos.x as f32, pos.y as f32);
