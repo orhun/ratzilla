@@ -51,6 +51,8 @@ pub struct WebGl2BackendOptions {
     measure_performance: bool,
     /// Enable console debugging and introspection API.
     console_debug_api: bool,
+    /// Device pixel ratio.
+    pixel_ratio: Option<f32>,
 }
 
 impl WebGl2BackendOptions {
@@ -146,6 +148,16 @@ impl WebGl2BackendOptions {
     pub fn enable_console_debug_api(mut self) -> Self {
         self.console_debug_api = true;
         self
+    }
+
+    /// Set pixel ratio.
+    pub fn pixel_ratio(mut self, ratio: f32) -> Self {
+        self.pixel_ratio = Some(ratio);
+        self
+    }
+
+    fn get_pixel_ratio(&self) -> f32 {
+        self.pixel_ratio.unwrap_or(1.0)
     }
 }
 
@@ -355,12 +367,22 @@ impl WebGl2Backend {
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
+        let pixel_ratio = self.options.get_pixel_ratio();
+        let scaled_width = (display_width as f32 * pixel_ratio).round() as u32;
+        let scaled_height = (display_height as f32 * pixel_ratio).round() as u32;
+
         let buffer_width = canvas.width();
         let buffer_height = canvas.height();
 
-        if display_width != buffer_width || display_height != buffer_height {
-            canvas.set_width(display_width);
-            canvas.set_height(display_height);
+        if scaled_width != buffer_width || scaled_height != buffer_height {
+            canvas.set_width(scaled_width);
+            canvas.set_height(scaled_height);
+            canvas
+                .style()
+                .set_property("width", &format!("{}px", display_width))?;
+            canvas
+                .style()
+                .set_property("height", &format!("{}px", display_height))?;
 
             self.resize_canvas()?;
         }
@@ -578,7 +600,8 @@ impl WebGl2Backend {
         let beamterm = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
             .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
-            .font_atlas(options.font_atlas.take().unwrap_or_default());
+            .font_atlas(options.font_atlas.take().unwrap_or_default())
+            .pixel_ratio(options.get_pixel_ratio());
 
         let beamterm = if options.default_mouse_handler {
             beamterm.default_mouse_input_handler(SelectionMode::Block, true)
