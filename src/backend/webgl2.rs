@@ -4,9 +4,8 @@ use crate::{
     widgets::hyperlink::HYPERLINK_MODIFIER,
     CursorShape,
 };
-use beamterm_renderer::{
-    mouse::*, select, CellData, GlyphEffect, SelectionMode, Terminal as Beamterm, Terminal,
-};
+pub use beamterm_renderer::SelectionMode;
+use beamterm_renderer::{mouse::*, select, CellData, GlyphEffect, Terminal as Beamterm, Terminal};
 use bitvec::prelude::BitVec;
 use compact_str::CompactString;
 use ratatui::{
@@ -50,8 +49,8 @@ pub struct WebGl2BackendOptions {
     cursor_shape: CursorShape,
     /// Hyperlink click callback.
     hyperlink_callback: Option<HyperlinkCallback>,
-    /// Whether to use beamterm's internal mouse handler for selection.
-    default_mouse_handler: bool,
+    /// Mouse selection mode (enables text selection with mouse).
+    mouse_selection_mode: Option<SelectionMode>,
     /// Measure performance using the `performance` API.
     measure_performance: bool,
     /// Enable console debugging and introspection API.
@@ -111,9 +110,23 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Enables block-based mouse selection with automatic copy to clipboard on selection.
-    pub fn enable_mouse_selection(mut self) -> Self {
-        self.default_mouse_handler = true;
+    /// Enables mouse selection with automatic copy to clipboard on selection.
+    ///
+    /// Uses [`SelectionMode::Block`] for rectangular selection.
+    #[deprecated(
+        note = "use `enable_mouse_selection_with_mode` instead",
+        since = "0.3.0"
+    )]
+    pub fn enable_mouse_selection(self) -> Self {
+        self.enable_mouse_selection_with_mode(SelectionMode::default())
+    }
+
+    /// Enables mouse text selection with the specified selection mode.
+    ///
+    /// - [`SelectionMode::Block`]: Rectangular selection of cells (default)
+    /// - [`SelectionMode::Linear`]: Linear selection following text flow
+    pub fn enable_mouse_selection_with_mode(mut self, mode: SelectionMode) -> Self {
+        self.mouse_selection_mode = Some(mode);
         self
     }
 
@@ -585,8 +598,8 @@ impl WebGl2Backend {
             .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
             .font_atlas(options.font_atlas.take().unwrap_or_default());
 
-        let beamterm = if options.default_mouse_handler {
-            beamterm.default_mouse_input_handler(SelectionMode::Block, true)
+        let beamterm = if let Some(mode) = options.mouse_selection_mode {
+            beamterm.default_mouse_input_handler(mode, true)
         } else {
             beamterm
         };
@@ -611,7 +624,7 @@ impl Backend for WebGl2Backend {
     {
         // we only update when we have new cell data or if the mouse selection
         // handler is enabled (otherwise, we fail to update the visualized selection).
-        if content.size_hint().1 != Some(0) || self.options.default_mouse_handler {
+        if content.size_hint().1 != Some(0) || self.options.mouse_selection_mode.is_some() {
             self.update_grid(content)?;
         }
 
