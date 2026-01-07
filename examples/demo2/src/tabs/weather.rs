@@ -66,7 +66,9 @@ impl Widget for WeatherTab {
 #[allow(dead_code)]
 fn render_calendar(area: Rect, buf: &mut Buffer) {
     let date = OffsetDateTime::now_utc().date();
-    Monthly::new(date, CalendarEventStore::today(Style::new().red().bold()))
+    let mut events = CalendarEventStore::default();
+    events.add(date, Style::new().red().bold());
+    Monthly::new(date, events)
         .block(Block::new().padding(Padding::new(0, 0, 2, 0)))
         .show_month_header(Style::new().bold())
         .show_weekdays_header(Style::new().italic())
@@ -102,7 +104,7 @@ fn render_simple_barchart(area: Rect, buf: &mut Buffer) {
                 } else {
                     Style::new().fg(Color::DarkGray).bg(Color::Yellow).bold()
                 })
-                .label(label.into())
+                .label(label)
         })
         .collect_vec();
     let group = BarGroup::default().bars(&data);
@@ -130,7 +132,7 @@ fn render_horizontal_barchart(area: Rect, buf: &mut Buffer) {
             .value(71)
             .value_style(Style::new().bold()), // current season
     ];
-    let group = BarGroup::default().label("GPU".into()).bars(&data);
+    let group = BarGroup::default().label("GPU").bars(&data);
     BarChart::default()
         .block(Block::new().padding(Padding::new(0, 0, 2, 0)))
         .direction(Direction::Horizontal)
@@ -166,6 +168,6 @@ fn render_line_gauge(percent: f64, area: Rect, buf: &mut Buffer) {
         .style(Style::new().light_blue())
         .filled_style(Style::new().fg(filled_color))
         .unfilled_style(Style::new().fg(unfilled_color))
-        .line_set(symbols::line::THICK)
+        .filled_symbol(symbols::line::THICK.horizontal)
         .render(area, buf);
 }

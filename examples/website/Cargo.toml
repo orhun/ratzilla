@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-ratzilla = { path = "../../" }
-tachyonfx = { version = "0.19.0", default-features = false, features = ["web-time"] }
-console_error_panic_hook = "0.1.7"
-examples-shared = { path = "../shared" }
+ratzilla.workspace = true
+tachyonfx.workspace = true
+console_error_panic_hook.workspace = true
+examples-shared.workspace = true

@@ -1,9 +1,8 @@
-use ratzilla::ratatui::buffer::Buffer;
-use ratzilla::ratatui::layout::Rect;
-use std::fmt::Debug;
-use std::rc::Rc;
+use ratzilla::ratatui::{buffer::Buffer, layout::Rect};
+use std::{fmt::Debug, rc::Rc};
 use tachyonfx::{
-    color_from_hsl, default_shader_impl, CellFilter, ColorSpace, Duration, Interpolation, Shader,
+    color_from_hsl, default_shader_impl, CellFilter, ColorSpace, Duration, FilterProcessor,
+    Interpolation, Shader,
 };
 
 /// A shader that creates wave interference patterns
@@ -17,7 +16,7 @@ pub struct WaveInterference {
     /// Optional rectangular area to apply the effect to
     area: Option<Rect>,
     /// Cell filter to control which cells are affected
-    cell_filter: Option<CellFilter>,
+    cell_filter: Option<FilterProcessor>,
     /// Color space to use for color calculations
     color_space: ColorSpace,
 }
@@ -59,19 +58,17 @@ impl WaveInterference {
             color_space: ColorSpace::Hsl,
         }
     }
+}
 
-    fn calc_wave_amplitude(&self, pos: (f32, f32)) -> f32 {
-        let elapsed = self.alive.as_secs_f32();
+fn calc_wave_amplitude(elapsed: f32, pos: (f32, f32), waves: &[Wave]) -> f32 {
+    // total amplitude of all waves
+    let total_amplitude = waves.iter().map(|w| w.amplitude).sum::<f32>();
 
-        // total amplitude of all waves
-        let total_amplitude = self.waves.iter().map(|w| w.amplitude).sum::<f32>();
-
-        self.waves
-            .iter()
-            .map(|w| w.calculate(pos, elapsed) * 0.5)
-            .sum::<f32>()
-            / total_amplitude
-    }
+    waves
+        .iter()
+        .map(|w| w.calculate(pos, elapsed) * 0.5)
+        .sum::<f32>()
+        / total_amplitude
 }
 
 impl Shader for WaveInterference {
@@ -85,15 +82,16 @@ impl Shader for WaveInterference {
         // Calculate elapsed time in seconds
         self.alive += duration;
         let elapsed = self.alive.as_secs_f32();
+        let waves = self.waves.clone();
 
         let elapsed_cos = elapsed.cos();
 
-        // apply effect to each cell in the area
+        let hue_shift_speed = self.hue_shift_speed;
         let cell_iter = self.cell_iter(buf, area);
 
-        for (pos, cell) in cell_iter {
+        cell_iter.for_each_cell(|pos, cell| {
             let pos = (pos.x as f32, pos.y as f32);
-            let normalized = self.calc_wave_amplitude(pos);
+            let normalized = calc_wave_amplitude(elapsed, pos, &waves);
             assert!(
                 normalized >= -1.0 && normalized <= 1.0,
                 "Normalized value out of range: {}",
@@ -102,7 +100,7 @@ impl Shader for WaveInterference {
 
             let a = Interpolation::QuartOut.alpha(normalized.abs()) * normalized.signum();
 
-            let hue_shift = elapsed * self.hue_shift_speed;
+            let hue_shift = elapsed * hue_shift_speed;
             let hue =
                 (normalized * 360.0 + hue_shift + 1.4 * pos.0 - 3.2 * pos.1 * elapsed_cos) % 360.0;
             let lightness = 20.0 + (a * a * a.signum()) * 80.0;
@@ -118,7 +116,7 @@ impl Shader for WaveInterference {
                 saturation,
                 lightness * 1.0,
             ));
-        }
+        });
 
         None
     }
