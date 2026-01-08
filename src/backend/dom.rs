@@ -156,6 +156,7 @@ impl DomBackend {
 
             // Create a <pre> element for the line
             let pre = self.document.create_element("pre")?;
+            pre.set_attribute("style", "height: 15px;")?;
 
             // Append all elements (spans and anchors) to the <pre>
             for elem in line_cells {
