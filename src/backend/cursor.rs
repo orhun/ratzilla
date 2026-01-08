@@ -1,3 +1,4 @@
+use crate::backend::utils::CssAttribute;
 use ratatui::style::{Style, Stylize};
 
 /// Supported cursor shapes.
@@ -32,15 +33,20 @@ impl CursorShape {
     }
 
     /// Returns a list of css fields and their values for this cursor shape.
-    pub fn get_css_field_value(&self) -> Vec<(String, Option<String>)> {
+    pub fn get_css_attribute(&self) -> CssAttribute {
         match self {
-            CursorShape::SteadyBlock => {
-                vec![("text-decoration".to_string(), Some("none".to_string()))]
-            }
-            CursorShape::SteadyUnderScore => {
-                vec![("text-decoration".to_string(), Some("underline".to_string()))]
-            }
-            CursorShape::None => vec![("text-decoration".to_string(), None)],
+            CursorShape::SteadyBlock => CssAttribute {
+                field: "text-decoration",
+                value: Some("none"),
+            },
+            CursorShape::SteadyUnderScore => CssAttribute {
+                field: "text-decoration",
+                value: Some("underline"),
+            },
+            CursorShape::None => CssAttribute {
+                field: "text-decoration",
+                value: None,
+            },
         }
     }
 }

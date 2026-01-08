@@ -235,9 +235,11 @@ impl Backend for DomBackend {
             let cell_position = (pos.y * self.size.width + pos.x) as usize;
 
             // Use CursorShape::None to clear cursor CSS
-            for (field, value) in CursorShape::None.get_css_field_value() {
-                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
-            }
+            update_css_field(
+                CursorShape::None.get_css_attribute(),
+                &self.cells[cell_position],
+            )
+            .map_err(Error::from)?;
         }
 
         Ok(())
@@ -250,9 +252,11 @@ impl Backend for DomBackend {
         // Remove cursor at last position
         if let Some(pos) = self.last_cursor_position {
             let cell_position = (pos.y * self.size.width + pos.x) as usize;
-            for (field, value) in CursorShape::None.get_css_field_value() {
-                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
-            }
+            update_css_field(
+                CursorShape::None.get_css_attribute(),
+                &self.cells[cell_position],
+            )
+            .map_err(Error::from)?;
         }
 
         // Show cursor at current position
@@ -260,9 +264,11 @@ impl Backend for DomBackend {
             let cell_position = (pos.y * self.size.width + pos.x) as usize;
 
             // Use the current cursor shape (assuming you store it in self.cursor_shape)
-            for (field, value) in self.options.cursor_shape.get_css_field_value() {
-                update_css_field(field, value, &self.cells[cell_position]).map_err(Error::from)?;
-            }
+            update_css_field(
+                self.options.cursor_shape.get_css_attribute(),
+                &self.cells[cell_position],
+            )
+            .map_err(Error::from)?;
         }
 
         Ok(())

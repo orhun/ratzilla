@@ -14,6 +14,11 @@ use web_sys::{
     window, Document, Element, HtmlCanvasElement, Window,
 };
 
+pub struct CssAttribute {
+    pub field: &'static str,
+    pub value: Option<&'static str>,
+}
+
 use unicode_width::UnicodeWidthStr;
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
@@ -102,11 +107,10 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 /// - If `value` is `Some(v)`: sets/updates `field: v`.
 /// - If `value` is `None`: removes `field`.
 /// - If the final style is empty: removes the `style` attribute entirely.
-pub(crate) fn update_css_field(
-    field: String,
-    value: Option<String>,
-    elem: &Element,
-) -> Result<(), JsValue> {
+pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Result<(), JsValue> {
+    let field = attribute.field;
+    let value = attribute.value;
+
     // Get current inline style (as raw string)
     let css = elem.get_attribute("style").unwrap_or_default();
 
