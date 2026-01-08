@@ -210,7 +210,7 @@ impl Backend for DomBackend {
                 .map_err(Error::from)?;
 
             // don't display the next cell if a fullwidth glyph preceeds it
-            if cell.symbol().width() == 2 {
+            if cell.symbol().len() > 1 && cell.symbol().width() == 2 {
                 let next_elem = self.cells[cell_position + 1].clone();
                 next_elem.set_inner_html("");
                 next_elem
