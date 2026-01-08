@@ -104,8 +104,9 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
 }
 
 /// Update or remove a CSS field in the inline `style` attribute.
-/// - If `value` is `Some(v)`: sets/updates `field: v`.
-/// - If `value` is `None`: removes `field`.
+///
+/// - If `attribute.value` is `Some(v)`: sets/updates `attribute.field: v`.
+/// - If `attribute.value` is `None`: removes `attribute.field`.
 /// - If the final style is empty: removes the `style` attribute entirely.
 pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Result<(), JsValue> {
     let field = attribute.field;

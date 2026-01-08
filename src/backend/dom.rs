@@ -251,9 +251,6 @@ impl Backend for DomBackend {
         Ok(())
     }
 
-    /// Show cursor.
-    ///
-    /// First hide cursor at last known cursor position
     fn show_cursor(&mut self) -> IoResult<()> {
         // Remove cursor at last position
         if let Some(pos) = self.last_cursor_position {
@@ -269,7 +266,6 @@ impl Backend for DomBackend {
         if let Some(pos) = self.cursor_position {
             let cell_position = (pos.y * self.size.width + pos.x) as usize;
 
-            // Use the current cursor shape (assuming you store it in self.cursor_shape)
             update_css_field(
                 self.options.cursor_shape.get_css_attribute(),
                 &self.cells[cell_position],
