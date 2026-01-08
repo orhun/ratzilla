@@ -159,11 +159,10 @@ pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Resul
     }
 
     // Rebuild CSS string
-    let updated_css = styles
-        .iter()
-        .map(|(k, v)| format!("{k}: {v}"))
-        .collect::<Vec<String>>()
-        .join("; ");
+    let mut updated_css = String::new();
+    for (k, v) in styles {
+        updated_css.push_str(format!("{k}: {v};").as_str());
+    }
 
     // Apply or remove attribute if empty
     if updated_css.is_empty() {
