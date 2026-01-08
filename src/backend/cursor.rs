@@ -34,18 +34,13 @@ impl CursorShape {
     /// Returns a list of css fields and their values for this cursor shape.
     pub fn get_css_field_value(&self) -> Vec<(String, Option<String>)> {
         match self {
-            CursorShape::SteadyBlock => vec![
-                ("cursor".to_string(), Some("block".to_string())),
-                ("text-decoration".to_string(), Some("none".to_string())),
-            ],
-            CursorShape::SteadyUnderScore => vec![
-                ("cursor".to_string(), Some("underscore".to_string())),
-                ("text-decoration".to_string(), Some("underline".to_string())),
-            ],
-            CursorShape::None => vec![
-                ("cursor".to_string(), None),
-                ("text-decoration".to_string(), None),
-            ],
+            CursorShape::SteadyBlock => {
+                vec![("text-decoration".to_string(), Some("none".to_string()))]
+            }
+            CursorShape::SteadyUnderScore => {
+                vec![("text-decoration".to_string(), Some("underline".to_string()))]
+            }
+            CursorShape::None => vec![("text-decoration".to_string(), None)],
         }
     }
 }
