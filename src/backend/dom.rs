@@ -182,6 +182,10 @@ impl Backend for DomBackend {
         if !*self.initialized.borrow() {
             self.initialized.replace(true);
 
+            // Clear cursor position to avoid modifying css style of a non-existent cell
+            self.cursor_position = None;
+            self.last_cursor_position = None;
+
             // Only runs on resize event.
             if self
                 .document
@@ -211,11 +215,13 @@ impl Backend for DomBackend {
 
             // don't display the next cell if a fullwidth glyph preceeds it
             if cell.symbol().len() > 1 && cell.symbol().width() == 2 {
-                let next_elem = self.cells[cell_position + 1].clone();
-                next_elem.set_inner_html("");
-                next_elem
-                    .set_attribute("style", &get_cell_style_as_css(&Cell::new("")))
-                    .map_err(Error::from)?;
+                if (cell_position + 1) < self.cells.len() {
+                    let next_elem = self.cells[cell_position + 1].clone();
+                    next_elem.set_inner_html("");
+                    next_elem
+                        .set_attribute("style", &get_cell_style_as_css(&Cell::new("")))
+                        .map_err(Error::from)?;
+                }
             }
         }
 
