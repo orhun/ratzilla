@@ -14,32 +14,38 @@ edition = "2021"
 
 [dependencies]
 web-sys = { version = "0.3.81", features = [
-    'console',
-    'CanvasRenderingContext2d',
-    'Document',
-    'Element',
-    'HtmlCanvasElement',
-    'HtmlElement',
-    'KeyboardEvent',
-    'Location',
-    'MouseEvent',
-    'Navigator',
-    'Node',
-    'Performance',
-    'Screen',
-    'WebGl2RenderingContext',
-    'WebGlBuffer',
-    'WebGlProgram',
-    'WebGlRenderingContext',
-    'WebGlShader',
-    'WebGlTexture',
-    'WebGlUniformLocation',
-    'WebGlVertexArrayObject',
-    'Window',
+  'console',
+  'CanvasRenderingContext2d',
+  'Document',
+  'Element',
+  'HtmlCanvasElement',
+  'HtmlElement',
+  'KeyboardEvent',
+  'Location',
+  'MouseEvent',
+  'Navigator',
+  'Node',
+  'Performance',
+  'Screen',
+  'WebGl2RenderingContext',
+  'WebGlBuffer',
+  'WebGlProgram',
+  'WebGlRenderingContext',
+  'WebGlShader',
+  'WebGlTexture',
+  'WebGlUniformLocation',
+  'WebGlVertexArrayObject',
+  'Window',
 ] }
 compact_str = "0.9.0"
-ratatui = { version = "0.30", default-features = false, features = ["all-widgets", "layout-cache"] }
+ratatui = { version = "0.30", default-features = false, features = [
+  "all-widgets",
+  "layout-cache",
+] }
 console_error_panic_hook = "0.1.7"
 thiserror = "2.0.12"
-bitvec = { version = "1.0.1", default-features = false, features = ["alloc", "std"] }
-beamterm-renderer = "0.10.0"
+bitvec = { version = "1.0.1", default-features = false, features = [
+  "alloc",
+  "std",
+] }
+beamterm-renderer = "0.12.0"
