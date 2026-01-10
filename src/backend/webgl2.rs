@@ -367,22 +367,12 @@ impl WebGl2Backend {
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
-        let pixel_ratio = self.options.get_pixel_ratio();
-        let scaled_width = (display_width as f32 * pixel_ratio).round() as u32;
-        let scaled_height = (display_height as f32 * pixel_ratio).round() as u32;
-
         let buffer_width = canvas.width();
         let buffer_height = canvas.height();
 
-        if scaled_width != buffer_width || scaled_height != buffer_height {
-            canvas.set_width(scaled_width);
-            canvas.set_height(scaled_height);
-            canvas
-                .style()
-                .set_property("width", &format!("{}px", display_width))?;
-            canvas
-                .style()
-                .set_property("height", &format!("{}px", display_height))?;
+        if display_width != buffer_width || display_height != buffer_height {
+            canvas.set_width(display_width);
+            canvas.set_height(display_height);
 
             self.resize_canvas()?;
         }
