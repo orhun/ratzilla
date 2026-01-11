@@ -51,8 +51,8 @@ pub struct WebGl2BackendOptions {
     measure_performance: bool,
     /// Enable console debugging and introspection API.
     console_debug_api: bool,
-    /// Device pixel ratio.
-    pixel_ratio: Option<f32>,
+    /// Enable high pixel ratio rendering in HiDPI displays.
+    auto_pixel_ratio: bool,
 }
 
 impl WebGl2BackendOptions {
@@ -150,14 +150,10 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Set pixel ratio.
-    pub fn pixel_ratio(mut self, ratio: f32) -> Self {
-        self.pixel_ratio = Some(ratio);
+    /// Enables automatic pixel ratio adjustment for HiDPI displays.
+    pub fn enable_auto_pixel_ratio(mut self) -> Self {
+        self.auto_pixel_ratio = true;
         self
-    }
-
-    fn get_pixel_ratio(&self) -> f32 {
-        self.pixel_ratio.unwrap_or(1.0)
     }
 }
 
@@ -236,6 +232,8 @@ pub struct WebGl2Backend {
     cursor_over_hyperlink: Option<Rc<RefCell<bool>>>,
     /// Hyperlink click callback.
     _hyperlink_callback: Option<HyperlinkCallback>,
+    /// Pixel ratio of the current window.
+    pixel_ratio: f32,
 }
 
 impl WebGl2Backend {
@@ -301,6 +299,12 @@ impl WebGl2Backend {
             None
         };
 
+        let pixel_ratio = if options.auto_pixel_ratio {
+            get_window()?.device_pixel_ratio() as f32
+        } else {
+            1.0
+        };
+
         Ok(Self {
             beamterm,
             cursor_position: None,
@@ -310,6 +314,7 @@ impl WebGl2Backend {
             performance,
             cursor_over_hyperlink,
             _hyperlink_callback: hyperlink_callback,
+            pixel_ratio,
         })
     }
 
@@ -361,18 +366,43 @@ impl WebGl2Backend {
         Ok(())
     }
 
+    /// Checks the pixel ratio of the window and update beamterm if necessary.
+    fn check_pixel_ratio(&mut self) -> Result<(), Error> {
+        if !self.options.auto_pixel_ratio {
+            return Ok(());
+        };
+
+        let pixel_ratio = get_window()?.device_pixel_ratio() as f32;
+        if pixel_ratio != self.pixel_ratio {
+            self.pixel_ratio = pixel_ratio;
+            self.beamterm.set_pixel_ratio(pixel_ratio);
+        }
+
+        Ok(())
+    }
+
     /// Checks if the canvas size matches the display size and resizes it if necessary.
     fn check_canvas_resize(&mut self) -> Result<(), Error> {
         let canvas = self.beamterm.canvas();
         let display_width = canvas.client_width() as u32;
         let display_height = canvas.client_height() as u32;
 
+        let pixel_ratio = self.pixel_ratio;
+        let physical_width = (display_width as f32 * pixel_ratio).round() as u32;
+        let physical_height = (display_height as f32 * pixel_ratio).round() as u32;
+
         let buffer_width = canvas.width();
         let buffer_height = canvas.height();
 
-        if display_width != buffer_width || display_height != buffer_height {
-            canvas.set_width(display_width);
-            canvas.set_height(display_height);
+        if physical_width != buffer_width || physical_height != buffer_height {
+            canvas.set_width(physical_width);
+            canvas.set_height(physical_height);
+            canvas
+                .style()
+                .set_property("width", &format!("{}px", display_width))?;
+            canvas
+                .style()
+                .set_property("height", &format!("{}px", display_height))?;
 
             self.resize_canvas()?;
         }
@@ -590,11 +620,17 @@ impl WebGl2Backend {
         let beamterm = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
             .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
-            .font_atlas(options.font_atlas.take().unwrap_or_default())
-            .pixel_ratio(options.get_pixel_ratio());
+            .font_atlas(options.font_atlas.take().unwrap_or_default());
 
         let beamterm = if options.default_mouse_handler {
             beamterm.default_mouse_input_handler(SelectionMode::Block, true)
+        } else {
+            beamterm
+        };
+
+        let beamterm = if options.auto_pixel_ratio {
+            let pixel_ratio = get_window()?.device_pixel_ratio() as f32;
+            beamterm.pixel_ratio(pixel_ratio)
         } else {
             beamterm
         };
@@ -629,6 +665,7 @@ impl Backend for WebGl2Backend {
     /// This function is called after the [`WebGl2Backend::draw`] function to
     /// actually render the content to the screen.
     fn flush(&mut self) -> IoResult<()> {
+        self.check_pixel_ratio()?;
         self.check_canvas_resize()?;
 
         self.measure_begin(WEBGL_RENDER_MARK);
