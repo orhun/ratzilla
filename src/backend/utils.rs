@@ -103,21 +103,9 @@ pub(crate) fn get_cell_style_as_css(cell: &Cell) -> String {
     format!("{fg_style} {bg_style} {modifier_style} {braille_style} {sizing}")
 }
 
-/// Update or remove a CSS field in the inline `style` attribute.
-///
-/// - If `attribute.value` is `Some(v)`: sets/updates `attribute.field: v`.
-/// - If `attribute.value` is `None`: removes `attribute.field`.
-/// - If the final style is empty: removes the `style` attribute entirely.
-pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Result<(), JsValue> {
-    let field = attribute.field;
-    let value = attribute.value;
-
-    // Get current inline style (as raw string)
-    let css = elem.get_attribute("style").unwrap_or_default();
-
-    // Parse existing CSS into a Vec<(property, value)>
-    let mut styles: Vec<(String, String)> = css
-        .split(';')
+/// Parse an inline CSS style string into a Vec of (property, value) pairs.
+fn parse_inline_style(css: &str) -> Vec<(String, String)> {
+    css.split(';')
         .filter_map(|decl| {
             let decl = decl.trim();
             if decl.is_empty() {
@@ -132,9 +120,36 @@ pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Resul
                 Some((key.to_string(), val.to_string()))
             }
         })
-        .collect();
+        .collect()
+}
 
-    // Normalize the target field name (CSS is case-insensitive for property names)
+fn build_inline_style(styles: &[(String, String)]) -> String {
+    let mut s = String::new();
+    for (k, v) in styles {
+        s.push_str(format!("{k}: {v};").as_str());
+    }
+    s
+}
+
+fn set_or_remove_style_attribute(elem: &Element, css: String) -> Result<(), JsValue> {
+    if css.is_empty() {
+        elem.remove_attribute("style")
+    } else {
+        elem.set_attribute("style", &css)
+    }
+}
+
+/// Update or remove a CSS field in the inline `style` attribute.
+///
+/// - If `attribute.value` is `Some(v)`: sets/updates `attribute.field: v`.
+/// - If `attribute.value` is `None`: removes `attribute.field`.
+/// - If the final style is empty: removes the `style` attribute entirely.
+pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Result<(), JsValue> {
+    let field = attribute.field;
+    let value = attribute.value;
+
+    let css = elem.get_attribute("style").unwrap_or_default();
+    let mut styles = parse_inline_style(&css);
     let target = field.trim().to_string();
 
     // Either update/add or remove the field
@@ -159,17 +174,8 @@ pub(crate) fn update_css_field(attribute: CssAttribute, elem: &Element) -> Resul
     }
 
     // Rebuild CSS string
-    let mut updated_css = String::new();
-    for (k, v) in styles {
-        updated_css.push_str(format!("{k}: {v};").as_str());
-    }
-
-    // Apply or remove attribute if empty
-    if updated_css.is_empty() {
-        elem.remove_attribute("style")
-    } else {
-        elem.set_attribute("style", &updated_css)
-    }
+    let updated_css = build_inline_style(&styles);
+    set_or_remove_style_attribute(elem, updated_css)
 }
 
 /// Converts a Color to a CSS style.
