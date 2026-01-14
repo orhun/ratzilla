@@ -175,6 +175,8 @@ impl DomBackend {
 }
 
 impl Backend for DomBackend {
+    type Error = IoError;
+
     /// Draw the new content to the screen.
     ///
     /// This function is called in the [`ratatui::Terminal::flush`] function.
