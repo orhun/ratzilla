@@ -78,6 +78,10 @@ jobs:
         run: cargo test --doc --all-features
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
+      - name: Install wasm-pack
+        run: curl https://drager.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Run browser headless tests
+        run: wasm-pack test --firefox --headless
 
   generate-template:
     runs-on: ubuntu-latest
