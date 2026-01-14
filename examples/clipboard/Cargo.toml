@@ -6,11 +6,11 @@ publish = false
 
 [dependencies]
 color-eyre = "0.6.5"
-console_error_panic_hook = "0.1.7"
-ratatui = { version = "0.29.0", default-features = false }
-ratzilla = { path = "../../" }
-examples-shared = { path = "../shared" }
-wasm-bindgen = "0.2.104"
-wasm-bindgen-futures = "0.4.54"
-web-sys = { version = "0.3.81", features = ["Clipboard"] }
+console_error_panic_hook.workspace = true
+ratatui = { version = "0.30.0", default-features = false }
+ratzilla.workspace = true
+examples-shared.workspace = true
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+web-sys = { workspace = true, features = ["Clipboard"] }
 
