@@ -9,6 +9,7 @@ use ratatui::{
     layout::Size,
     style::{Color, Modifier},
 };
+use unicode_width::UnicodeWidthStr;
 use web_sys::{
     wasm_bindgen::{JsCast, JsValue},
     window, Document, Element, HtmlCanvasElement, Window,
@@ -19,7 +20,6 @@ pub struct CssAttribute {
     pub value: Option<&'static str>,
 }
 
-use unicode_width::UnicodeWidthStr;
 /// Creates a new `<span>` element with the given cell.
 pub(crate) fn create_span(document: &Document, cell: &Cell) -> Result<Element, Error> {
     let span = document.create_element("span")?;
@@ -123,6 +123,7 @@ fn parse_inline_style(css: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Build a css string from an array of (field, value) css style attributes.
 fn build_inline_style(styles: &[(String, String)]) -> String {
     let mut s = String::new();
     for (k, v) in styles {
@@ -131,6 +132,9 @@ fn build_inline_style(styles: &[(String, String)]) -> String {
     s
 }
 
+/// Replace the `style` attribute by the given css string in the given Element.
+///
+/// If the css string is empty, removes completly the `style` attribute.
 fn set_or_remove_style_attribute(elem: &Element, css: String) -> Result<(), JsValue> {
     if css.is_empty() {
         elem.remove_attribute("style")
