@@ -311,7 +311,10 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_add_new_field() {
         let el = create_elem_with_style("color: red;");
-        let attr = CssAttribute { field: "background-color", value: Some("blue") };
+        let attr = CssAttribute {
+            field: "background-color",
+            value: Some("blue"),
+        };
         update_css_field(attr, &el).unwrap();
         let got = el.get_attribute("style").unwrap();
         assert!(got.contains("color: red;"));
@@ -321,7 +324,10 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_update_existing_field() {
         let el = create_elem_with_style("color: red;");
-        let attr = CssAttribute { field: "color", value: Some("green") };
+        let attr = CssAttribute {
+            field: "color",
+            value: Some("green"),
+        };
         update_css_field(attr, &el).unwrap();
         assert_eq!(el.get_attribute("style").unwrap(), "color: green;");
     }
@@ -329,7 +335,10 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_remove_field() {
         let el = create_elem_with_style("color: red; background-color: blue;");
-        let attr = CssAttribute { field: "color", value: None };
+        let attr = CssAttribute {
+            field: "color",
+            value: None,
+        };
         update_css_field(attr, &el).unwrap();
         let got = el.get_attribute("style").unwrap();
         assert_eq!(got, "background-color: blue;");
@@ -338,7 +347,10 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_remove_last_field_removes_attribute() {
         let el = create_elem_with_style("color: red;");
-        let attr = CssAttribute { field: "color", value: None };
+        let attr = CssAttribute {
+            field: "color",
+            value: None,
+        };
         update_css_field(attr, &el).unwrap();
         assert!(el.get_attribute("style").is_none());
     }
