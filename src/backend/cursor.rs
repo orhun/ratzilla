@@ -1,5 +1,5 @@
 use crate::backend::utils::CssAttribute;
-use ratatui::style::{Style, Stylize};
+use ratatui::style::Style;
 
 /// Supported cursor shapes.
 #[derive(Debug, Default)]
