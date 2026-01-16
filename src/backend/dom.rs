@@ -213,7 +213,7 @@ impl Backend for DomBackend {
 
         for (x, y, cell) in content {
             let cell_position = (y * self.size.width + x) as usize;
-            let elem = self.cells[cell_position].clone();
+            let elem = &self.cells[cell_position];
 
             elem.set_inner_html(cell.symbol());
             elem.set_attribute("style", &get_cell_style_as_css(cell))
@@ -222,7 +222,7 @@ impl Backend for DomBackend {
             // don't display the next cell if a fullwidth glyph preceeds it
             if cell.symbol().len() > 1 && cell.symbol().width() == 2 {
                 if (cell_position + 1) < self.cells.len() {
-                    let next_elem = self.cells[cell_position + 1].clone();
+                    let next_elem = &self.cells[cell_position + 1];
                     next_elem.set_inner_html("");
                     next_elem
                         .set_attribute("style", &get_cell_style_as_css(&Cell::new("")))
