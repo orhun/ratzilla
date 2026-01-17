@@ -235,6 +235,7 @@ There is a Vercel deployment template available for Ratzilla [here](https://verc
 - <https://rbn.dev> - Personal website of 0x01d ([source](https://github.com/0x01d/website))
 - <https://gluesql.org/glues> - Glues, a Vim-inspired TUI note-taking app ([source](https://github.com/gluesql/glues))
 - <https://alertangel.github.io/> - Website for AlertAngel: A device to make monitoring the Elderly a breeze. ([source](https://github.com/AlertAngel/alertangel.github.io)) (WIP)
+- <https://sdr-geo-db.vercel.app/> - SDR contact logging database ([source](https://github.com/nuts-rice/sdr_geo_db))
 
 ## Acknowledgements
 
