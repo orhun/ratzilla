@@ -26,6 +26,27 @@ use web_sys::{wasm_bindgen::JsCast, window, Element};
 /// Re-export beamterm's atlas data type. Used by [`WebGl2BackendOptions::font_atlas`].
 pub use beamterm_renderer::FontAtlasData;
 
+/// Font atlas configuration.
+#[derive(Debug)]
+pub enum FontAtlasConfig {
+    /// Static pre-generated font atlas.
+    Static(FontAtlasData),
+    /// Dynamic font atlas with runtime font selection.
+    ///
+    /// The tuple contains: (font_family, font_size)
+    Dynamic(Vec<String>, f32),
+}
+
+impl FontAtlasConfig {
+    /// Constructs a new [`FontAtlasConfig::Dynamic`].
+    pub fn dynamic(font_family: &[&str], font_size: f32) -> Self {
+        Self::Dynamic(
+            font_family.iter().map(|s| s.to_string()).collect(),
+            font_size,
+        )
+    }
+}
+
 // Labels used by the Performance API
 const SYNC_TERMINAL_BUFFER_MARK: &str = "sync-terminal-buffer";
 const WEBGL_RENDER_MARK: &str = "webgl-render";
@@ -41,8 +62,8 @@ pub struct WebGl2BackendOptions {
     size: Option<(u32, u32)>,
     /// Fallback glyph to use for characters not in the font atlas.
     fallback_glyph: Option<CompactString>,
-    /// Override the default font atlas.
-    font_atlas: Option<FontAtlasData>,
+    /// Font atlas configuration (static or dynamic).
+    font_atlas_config: Option<FontAtlasConfig>,
     /// The canvas padding color.
     canvas_padding_color: Option<Color>,
     /// The cursor shape.
@@ -104,9 +125,39 @@ impl WebGl2BackendOptions {
         self
     }
 
-    /// Sets a custom font atlas to use for rendering.
-    pub fn font_atlas(mut self, atlas: FontAtlasData) -> Self {
-        self.font_atlas = Some(atlas);
+    /// Sets a custom static font atlas to use for rendering.
+    ///
+    /// Static atlases are pre-generated using the beamterm-atlas CLI tool and
+    /// loaded from binary .atlas files.
+    #[deprecated(
+        note = "use `font_atlas_config(FontAtlasConfig::Static(atlas))` instead",
+        since = "0.3.0"
+    )]
+    pub fn font_atlas(self, atlas: FontAtlasData) -> Self {
+        self.font_atlas_config(FontAtlasConfig::Static(atlas))
+    }
+
+    /// Sets the font atlas configuration (static or dynamic).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ratzilla::backend::webgl2::{WebGl2BackendOptions, FontAtlasConfig};
+    /// use ratzilla::backend::webgl2::FontAtlasData;
+    ///
+    /// // Static atlas
+    /// let options = WebGl2BackendOptions::new()
+    ///     .font_atlas_config(FontAtlasConfig::Static(FontAtlasData::default()));
+    ///
+    /// // Dynamic atlas
+    /// let options = WebGl2BackendOptions::new()
+    ///     .font_atlas_config(FontAtlasConfig::Dynamic(
+    ///         vec!["JetBrains Mono".to_string(), "monospace".to_string()],
+    ///         16.0
+    ///     ));
+    /// ```
+    pub fn font_atlas_config(mut self, config: FontAtlasConfig) -> Self {
+        self.font_atlas_config = Some(config);
         self
     }
 
@@ -593,10 +644,19 @@ impl WebGl2Backend {
 
         let canvas = create_canvas_in_element(parent, width, height)?;
 
-        let beamterm = Beamterm::builder(canvas)
+        let mut beamterm = Beamterm::builder(canvas)
             .canvas_padding_color(options.get_canvas_padding_color())
-            .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()))
-            .font_atlas(options.font_atlas.take().unwrap_or_default());
+            .fallback_glyph(options.fallback_glyph.as_ref().unwrap_or(&" ".into()));
+
+        // Configure font atlas (static or dynamic)
+        beamterm = match options.font_atlas_config.take() {
+            Some(FontAtlasConfig::Dynamic(font_family, font_size)) => {
+                let font_family_refs: Vec<&str> = font_family.iter().map(|s| s.as_str()).collect();
+                beamterm.dynamic_font_atlas(&font_family_refs, font_size)
+            }
+            Some(FontAtlasConfig::Static(atlas)) => beamterm.font_atlas(atlas),
+            None => beamterm.font_atlas(FontAtlasData::default()),
+        };
 
         let beamterm = if let Some(mode) = options.mouse_selection_mode {
             beamterm.default_mouse_input_handler(mode, true)
