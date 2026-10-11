@@ -312,9 +312,26 @@ impl Backend for DomBackend {
         // Only runs on resize event.
         if let Some(measured) = self.pending_resize.take() {
             self.cell_size = measured.cell_size;
-            self.size = measured.size;
-            self.reset_grid()?;
-            self.initialized = false;
+            if measured.size == self.size {
+                // ratatui redraws only changed cells at an unchanged size, so
+                // put back the old grid, which the resize listener detached.
+                let line_height = format!("height: {}px;", self.cell_size.1);
+                let mut row = self.grid.first_element_child();
+                while let Some(line) = row {
+                    line.set_attribute("style", &line_height)
+                        .map_err(Error::from)?;
+                    row = line.next_element_sibling();
+                }
+                if self.initialized {
+                    self.grid_parent
+                        .append_child(&self.grid)
+                        .map_err(Error::from)?;
+                }
+            } else {
+                self.size = measured.size;
+                self.reset_grid()?;
+                self.initialized = false;
+            }
         }
 
         if !self.initialized {
@@ -552,6 +569,11 @@ mod tests {
         Size::new(cols as u16, rows as u16)
     }
 
+    fn fire_resize() {
+        let resize = web_sys::Event::new("resize").unwrap();
+        window().unwrap().dispatch_event(&resize).unwrap();
+    }
+
     fn draw(terminal: &mut Terminal<DomBackend>) {
         terminal
             .draw(|frame| frame.render_widget(Block::bordered(), frame.area()))
@@ -577,11 +599,53 @@ mod tests {
         let before = terminal.size().unwrap();
 
         set_parent_size(&parent, 200, 100);
-        let resize = web_sys::Event::new("resize").unwrap();
-        window().unwrap().dispatch_event(&resize).unwrap();
+        fire_resize();
         draw(&mut terminal);
 
         assert_ne!(terminal.size().unwrap(), before);
         assert_eq!(terminal.size().unwrap(), dom_grid_size(&parent));
+    }
+
+    #[wasm_bindgen_test]
+    fn keeps_content_after_same_size_resize() {
+        let parent = sized_parent("keeps_content_after_same_size_resize", 300, 200);
+        let mut terminal =
+            Terminal::new(DomBackend::new_by_id("keeps_content_after_same_size_resize").unwrap())
+                .unwrap();
+        draw(&mut terminal);
+        let drawn = parent.text_content().unwrap();
+
+        fire_resize();
+        draw(&mut terminal);
+
+        assert_eq!(parent.text_content().unwrap(), drawn);
+    }
+
+    #[wasm_bindgen_test]
+    fn rows_follow_cell_height_after_same_size_resize() {
+        // Sized in `em`, so a bigger font gives bigger cells but the same grid.
+        let parent = sized_parent("rows_follow_cell_height", 0, 0);
+        let style = |font: u32| format!("font-size: {font}px; width: 30em; height: 20em;");
+        parent.set_attribute("style", &style(16)).unwrap();
+        let mut terminal =
+            Terminal::new(DomBackend::new_by_id("rows_follow_cell_height").unwrap()).unwrap();
+        draw(&mut terminal);
+        let size = terminal.size().unwrap();
+        let row_height = || {
+            let grid = parent.first_element_child().unwrap();
+            grid.first_element_child()
+                .unwrap()
+                .get_bounding_client_rect()
+                .height() as f32
+        };
+        let before = row_height();
+
+        parent.set_attribute("style", &style(24)).unwrap();
+        fire_resize();
+        draw(&mut terminal);
+
+        assert_eq!(terminal.size().unwrap(), size);
+        assert_ne!(row_height(), before);
+        assert_eq!(row_height(), terminal.backend().cell_size_css_px().1);
     }
 }
