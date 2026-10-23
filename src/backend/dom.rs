@@ -421,11 +421,17 @@ impl Backend for DomBackend {
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
+        let (size, cell_size) = self
+            .pending_resize
+            .get()
+            .map_or((self.size, self.cell_size), |measured| {
+                (measured.size, measured.cell_size)
+            });
         Ok(WindowSize {
-            columns_rows: self.size,
+            columns_rows: size,
             pixels: Size::new(
-                (self.size.width as f64 * self.cell_size.0) as u16,
-                (self.size.height as f64 * self.cell_size.1) as u16,
+                (size.width as f64 * cell_size.0) as u16,
+                (size.height as f64 * cell_size.1) as u16,
             ),
         })
     }
