@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::Cell as StdCell,
     io::{Error as IoError, Result as IoResult},
     rc::Rc,
 };
@@ -75,7 +75,9 @@ impl DomBackendOptions {
 /// appended to a `<pre>` element.
 pub struct DomBackend {
     /// Whether the backend has been initialized.
-    initialized: Rc<RefCell<bool>>,
+    initialized: bool,
+    /// Size measured on resize, applied by the next draw.
+    pending_resize: Rc<StdCell<Option<GridMeasurement>>>,
     /// Cells.
     cells: Vec<Element>,
     /// Grid element.
@@ -102,6 +104,15 @@ pub struct DomBackend {
     key_callback: Option<EventCallback<web_sys::KeyboardEvent>>,
 }
 
+/// Cell and grid size measured on resize.
+#[derive(Debug, Clone, Copy)]
+struct GridMeasurement {
+    /// Cell dimensions in pixels (width, height).
+    cell_size: (f64, f64),
+    /// Grid size in cells.
+    size: Size,
+}
+
 /// Type alias for mouse event callback state.
 type DomMouseCallbackState = EventCallback<web_sys::MouseEvent>;
 
@@ -109,6 +120,7 @@ impl std::fmt::Debug for DomBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DomBackend")
             .field("initialized", &self.initialized)
+            .field("pending_resize", &self.pending_resize)
             .field("cells", &format!("[{} cells]", self.cells.len()))
             .field("size", &self.size)
             .field("cell_size", &self.cell_size)
@@ -149,18 +161,27 @@ impl DomBackend {
             Self::measure_cell_size(&document, &grid_parent).unwrap_or(DEFAULT_CELL_SIZE);
         let size = Self::calculate_size(&grid_parent, cell_size);
 
-        let initialized = Rc::new(RefCell::new(false));
-        let initialized_cb = initialized.clone();
-        let resize_callback = EventCallback::new(
-            window.clone(),
-            Self::RESIZE_EVENT_TYPES,
+        // Measured here, not in draw: ratatui calls size() before draw.
+        let pending_resize = Rc::new(StdCell::new(None));
+        let resize_callback = EventCallback::new(window.clone(), Self::RESIZE_EVENT_TYPES, {
+            let pending_resize = pending_resize.clone();
+            let document = document.clone();
+            let grid_parent = grid_parent.clone();
+            let grid_id = options.grid_id();
             move |_: web_sys::Event| {
-                initialized_cb.replace(false);
-            },
-        )?;
+                if document.get_element_by_id(&grid_id).is_some() {
+                    grid_parent.set_inner_html("");
+                }
+                let cell_size =
+                    Self::measure_cell_size(&document, &grid_parent).unwrap_or(DEFAULT_CELL_SIZE);
+                let size = Self::calculate_size(&grid_parent, cell_size);
+                pending_resize.set(Some(GridMeasurement { cell_size, size }));
+            }
+        })?;
 
         let mut backend = Self {
-            initialized,
+            initialized: false,
+            pending_resize,
             cells: vec![],
             grid: document.create_element("div")?,
             grid_parent,
@@ -288,27 +309,20 @@ impl Backend for DomBackend {
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
     {
-        if !*self.initialized.borrow() {
-            self.initialized.replace(true);
+        // Only runs on resize event.
+        if let Some(measured) = self.pending_resize.take() {
+            self.cell_size = measured.cell_size;
+            self.size = measured.size;
+            self.reset_grid()?;
+            self.initialized = false;
+        }
+
+        if !self.initialized {
+            self.initialized = true;
 
             // Clear cursor position to avoid modifying css style of a non-existent cell
             self.cursor_position = None;
             self.last_cursor_position = None;
-
-            // Only runs on resize event.
-            if self
-                .document
-                .get_element_by_id(&self.options.grid_id())
-                .is_some()
-            {
-                self.grid_parent.set_inner_html("");
-                self.reset_grid()?;
-
-                // re-measure cell size and update grid dimensions
-                self.cell_size = Self::measure_cell_size(&self.document, &self.grid_parent)
-                    .unwrap_or(DEFAULT_CELL_SIZE);
-                self.size = Self::calculate_size(&self.grid_parent, self.cell_size);
-            }
 
             self.grid_parent
                 .append_child(&self.grid)
@@ -400,19 +414,24 @@ impl Backend for DomBackend {
     }
 
     fn size(&self) -> IoResult<Size> {
-        let size = get_size();
-        Ok(Size::new(
-            size.width.saturating_sub(1),
-            size.height.saturating_sub(1),
-        ))
+        Ok(self
+            .pending_resize
+            .get()
+            .map_or(self.size, |measured| measured.size))
     }
 
     fn window_size(&mut self) -> IoResult<WindowSize> {
+        let (size, cell_size) = self
+            .pending_resize
+            .get()
+            .map_or((self.size, self.cell_size), |measured| {
+                (measured.size, measured.cell_size)
+            });
         Ok(WindowSize {
-            columns_rows: self.size,
+            columns_rows: size,
             pixels: Size::new(
-                (self.size.width as f64 * self.cell_size.0) as u16,
-                (self.size.height as f64 * self.cell_size.1) as u16,
+                (size.width as f64 * cell_size.0) as u16,
+                (size.height as f64 * cell_size.1) as u16,
             ),
         })
     }
@@ -497,5 +516,72 @@ impl WebEventHandler for DomBackend {
 
     fn clear_key_events(&mut self) {
         self.key_callback = None;
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use ratatui::{widgets::Block, Terminal};
+    use wasm_bindgen_test::*;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    /// Appends a parent of a fixed size, so the grid doesn't depend on the window.
+    fn sized_parent(id: &str, width: u32, height: u32) -> Element {
+        let document = window().unwrap().document().unwrap();
+        let parent = document.create_element("div").unwrap();
+        parent.set_id(id);
+        set_parent_size(&parent, width, height);
+        document.body().unwrap().append_child(&parent).unwrap();
+        parent
+    }
+
+    fn set_parent_size(parent: &Element, width: u32, height: u32) {
+        parent
+            .set_attribute("style", &format!("width: {width}px; height: {height}px;"))
+            .unwrap();
+    }
+
+    /// The rows and columns of the grid in the DOM.
+    fn dom_grid_size(parent: &Element) -> Size {
+        let grid = parent.first_element_child().unwrap();
+        let rows = grid.child_element_count();
+        let cols = grid.first_element_child().unwrap().child_element_count();
+        Size::new(cols as u16, rows as u16)
+    }
+
+    fn draw(terminal: &mut Terminal<DomBackend>) {
+        terminal
+            .draw(|frame| frame.render_widget(Block::bordered(), frame.area()))
+            .unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn size_matches_grid() {
+        let parent = sized_parent("size_matches_grid", 300, 200);
+        let mut terminal =
+            Terminal::new(DomBackend::new_by_id("size_matches_grid").unwrap()).unwrap();
+        draw(&mut terminal);
+        assert_eq!(terminal.size().unwrap(), dom_grid_size(&parent));
+    }
+
+    #[wasm_bindgen_test]
+    fn size_matches_grid_after_resize() {
+        let parent = sized_parent("size_matches_grid_after_resize", 300, 200);
+        let mut terminal =
+            Terminal::new(DomBackend::new_by_id("size_matches_grid_after_resize").unwrap())
+                .unwrap();
+        draw(&mut terminal);
+        let before = terminal.size().unwrap();
+
+        set_parent_size(&parent, 200, 100);
+        let resize = web_sys::Event::new("resize").unwrap();
+        window().unwrap().dispatch_event(&resize).unwrap();
+        draw(&mut terminal);
+
+        assert_ne!(terminal.size().unwrap(), before);
+        assert_eq!(terminal.size().unwrap(), dom_grid_size(&parent));
     }
 }
